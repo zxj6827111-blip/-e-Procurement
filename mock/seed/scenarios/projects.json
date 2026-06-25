@@ -1,0 +1,24 @@
+{
+  "scenarios": [
+    {
+      "id": "p-pre",
+      "name": "报价截止前保密项目",
+      "checks": ["supplier_isolation", "bid_confidentiality", "abnormal_view"]
+    },
+    {
+      "id": "p-award",
+      "name": "截止后完整闭环项目",
+      "checks": ["expert_isolation", "score_version", "audit_log"]
+    },
+    {
+      "id": "p-food",
+      "name": "简化询价 / 比选项目",
+      "checks": ["method_rule_placeholder"]
+    },
+    {
+      "id": "p-ext",
+      "name": "外部交易备案项目",
+      "checks": ["external_trade_blocking", "archive_supplement"]
+    }
+  ]
+}

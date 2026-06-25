@@ -1,0 +1,1340 @@
+openapi: 3.1.0
+info:
+  title: Hotel Group Internal Procurement MVP API
+  version: 0.3.0
+  description: >
+    Formal MVP API contract covering P0 controls and Phase 1 supplier management,
+    procurement request and project initiation. This contract keeps the MVP boundary:
+    no CA, e-signature, bid-file encryption/decryption, trusted timestamp,
+    tamper-proof evidence, opening hall, or real external system integration.
+servers:
+  - url: http://127.0.0.1:3000
+security:
+  - MockUserHeader: []
+components:
+  securitySchemes:
+    MockUserHeader:
+      type: apiKey
+      in: header
+      name: x-mock-user-id
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            auditLogId:
+              type: string
+  responses:
+    Ok:
+      description: Request succeeded.
+    Created:
+      description: Resource created.
+    PermissionDenied:
+      description: Request rejected by backend policy and recorded with auditLogId when applicable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/auth/mock-login:
+    post:
+      tags: [Auth]
+      summary: Mock login for local/test use
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/me:
+    get:
+      tags: [Auth]
+      summary: Current mock user context
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/me/mock-role-switch:
+    post:
+      tags: [Auth]
+      summary: Mock role switch
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/me/org-scope:
+    get:
+      tags: [Auth]
+      summary: Current organization scope
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/me/menus:
+    get:
+      tags: [Auth]
+      summary: Current menu permissions
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/me/actions:
+    get:
+      tags: [Auth]
+      summary: Current action permissions
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/organizations:
+    get:
+      tags: [Organization]
+      summary: Organization list scoped to current user
+      description: Admin can read all organizations. Business, audit, supplier and expert users only receive organizations visible through their own org/user scope.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/roles:
+    get:
+      tags: [Organization]
+      summary: Admin-only role configuration
+      description: Only system administrators can read role configuration. Business, supplier, expert and audit users receive 403.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/role-permissions:
+    get:
+      tags: [Organization]
+      summary: Admin-only role permission configuration
+      description: Only system administrators can read role permission configuration. This endpoint is not a business authorization source for ordinary users.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/system-dictionaries:
+    get:
+      tags: [Organization]
+      summary: Admin-only system dictionaries
+      description: Only system administrators can read dictionary configuration. Procurement method lookup uses /api/procurement-method-rules instead.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/suppliers:
+    get:
+      tags: [Suppliers]
+      summary: Supplier list with supplier self-scope isolation
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/suppliers/admissions:
+    post:
+      tags: [Suppliers]
+      summary: Phase 1 supplier admission registration
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/suppliers/{supplierId}:
+    get:
+      tags: [Suppliers]
+      summary: Supplier detail
+      parameters:
+        - name: supplierId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/suppliers/{supplierId}/qualifications:
+    get:
+      tags: [Suppliers]
+      summary: Phase 1 supplier qualification metadata
+      parameters:
+        - name: supplierId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/suppliers/{supplierId}/category-authorizations:
+    post:
+      tags: [Suppliers]
+      summary: Phase 1 category authorization
+      parameters:
+        - name: supplierId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/suppliers/{supplierId}/restrictions:
+    post:
+      tags: [Suppliers]
+      summary: Phase 1 supplier restriction list action
+      parameters:
+        - name: supplierId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/suppliers/{supplierId}/status:
+    post:
+      tags: [Suppliers]
+      summary: Phase 1 supplier admission status update
+      parameters:
+        - name: supplierId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/suppliers/{supplierId}/project-participations:
+    get:
+      tags: [Suppliers]
+      summary: Phase 1 supplier project participation list
+      parameters:
+        - name: supplierId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/procurement-requests:
+    get:
+      tags: [Procurement Requests]
+      summary: Phase 1 procurement request list scoped by business role
+      description: Buyer, group manager and auditor read by organization/project scope. Supplier and expert read only related project requests. System administrator is denied business request content.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      tags: [Procurement Requests]
+      summary: Phase 1 procurement request creation
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/procurement-requests/{requestId}:
+    get:
+      tags: [Procurement Requests]
+      summary: Phase 1 procurement request detail scoped by role
+      description: Admin is isolated from procurement request business details. Suppliers and experts cannot use this endpoint to infer unrelated demand content.
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    patch:
+      tags: [Procurement Requests]
+      summary: Phase 1 procurement request draft update
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    delete:
+      tags: [Procurement Requests]
+      summary: Phase 1 procurement request draft delete
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/procurement-requests/{requestId}/submit:
+    post:
+      tags: [Procurement Requests]
+      summary: Phase 1 procurement request submit
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/procurement-requests/{requestId}/cancel:
+    post:
+      tags: [Procurement Requests]
+      summary: Phase 1 procurement request cancel before project creation
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/procurement-requests/{requestId}/method-decision:
+    post:
+      tags: [Procurement Requests]
+      summary: Phase 1 configurable procurement method decision
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/procurement-method-rules:
+    get:
+      tags: [Procurement Requests]
+      summary: Procurement method rules visible to procurement/audit/config roles
+      description: Buyer, group manager, auditor and admin can read method rules. Supplier and expert users receive 403 so procurement policy configuration is not exposed through portal roles.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/procurement-documents:
+    get:
+      tags: [Procurement Documents]
+      summary: Phase 2 procurement document list filtered by role scope
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/projects/{projectId}/procurement-documents:
+    post:
+      tags: [Procurement Documents]
+      summary: Phase 2 create procurement document metadata
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/procurement-documents/{documentId}:
+    patch:
+      tags: [Procurement Documents]
+      summary: Phase 2 update draft document or create revision when locked
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/procurement-documents/{documentId}/submit-review:
+    post:
+      tags: [Procurement Documents]
+      summary: Phase 2 submit document review
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/procurement-documents/{documentId}/publish:
+    post:
+      tags: [Procurement Documents]
+      summary: Phase 2 publish and lock procurement document
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/procurement-documents/{documentId}/revisions:
+    post:
+      tags: [Procurement Documents]
+      summary: Phase 2 create a new document version
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+  /api/announcements:
+    get:
+      tags: [Announcements]
+      summary: Phase 2 announcement list with supplier visibility filtering
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/projects/{projectId}/announcements:
+    get:
+      tags: [Announcements]
+      summary: Phase 2 project announcement list
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    post:
+      tags: [Announcements]
+      summary: Phase 2 create announcement from locked procurement document
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/announcements/{announcementId}/publish:
+    post:
+      tags: [Announcements]
+      summary: Phase 2 publish announcement and optionally send supplier invitations
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/announcements/{announcementId}/invitations:
+    post:
+      tags: [Announcements]
+      summary: Phase 2 send targeted supplier invitations
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+  /api/supplier-invitations:
+    get:
+      tags: [Announcements]
+      summary: Phase 2 supplier invitation records
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/registrations:
+    get:
+      tags: [Supplier Registration]
+      summary: Phase 2 registration list scoped by role and supplier identity
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/announcements/{announcementId}/registrations:
+    post:
+      tags: [Supplier Registration]
+      summary: Phase 2 supplier registration submission
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/registrations/{registrationId}/qualify:
+    post:
+      tags: [Supplier Registration]
+      summary: Phase 2 qualification decision for supplier registration
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects:
+    get:
+      tags: [Projects]
+      summary: Project list filtered by role scope
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+    post:
+      tags: [Projects]
+      summary: Phase 1 project creation from method-decided request
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}:
+    get:
+      tags: [Projects]
+      summary: Project detail
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/transitions:
+    post:
+      tags: [Projects]
+      summary: Project state transition validation
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/internal-actions/{action}:
+    post:
+      tags: [Projects]
+      summary: Backend internal action guard, including external-trade blocking
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/procurement-project-packages:
+    get:
+      tags: [Projects]
+      summary: Procurement project packages
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/projects/{projectId}/bids/summary:
+    get:
+      tags: [Bid Confidentiality]
+      summary: Phase 3 bid summary with role-based confidentiality
+      description: Before quote cutoff, procurement and audit users receive only counts and no amount/file fields. Suppliers see only their own bid. Experts never receive amount, fileName, responseFileMetadata or file identifiers from this summary endpoint.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/bids:
+    post:
+      tags: [Bidding]
+      summary: Phase 3 supplier creates a bid draft
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/bids/{bidId}:
+    patch:
+      tags: [Bidding]
+      summary: Phase 3 supplier updates draft or withdrawn bid metadata
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/bids/{bidId}/submit:
+    post:
+      tags: [Bidding]
+      summary: Phase 3 supplier submits a bid and creates a bid version
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/bids/{bidId}/withdraw:
+    post:
+      tags: [Bidding]
+      summary: Phase 3 supplier withdraws a submitted bid before deadline
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/bids/{bidId}/resubmit:
+    post:
+      tags: [Bidding]
+      summary: Phase 3 supplier resubmits a withdrawn bid and creates a new version
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/bids/lock:
+    post:
+      tags: [Bidding]
+      summary: Phase 3 manually lock submitted bids after cutoff
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/bids/{bidId}/versions:
+    get:
+      tags: [Bidding]
+      summary: Phase 3 bid version trace with confidential bid body guard
+      description: Suppliers can read only their own bid versions. Procurement and audit readers need project scope and cannot read before cutoff. Experts and admins are denied so they cannot bypass confidentiality confirmation through version snapshots.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/bids/{bidId}/view-check:
+    post:
+      tags: [Bid Confidentiality]
+      summary: Bid content view check
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/bid-files/{fileId}/view-check:
+    post:
+      tags: [Bid Confidentiality]
+      summary: Bid file metadata view check
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/bid-files/{fileId}/download:
+    get:
+      tags: [Bid Confidentiality]
+      summary: Bid file download guard
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/bid-view-approvals:
+    post:
+      tags: [Bid View Approvals]
+      summary: Create abnormal bid view approval
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+  /api/bid-view-approvals/{approvalId}/submit:
+    post:
+      tags: [Bid View Approvals]
+      summary: Submit abnormal bid view approval
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/bid-view-approvals/{approvalId}/approve:
+    post:
+      tags: [Bid View Approvals]
+      summary: Approve abnormal bid view request
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/bid-view-approvals/active:
+    get:
+      tags: [Bid View Approvals]
+      summary: Active abnormal view approvals
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/bid-view-approvals/{approvalId}/content:
+    get:
+      tags: [Bid View Approvals]
+      summary: View authorized abnormal content
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/bid-view-approvals/{approvalId}/validate:
+    post:
+      tags: [Bid View Approvals]
+      summary: Validate abnormal view approval scope
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/bid-view-logs:
+    get:
+      tags: [Bid View Approvals]
+      summary: Bid view logs
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/experts:
+    get:
+      tags: [Expert Review]
+      summary: Expert directory
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/experts/{expertId}:
+    get:
+      tags: [Expert Review]
+      summary: Expert detail
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/expert-assignments:
+    get:
+      tags: [Expert Review]
+      summary: Project expert assignments
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/expert-assignments/draw:
+    post:
+      tags: [Expert Review]
+      summary: Mock draw experts for project
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/expert-assignments/appoint:
+    post:
+      tags: [Expert Review]
+      summary: Appoint expert with required reason
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/expert-assignments/{assignmentId}/replace:
+    post:
+      tags: [Expert Review]
+      summary: Replace assigned expert with required reason
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/expert-assignments/{assignmentId}/confirm:
+    post:
+      tags: [Expert Review]
+      summary: Expert confirms avoidance, discipline or confidentiality
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/expert-review/my-scoring-sheets:
+    get:
+      tags: [Expert Review]
+      summary: Expert own scoring sheets
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/scoring-sheets/{sheetId}:
+    get:
+      tags: [Expert Review]
+      summary: Expert own scoring sheet detail
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/scoring-sheets/{sheetId}/save:
+    post:
+      tags: [Expert Review]
+      summary: Save scoring sheet
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/scoring-sheets/{sheetId}/submit-lock:
+    post:
+      tags: [Expert Review]
+      summary: Submit and lock scoring sheet
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/scoring-sheets/{sheetId}/reevaluation-request:
+    post:
+      tags: [Expert Review]
+      summary: Request reevaluation
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+  /api/scoring-sheets/{sheetId}/reevaluation-approve:
+    post:
+      tags: [Expert Review]
+      summary: Approve reevaluation and create new version
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/scoring-sheets/{sheetId}/versions:
+    get:
+      tags: [Expert Review]
+      summary: Scoring sheet versions
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/expert-review/{projectId}/materials/view-check:
+    post:
+      tags: [Expert Review]
+      summary: Check expert material access after confidentiality confirmation
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/scoring-summary:
+    get:
+      tags: [Expert Review]
+      summary: Scoring summary and ranking
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/review-report:
+    get:
+      tags: [Expert Review]
+      summary: Review report snapshots
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      tags: [Expert Review]
+      summary: Generate review report snapshot
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/review-report/freeze:
+    post:
+      tags: [Expert Review]
+      summary: Freeze review report and substantive conclusions
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/award-recommendation:
+    get:
+      tags: [Award Result]
+      summary: Award recommendation from frozen review report
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/award-approvals:
+    get:
+      tags: [Award Result]
+      summary: Award approval records
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      tags: [Award Result]
+      summary: Create award approval draft
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          description: Frozen report or non-lowest-price reason required
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/award-approvals/{approvalId}/submit:
+    post:
+      tags: [Award Result]
+      summary: Submit award approval through mock OA adapter
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/award-approvals/{approvalId}/mock-approve:
+    post:
+      tags: [Award Result]
+      summary: Mock-approve submitted award approval
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          description: Award approval status denied
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/result-notifications:
+    get:
+      tags: [Award Result]
+      summary: Result notification records or supplier self result
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      tags: [Award Result]
+      summary: Send supplier result notifications through mock message adapter
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          description: Approved award approval required
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/internal-publicity:
+    get:
+      tags: [Award Result]
+      summary: Internal result publicity records
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      tags: [Award Result]
+      summary: Publish internal result publicity record
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          description: Approved award approval required
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/external-trades:
+    get:
+      tags: [External Trade]
+      summary: External-trade filing project list
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/external-trades/projects:
+    post:
+      tags: [External Trade]
+      summary: Create external-trade filing project
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/external-trades/{projectId}:
+    get:
+      tags: [External Trade]
+      summary: External-trade filing detail
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/external-trades/{projectId}/internal-approval:
+    post:
+      tags: [External Trade]
+      summary: Record internal approval evidence for external-trade filing
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/external-trades/{projectId}/external-project:
+    post:
+      tags: [External Trade]
+      summary: Register external platform and project code
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          description: External platform name and project code required
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/external-trades/{projectId}/announcement-materials:
+    post:
+      tags: [External Trade]
+      summary: Upload external announcement material metadata
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/external-trades/{projectId}/result-materials:
+    post:
+      tags: [External Trade]
+      summary: Upload external result material metadata
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/external-trades/{projectId}/result-record:
+    post:
+      tags: [External Trade]
+      summary: Record external result filing
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          description: External result material metadata required
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/external-trades/{projectId}/records:
+    post:
+      tags: [External Trade]
+      summary: Backward-compatible external-trade filing save endpoint
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/external-trades/{projectId}/block-check:
+    post:
+      tags: [External Trade]
+      summary: External-trade internal action block check
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/external-trade-block-logs:
+    get:
+      tags: [External Trade]
+      summary: External-trade block logs scoped to audit readers
+      description: Audit, group manager and buyer roles can read only logs in their project/organization scope. Supplier, expert and admin roles are denied audit log content.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/contracts:
+    get:
+      tags: [Contract Performance]
+      summary: Contract ledger list scoped by role and project
+      description: Suppliers see only their own enterprise contracts. Buyer, group manager and auditor read by project/organization scope. Expert and admin roles are denied business contract content.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/contracts:
+    get:
+      tags: [Contract Performance]
+      summary: Project contract ledgers
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      tags: [Contract Performance]
+      summary: Register contract ledger
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/contracts/{contractId}/performance-nodes:
+    get:
+      tags: [Contract Performance]
+      summary: Contract performance nodes
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      tags: [Contract Performance]
+      summary: Create performance node
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/performance-nodes/{nodeId}/status:
+    post:
+      tags: [Contract Performance]
+      summary: Update performance node status
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/contracts/{contractId}/acceptance-payments:
+    get:
+      tags: [Contract Performance]
+      summary: Contract acceptance and payment records
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      tags: [Contract Performance]
+      summary: Record acceptance or payment metadata
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/contracts/{contractId}/supplier-evaluations:
+    post:
+      tags: [Contract Performance]
+      summary: Create supplier evaluation
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/suppliers/{supplierId}/evaluations:
+    get:
+      tags: [Contract Performance]
+      summary: Supplier evaluation history scoped by supplier/project reader
+      description: Suppliers see only their own evaluation history. Procurement and audit readers use project/organization scope. Expert and admin roles are denied evaluation content.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/archive-templates:
+    get:
+      tags: [Archive]
+      summary: Archive templates
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/archive-items:
+    get:
+      tags: [Archive]
+      summary: Archive items
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/projects/{projectId}/archive-items:
+    get:
+      tags: [Archive]
+      summary: Project archive items
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/projects/{projectId}/archive-snapshot:
+    post:
+      tags: [Archive]
+      summary: Create archive snapshot
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+  /api/projects/{projectId}/archive-check:
+    post:
+      tags: [Archive]
+      summary: Archive completeness check
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/projects/{projectId}/archive-seal:
+    post:
+      tags: [Archive]
+      summary: Seal archive
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/archive-items/{itemId}/supplement-requests:
+    post:
+      tags: [Archive]
+      summary: Create archive supplement request
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+  /api/archive-supplement-requests:
+    get:
+      tags: [Archive]
+      summary: Archive supplement request list
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/archive-supplement-requests/{requestId}/approve:
+    post:
+      tags: [Archive]
+      summary: Approve archive supplement request
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/archive-supplement-requests/{requestId}/apply:
+    post:
+      tags: [Archive]
+      summary: Apply approved archive supplement metadata
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          description: Supplement request must be approved
+  /api/archive-items/{itemId}/update:
+    post:
+      tags: [Archive]
+      summary: Archive item direct update guard
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/projects/{projectId}/audit-trail:
+    get:
+      tags: [Audit]
+      summary: Project audit trail scoped to audit readers
+      description: Auditor, group manager and buyer can read only project/organization scoped audit trails. Supplier, expert and admin roles are denied audit log content.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/users/{userId}/audit-logs:
+    get:
+      tags: [Audit]
+      summary: User operation audit logs scoped to audit readers
+      description: Returns only logs that are also visible through the current reader's project/organization scope.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/sensitive-action-logs:
+    get:
+      tags: [Audit]
+      summary: Sensitive action logs scoped to audit readers
+      description: Sensitive audit logs are read-only and scoped. Supplier, expert and admin roles cannot read audit substance.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/result-notification-logs:
+    get:
+      tags: [Audit]
+      summary: Result notification logs scoped to audit readers
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/archive-audit-logs:
+    get:
+      tags: [Audit]
+      summary: Archive seal and supplement logs scoped to audit readers
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/project-workbench/projects/{projectId}:
+    get:
+      tags: [Project Workbench]
+      summary: Aggregated hotel procurement project workbench
+      description: >
+        Returns the closed-loop project view for supplier admission, request detail, documents,
+        invitations, registrations, bids, comparison, award, purchase orders, receipts,
+        evaluations, settlement materials, archive items and scoped audit logs. Suppliers see only
+        their own enterprise data. Buyer, group manager and auditor use project or organization scope.
+        Before quote deadline, buyer/group/auditor do not receive amount, fileName, responseFileMetadata
+        or bid line item prices. Expert and system administrator roles are denied the full workbench.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/project-workbench/projects/{projectId}/purchase-orders/generate:
+    post:
+      tags: [Project Workbench]
+      summary: Generate purchase order from approved award decision
+      description: >
+        Buyer or group manager can generate a lightweight purchase order after quote deadline and
+        approved award decision. Supplier, expert, auditor and admin cannot generate orders.
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          description: Missing approved award, selected bid or quote deadline condition.
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/project-workbench/purchase-orders/{orderId}/confirm:
+    post:
+      tags: [Project Workbench]
+      summary: Supplier confirms own purchase order
+      description: Suppliers can confirm only their own enterprise purchase orders. Business roles, experts, auditors and admins cannot use supplier confirmation.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          description: Purchase order status does not allow confirmation.
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/project-workbench/purchase-orders/{orderId}/receipts:
+    post:
+      tags: [Project Workbench]
+      summary: Record partial, full or exception receipt
+      description: >
+        Buyer or group manager records receipt results, including quantity mismatch, quality issue,
+        delivery delay, missing documents and other exception types. Suppliers, experts, auditors and
+        admins cannot record receipts.
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          description: Invalid receipt type or missing exception type.
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/project-workbench/purchase-orders/{orderId}/settlement-materials:
+    post:
+      tags: [Project Workbench]
+      summary: Upload settlement material status
+      description: >
+        Supplier can upload only own invoice, delivery note, acceptance record or other material.
+        Buyer and group manager can also add material status for their scoped projects. This is only
+        settlement document registration and does not implement payment, balance, credit or finance.
+      responses:
+        "201":
+          $ref: "#/components/responses/Created"
+        "400":
+          description: Invalid settlement material type.
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/audit-logs:
+    get:
+      tags: [Audit]
+      summary: Audit logs scoped to audit readers
+      description: Auditor and discipline/audit-equivalent readers are read-only. Buyer/group manager read only in project/organization scope. Supplier, expert and admin roles are denied.
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /api/integration-adapters:
+    get:
+      tags: [Integration]
+      summary: Mock adapter statuses
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /api/integration-adapters/{adapterKey}/mock-call:
+    post:
+      tags: [Integration]
+      summary: Mock adapter call and audit record
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"

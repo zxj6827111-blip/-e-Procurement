@@ -1,0 +1,24 @@
+{
+  "name": "e-procurement-mvp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "国企酒店集团内部阳光采购与专家评审管理平台 MVP 工程骨架",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace @eprocurement/api run dev",
+    "dev:web": "npm --workspace @eprocurement/web run dev -- --host 127.0.0.1",
+    "build": "npm --workspace @eprocurement/api run build && npm --workspace @eprocurement/web run build",
+    "openapi:validate": "node scripts/validate-openapi.mjs",
+    "test": "npm --workspace @eprocurement/api run test",
+    "test:api": "npm --workspace @eprocurement/api run test",
+    "typecheck": "npm --workspace @eprocurement/api run typecheck && npm --workspace @eprocurement/web run typecheck",
+    "r2:migrate": "node scripts/r2-sqlite-baseline.mjs",
+    "r9:readiness": "node scripts/r9-production-readiness-check.mjs --backup"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

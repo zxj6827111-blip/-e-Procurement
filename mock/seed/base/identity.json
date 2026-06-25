@@ -1,0 +1,6 @@
+{
+  "organizations": ["org-group", "org-east", "org-hotel"],
+  "roles": ["group_manager", "buyer", "supplier", "expert", "auditor", "admin"],
+  "users": ["u1", "u2", "u3", "u4", "u5", "u6"],
+  "note": "Base seed mirrors demo/mock-data.js and is implemented in apps/api/src/seed/data.ts."
+}

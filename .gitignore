@@ -1,0 +1,22 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+.env.local
+*.log
+apps/api/dist/
+apps/web/dist/
+
+# Local runtime data and generated artifacts
+.data/
+**/.data/
+output/
+tmp/
+.codex/
+.playwright-mcp/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*

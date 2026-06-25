@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>国企酒店集团阳光采购与专家评审管理平台 MVP Demo</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">采</div>
+          <div>
+            <strong>阳光采购样机</strong>
+            <span>MVP 客户评审版</span>
+          </div>
+        </div>
+
+        <section class="role-panel">
+          <label for="roleSelect">当前评审视角</label>
+          <select id="roleSelect" aria-label="切换角色"></select>
+          <p id="roleHint"></p>
+        </section>
+
+        <nav id="navList" class="nav-list" aria-label="主导航"></nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">内部阳光采购与专家评审管理平台</p>
+            <h1 id="pageTitle">集团采购驾驶舱</h1>
+          </div>
+          <div class="top-actions">
+            <button class="icon-button" id="auditQuickBtn" title="打开审计日志" type="button">日志</button>
+            <button class="primary-button" id="reviewModeBtn" type="button">客户评审要点</button>
+          </div>
+        </header>
+
+        <section id="alertStrip" class="alert-strip"></section>
+
+        <section id="pageContent" class="page-content"></section>
+      </main>
+    </div>
+
+    <dialog id="modal">
+      <div class="modal-head">
+        <h2 id="modalTitle"></h2>
+        <button class="icon-button" id="modalClose" title="关闭" type="button">×</button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+    </dialog>
+
+    <script src="./mock-data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

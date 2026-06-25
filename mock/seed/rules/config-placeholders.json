@@ -1,0 +1,7 @@
+{
+  "procurement_method_rules": "客户制度确认，配置化，不写死",
+  "amount_thresholds": "客户制度确认，配置化，不写死",
+  "approval_chains": "客户制度确认，Adapter / Mock / Stub",
+  "scoring_templates": "版本化配置，不写死",
+  "archive_templates": "模板配置化，项目保存快照"
+}
