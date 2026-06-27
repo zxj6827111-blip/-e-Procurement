@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { apiGet, apiPost, uploadFile } from "../api/http";
 import AuditLogRef from "../components/AuditLogRef.vue";
 import ErrorAlert from "../components/ErrorAlert.vue";
 import WorkflowSurfaceSummary from "../components/WorkflowSurfaceSummary.vue";
+import { useSessionStore } from "../stores/session";
+import { businessRecordLabel } from "../utils/business-display";
 import { formatDateTime, labelAuditAction, labelObjectType, labelStatus } from "../utils/status-labels";
 
 interface ArchiveItem {
@@ -33,6 +35,7 @@ interface AuditLog {
 }
 
 const selectedProjectId = ref("p-food");
+const session = useSessionStore();
 const selectedArchiveItemId = ref("ai-ext-result");
 const selectedSupplementRequestId = ref("asr-1");
 const supplementFile = ref<File | null>(null);
@@ -43,6 +46,10 @@ const projectAuditLogs = ref<AuditLog[]>([]);
 const sensitiveLogs = ref<AuditLog[]>([]);
 const auditLogId = ref("");
 const error = ref("");
+
+const archiveItemNames = computed(() => new Map(archiveItems.value.map((item) => [item.id, item.itemName])));
+const supplementRequestLabels = computed(() => new Map(supplementRequests.value.map((item, index) => [item.id, `补档申请 ${index + 1}`])));
+const canMaintainArchive = computed(() => ["group_manager", "buyer", "hotel_buyer", "platform_operator"].includes(session.roleId));
 
 async function load() {
   archiveItems.value = (await apiGet<{ archiveItems: ArchiveItem[] }>(`/api/projects/${selectedProjectId.value}/archive-items`)).archiveItems;
@@ -105,7 +112,7 @@ onMounted(load);
 
     <WorkflowSurfaceSummary title="档案补档审批与消息" :business-types="['archive_supplement']" compact />
 
-    <div class="form-grid">
+    <div v-if="canMaintainArchive" class="form-grid">
       <label>
         项目编号
         <input v-model="selectedProjectId" />
@@ -115,7 +122,15 @@ onMounted(load);
       <button type="button" @click="run(() => apiPost(`/api/projects/${selectedProjectId}/archive-seal`))">封存档案</button>
     </div>
 
-    <div class="form-grid">
+    <div v-else class="form-grid">
+      <label>
+        项目编号
+        <input v-model="selectedProjectId" />
+      </label>
+      <button type="button" @click="load">查看档案与审计记录</button>
+    </div>
+
+    <div v-if="canMaintainArchive" class="form-grid">
       <label>
         档案项
         <select v-model="selectedArchiveItemId">
@@ -128,7 +143,7 @@ onMounted(load);
       <label>
         补档申请
         <select v-model="selectedSupplementRequestId">
-          <option v-for="request in supplementRequests" :key="request.id" :value="request.id">{{ request.id }} / {{ labelStatus(request.approvalStatus) }}</option>
+          <option v-for="request in supplementRequests" :key="request.id" :value="request.id">{{ supplementRequestLabels.get(request.id) }} / {{ labelStatus(request.approvalStatus) }}</option>
         </select>
       </label>
       <button type="button" :disabled="!selectedSupplementRequestId" @click="run(() => apiPost(`/api/archive-supplement-requests/${selectedSupplementRequestId}/approve`, { approved: true }))">
@@ -178,8 +193,8 @@ onMounted(load);
       </thead>
       <tbody>
         <tr v-for="request in supplementRequests" :key="request.id">
-          <td>{{ request.id }}</td>
-          <td>{{ request.archiveItemId }}</td>
+          <td>{{ supplementRequestLabels.get(request.id) ?? businessRecordLabel(request.id, "补档申请") }}</td>
+          <td>{{ archiveItemNames.get(request.archiveItemId) ?? "档案材料" }}</td>
           <td>{{ request.reason }}</td>
           <td>{{ labelStatus(request.approvalStatus) }}</td>
         </tr>

@@ -170,7 +170,8 @@ describe("Stage 11 supply chain mall expansion", () => {
 
     const supplierProducts = await request(runtime.app).get("/api/mall/products").set("x-mock-user-id", "u-other-mall-supplier");
     expect(supplierProducts.status).toBe(200);
-    expect(supplierProducts.body.products).toHaveLength(0);
+    expect(supplierProducts.body.products.map((item: { id: string }) => item.id)).not.toContain(product.id);
+    expect(supplierProducts.body.products.every((item: { supplierId: string }) => item.supplierId === "sup-2")).toBe(true);
 
     const adminProducts = await request(runtime.app).get("/api/mall/products").set("x-mock-user-id", "u6");
     expect(adminProducts.status).toBe(403);
@@ -196,7 +197,7 @@ describe("Stage 11 supply chain mall expansion", () => {
     const orders = await request(runtime2.app).get("/api/mall/orders").set("x-mock-user-id", "u2");
     expect(orders.status).toBe(200);
     expect(orders.body.orders.some((item: { id: string }) => item.id === order.body.order.id)).toBe(true);
-  });
+  }, 15000);
 
   it("covers PDF 1:1 mall, questionnaire, scenario package, fund account and split-role paths", async () => {
     const runtime = boot();

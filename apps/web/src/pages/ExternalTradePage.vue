@@ -40,6 +40,28 @@ const detail = ref<ExternalTradeDetail>({});
 const blockResult = ref<{ allowed?: boolean; projectId?: string; externalTradeFlag?: boolean }>({});
 const auditLogId = ref("");
 const error = ref("");
+const externalTradeForm = ref({
+  projectName: "外部交易备案项目",
+  orgId: "",
+  orgName: "酒店集团",
+  category: "按集团制度备案",
+  internalApprovalOpinion: "内部审批已备案",
+  resultRecordNote: "外部结果已备案"
+});
+
+const blockActions = [
+  { value: "internal_announcement", label: "内部公告发布" },
+  { value: "internal_registration", label: "内部报名" },
+  { value: "internal_bid", label: "内部报价" },
+  { value: "internal_expert_review", label: "内部评审" },
+  { value: "internal_award", label: "内部定标" }
+];
+
+function projectLabel(projectId?: string) {
+  if (!projectId) return detail.value.project?.name ?? "外部交易项目";
+  const item = externalTrades.value.find((trade) => trade.project.id === projectId);
+  return item?.project.name ?? detail.value.project?.name ?? "外部交易项目";
+}
 
 async function load() {
   externalTrades.value = (await apiGet<{ externalTrades: ExternalTradeListItem[] }>("/api/external-trades")).externalTrades;
@@ -93,6 +115,34 @@ async function uploadExternalMaterial(kind: "announcement" | "result") {
   });
 }
 
+function createExternalProject() {
+  return run(() =>
+    apiPost("/api/external-trades/projects", {
+      name: externalTradeForm.value.projectName,
+      orgId: externalTradeForm.value.orgId || undefined,
+      orgName: externalTradeForm.value.orgName,
+      category: externalTradeForm.value.category,
+      internalApprovalOpinion: externalTradeForm.value.internalApprovalOpinion
+    })
+  );
+}
+
+function recordInternalApproval() {
+  return run(() =>
+    apiPost(`/api/external-trades/${selectedProjectId.value}/internal-approval`, {
+      opinion: externalTradeForm.value.internalApprovalOpinion
+    })
+  );
+}
+
+function recordExternalResult() {
+  return run(() =>
+    apiPost(`/api/external-trades/${selectedProjectId.value}/result-record`, {
+      note: externalTradeForm.value.resultRecordNote
+    })
+  );
+}
+
 onMounted(load);
 </script>
 
@@ -105,9 +155,33 @@ onMounted(load);
         项目编号
         <input v-model="selectedProjectId" />
       </label>
+      <label>
+        新建项目名称
+        <input v-model="externalTradeForm.projectName" />
+      </label>
+      <label>
+        组织ID
+        <input v-model="externalTradeForm.orgId" placeholder="不填使用当前组织" />
+      </label>
+      <label>
+        组织名称
+        <input v-model="externalTradeForm.orgName" />
+      </label>
+      <label>
+        项目分类
+        <input v-model="externalTradeForm.category" />
+      </label>
+      <label>
+        内部审批意见
+        <input v-model="externalTradeForm.internalApprovalOpinion" />
+      </label>
+      <label>
+        结果备案说明
+        <input v-model="externalTradeForm.resultRecordNote" />
+      </label>
       <button type="button" @click="load">刷新</button>
-      <button type="button" @click="run(() => apiPost('/api/external-trades/projects', { name: '新增外部交易备案项目' }))">新建外部交易项目</button>
-      <button type="button" @click="run(() => apiPost(`/api/external-trades/${selectedProjectId}/internal-approval`, { opinion: '内部审批已备案' }))">登记内部审批</button>
+      <button type="button" @click="createExternalProject">新建外部交易项目</button>
+      <button type="button" @click="recordInternalApproval">登记内部审批</button>
     </div>
 
     <div class="form-grid">
@@ -139,22 +213,18 @@ onMounted(load);
       <button type="button" :disabled="!materialFile" @click="uploadExternalMaterial('result')">
         上传外部结果材料
       </button>
-      <button type="button" @click="run(() => apiPost(`/api/external-trades/${selectedProjectId}/result-record`))">登记外部结果</button>
+      <button type="button" @click="recordExternalResult">登记外部结果</button>
     </div>
 
     <div class="form-grid">
-      <button type="button" @click="checkBlock('internal_announcement')">校验内部公告拦截</button>
-      <button type="button" @click="checkBlock('internal_registration')">校验内部报名拦截</button>
-      <button type="button" @click="checkBlock('internal_bid')">校验内部报价拦截</button>
-      <button type="button" @click="checkBlock('internal_expert_review')">校验内部评审拦截</button>
-      <button type="button" @click="checkBlock('internal_award')">校验内部定标拦截</button>
+      <button v-for="action in blockActions" :key="action.value" type="button" @click="checkBlock(action.value)">{{ action.label }}校验</button>
     </div>
 
     <h3>备案项目</h3>
     <table>
       <thead>
         <tr>
-          <th>项目编号</th>
+          <th>项目</th>
           <th>项目名称</th>
           <th>外部平台</th>
           <th>外部编号</th>
@@ -217,7 +287,7 @@ onMounted(load);
       </thead>
       <tbody>
         <tr>
-          <td>{{ blockResult.projectId || selectedProjectId }}</td>
+          <td>{{ projectLabel(blockResult.projectId || selectedProjectId) }}</td>
           <td>{{ blockResult.externalTradeFlag ? "是" : "-" }}</td>
           <td>{{ blockResult.allowed ? "允许" : error ? "已拦截" : "-" }}</td>
         </tr>

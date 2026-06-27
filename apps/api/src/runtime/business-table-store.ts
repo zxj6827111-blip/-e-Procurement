@@ -126,11 +126,11 @@ export class BusinessTableStore {
         item.projectId,
         item.documentId,
         item.title,
-        item.procurementMethod,
-        item.scope,
-        item.status,
-        item.registrationDeadlineAt,
-        item.quoteDeadlineAt,
+        item.procurementMethod ?? state.projects.find((project) => project.id === item.projectId)?.type ?? "internal_open",
+        item.scope ?? "invited_suppliers",
+        item.status ?? "published",
+        item.registrationDeadlineAt ?? state.projects.find((project) => project.id === item.projectId)?.quoteDeadlineAt ?? item.createdAt,
+        item.quoteDeadlineAt ?? state.projects.find((project) => project.id === item.projectId)?.quoteDeadlineAt ?? item.createdAt,
         item.publishedAt
       ]);
       this.replaceRows("business_inquiry_sheets", state.inquirySheets ?? [], (item) => [
@@ -222,14 +222,14 @@ export class BusinessTableStore {
         item.purchaseOrderId,
         item.projectId,
         item.supplierId,
-        item.receiptType,
+        item.receiptType ?? (item.exceptionType ? "exception" : "full"),
         item.exceptionType ?? null,
-        item.acceptanceResult,
-        item.handlingStatus,
+        item.acceptanceResult ?? (item.exceptionType ? "accepted_with_exception" : "accepted"),
+        item.handlingStatus ?? (item.exceptionType ? "pending_resolution" : "none"),
         JSON.stringify(item.receivedItems ?? []),
-        item.summary,
+        item.summary ?? "验收记录",
         JSON.stringify(item.attachmentMetadata ?? []),
-        item.createdAt
+        item.createdAt ?? item.receiptAt ?? new Date().toISOString()
       ]);
       this.replaceRows("business_settlement_materials", state.settlementMaterials, (item) => [
         item.id,
@@ -256,7 +256,29 @@ export class BusinessTableStore {
         item.status,
         JSON.stringify(item.snapshotJson ?? {})
       ]);
-      this.replaceRows("business_mall_products", state.mallProducts ?? [], (item) => [
+      this.replaceRowsWithColumns(
+        "business_mall_products",
+        [
+          "id",
+          "name",
+          "category",
+          "brand",
+          "unit",
+          "sku_code",
+          "specification",
+          "product_status",
+          "supplier_id",
+          "service_regions_json",
+          "procurement_category",
+          "image_file_ids_json",
+          "attachment_file_ids_json",
+          "tags_json",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        state.mallProducts ?? [],
+        (item) => [
         item.id,
         item.name,
         item.category,
@@ -336,7 +358,22 @@ export class BusinessTableStore {
         item.verifiedBy ?? null,
         item.verifiedAt ?? null
       ]);
-      this.replaceRows("business_mall_questionnaires", state.mallQuestionnaires ?? [], (item) => [
+      this.replaceRowsWithColumns(
+        "business_mall_questionnaires",
+        [
+          "id",
+          "title",
+          "scope",
+          "questionnaire_status",
+          "questions_json",
+          "target_supplier_ids_json",
+          "submissions_json",
+          "archived_at",
+          "created_by",
+          "created_at"
+        ],
+        state.mallQuestionnaires ?? [],
+        (item) => [
         item.id,
         item.title,
         item.scope,
@@ -348,7 +385,28 @@ export class BusinessTableStore {
         item.createdBy,
         item.createdAt
       ]);
-      this.replaceRows("business_mall_scenario_templates", state.mallScenarioTemplates ?? [], (item) => [
+      this.replaceRowsWithColumns(
+        "business_mall_scenario_templates",
+        [
+          "id",
+          "template_type",
+          "name",
+          "template_status",
+          "product_ids_json",
+          "package_items_json",
+          "applicable_brands_json",
+          "applicable_hotel_types_json",
+          "applicable_hotel_ids_json",
+          "room_count",
+          "budget_amount",
+          "description",
+          "generated_order_ids_json",
+          "attachment_file_ids_json",
+          "created_by",
+          "created_at"
+        ],
+        state.mallScenarioTemplates ?? [],
+        (item) => [
         item.id,
         item.templateType,
         item.name,
@@ -392,9 +450,19 @@ export class BusinessTableStore {
   private replaceRows<T>(tableName: string, rows: T[], mapper: (row: T) => SqlValue[]) {
     this.runtimeDb.db.prepare(`delete from ${tableName}`).run();
     if (rows.length === 0) return;
-    const placeholders = rows.map((row) => `(${mapper(row).map(() => "?").join(", ")})`).join(", ");
-    const values = rows.flatMap(mapper);
+    const mappedRows = rows.map((row) => this.normalizeSqlValues(mapper(row)));
+    const placeholders = mappedRows.map((row) => `(${row.map(() => "?").join(", ")})`).join(", ");
+    const values = mappedRows.flat();
     this.runtimeDb.db.prepare(`insert into ${tableName} values ${placeholders}`).run(...values);
+  }
+
+  private replaceRowsWithColumns<T>(tableName: string, columns: string[], rows: T[], mapper: (row: T) => SqlValue[]) {
+    this.runtimeDb.db.prepare(`delete from ${tableName}`).run();
+    if (rows.length === 0) return;
+    const mappedRows = rows.map((row) => this.normalizeSqlValues(mapper(row)));
+    const placeholders = mappedRows.map((row) => `(${row.map(() => "?").join(", ")})`).join(", ");
+    const values = mappedRows.flat();
+    this.runtimeDb.db.prepare(`insert into ${tableName} (${columns.join(", ")}) values ${placeholders}`).run(...values);
   }
 
   private upsertRows<T>(tableName: string, columns: string[], conflictColumns: string[], rows: T[], mapper: (row: T) => SqlValue[]) {
@@ -406,7 +474,7 @@ export class BusinessTableStore {
     const statement = this.runtimeDb.db.prepare(
       `insert into ${tableName} (${columns.join(", ")}) values (${placeholders}) on conflict(${conflictTarget}) ${updateClause}`
     );
-    for (const row of rows) statement.run(...mapper(row));
+    for (const row of rows) statement.run(...this.normalizeSqlValues(mapper(row)));
   }
 
   private syncR2BaselineState(state: SeedState) {
@@ -781,7 +849,21 @@ export class BusinessTableStore {
     );
     this.upsertRows(
       "r2_supplier_evaluations",
-      ["id", "supplier_id", "project_id", "purchase_order_id", "score", "dimensions_json", "evaluation_status", "locked_at", "created_by", "created_at", "updated_at"],
+      [
+        "id",
+        "supplier_id",
+        "project_id",
+        "purchase_order_id",
+        "score",
+        "dimensions_json",
+        "description",
+        "improvement_suggestion",
+        "evaluation_status",
+        "locked_at",
+        "created_by",
+        "created_at",
+        "updated_at"
+      ],
       ["id"],
       state.supplierEvaluations ?? [],
       (item) => [
@@ -789,12 +871,14 @@ export class BusinessTableStore {
         item.supplierId,
         item.projectId,
         item.purchaseOrderId ?? null,
-        item.score,
-        JSON.stringify(item.dimensions),
-        item.status,
-        item.lockedAt,
-        item.createdBy,
-        item.createdAt,
+        item.score ?? 0,
+        JSON.stringify(item.dimensions ?? {}),
+        item.description ?? "",
+        item.improvementSuggestion ?? null,
+        item.status ?? "submitted_locked",
+        item.lockedAt ?? item.createdAt ?? syncedAt,
+        item.createdBy ?? "system",
+        item.createdAt ?? item.lockedAt ?? syncedAt,
         syncedAt
       ]
     );
@@ -1561,15 +1645,15 @@ export class BusinessTableStore {
         item.purchaseOrderId,
         item.projectId,
         item.supplierId,
-        item.receiptType,
+        item.receiptType ?? (item.exceptionType ? "exception" : "full"),
         item.exceptionType ?? null,
-        item.acceptanceResult,
-        item.handlingStatus,
-        item.summary,
-        item.receiptAt,
-        item.operatorId,
+        item.acceptanceResult ?? (item.exceptionType ? "accepted_with_exception" : "accepted"),
+        item.handlingStatus ?? (item.exceptionType ? "pending_resolution" : "none"),
+        item.summary ?? "验收记录",
+        item.receiptAt ?? item.createdAt,
+        item.operatorId ?? item.createdBy,
         item.createdBy,
-        item.createdAt,
+        item.createdAt ?? item.receiptAt,
         syncedAt
       ]
     );
@@ -3038,7 +3122,9 @@ export class BusinessTableStore {
         accessed_at text not null,
         updated_at text not null
       );
-
+    `);
+    this.ensureApprovalInstanceColumns();
+    this.runtimeDb.db.exec(`
       create index if not exists idx_business_requests_project on business_procurement_requests(project_id);
       create index if not exists idx_business_projects_status on business_projects(project_status);
       create index if not exists idx_business_bids_project_supplier on business_bids(project_id, supplier_id);
@@ -3084,18 +3170,6 @@ export class BusinessTableStore {
     this.addColumnIfMissing("r2_approval_rules", "hotel_scope_json", "text not null default '[]'");
     this.addColumnIfMissing("r2_approval_rules", "approval_order_json", "text not null default '[]'");
     this.addColumnIfMissing("r2_approval_rules", "default_strategy", "text not null default 'manual_review_required'");
-    this.addColumnIfMissing("r2_approval_instances", "rule_id", "text null");
-    this.addColumnIfMissing("r2_approval_instances", "rule_code", "text null");
-    this.addColumnIfMissing("r2_approval_instances", "project_id", "text null");
-    this.addColumnIfMissing("r2_approval_instances", "org_id", "text null");
-    this.addColumnIfMissing("r2_approval_instances", "supplier_id", "text null");
-    this.addColumnIfMissing("r2_approval_instances", "business_title", "text not null default ''");
-    this.addColumnIfMissing("r2_approval_instances", "business_amount", "real null");
-    this.addColumnIfMissing("r2_approval_instances", "current_node_index", "integer not null default 0");
-    this.addColumnIfMissing("r2_approval_instances", "current_role_id", "text null");
-    this.addColumnIfMissing("r2_approval_instances", "current_user_id", "text null");
-    this.addColumnIfMissing("r2_approval_instances", "completed_by", "text null");
-    this.addColumnIfMissing("r2_approval_instances", "source_json", "text not null default '{}'");
     this.addColumnIfMissing("r2_approval_actions", "business_type", "text null");
     this.addColumnIfMissing("r2_approval_actions", "business_id", "text null");
     this.addColumnIfMissing("r2_approval_actions", "actor_role_id", "text null");
@@ -3250,5 +3324,24 @@ export class BusinessTableStore {
     if (!columns.some((column) => column.name === columnName)) {
       this.runtimeDb.db.exec(`alter table ${tableName} add column ${columnName} ${definition};`);
     }
+  }
+
+  private normalizeSqlValues(values: unknown[]): SqlValue[] {
+    return values.map((value) => (value === undefined ? null : value)) as SqlValue[];
+  }
+
+  private ensureApprovalInstanceColumns() {
+    this.addColumnIfMissing("r2_approval_instances", "rule_id", "text null");
+    this.addColumnIfMissing("r2_approval_instances", "rule_code", "text null");
+    this.addColumnIfMissing("r2_approval_instances", "project_id", "text null");
+    this.addColumnIfMissing("r2_approval_instances", "org_id", "text null");
+    this.addColumnIfMissing("r2_approval_instances", "supplier_id", "text null");
+    this.addColumnIfMissing("r2_approval_instances", "business_title", "text not null default ''");
+    this.addColumnIfMissing("r2_approval_instances", "business_amount", "real null");
+    this.addColumnIfMissing("r2_approval_instances", "current_node_index", "integer not null default 0");
+    this.addColumnIfMissing("r2_approval_instances", "current_role_id", "text null");
+    this.addColumnIfMissing("r2_approval_instances", "current_user_id", "text null");
+    this.addColumnIfMissing("r2_approval_instances", "completed_by", "text null");
+    this.addColumnIfMissing("r2_approval_instances", "source_json", "text not null default '{}'");
   }
 }

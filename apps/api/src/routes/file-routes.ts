@@ -146,6 +146,12 @@ function fileSummary(file: StoredFileRecord) {
 
 function assertFileAccess(ctx: AppContext, req: Request, res: Response, file: StoredFileRecord, action: "read" | "write") {
   const deniedAction = action === "read" ? "file.read.denied" : "file.write.denied";
+  if (isMallCatalogAsset(ctx, req, file)) {
+    if (action === "read") return true;
+    if (isProcurementMaintainerRole(req.auth.roleId)) return true;
+    if (isSupplierRole(req.auth.roleId) && supplierIdMatches(req.auth.user, file.supplierId)) return true;
+    return denyResponse(ctx, req, res, 403, "FILE_WRITE_DENIED", "Current role cannot replace mall catalog files.", deniedAction, file.objectType, file.objectId);
+  }
   if (file.objectType === "bid" || file.attachmentKind === "bid_response_file") {
     if (action !== "read") {
       return denyResponse(ctx, req, res, 403, "FILE_WRITE_DENIED", "Bid response files cannot be replaced through file center.", deniedAction, file.objectType, file.objectId, file.projectId);
@@ -177,36 +183,36 @@ function assertFileAccess(ctx: AppContext, req: Request, res: Response, file: St
     }
     if (isSupplierRole(req.auth.roleId)) {
       if (!supplierIdMatches(req.auth.user, file.supplierId)) {
-        return denyResponse(ctx, req, res, 403, "SUPPLIER_FILE_DOWNLOAD_DENIED", "Supplier can only access own files.", deniedAction, file.objectType, file.objectId, file.projectId);
+        return denyResponse(ctx, req, res, 403, "SUPPLIER_FILE_DOWNLOAD_DENIED", "供应商只能访问本企业附件。", deniedAction, file.objectType, file.objectId, file.projectId);
       }
       return action === "read" || file.uploadedBy === req.auth.user.id;
     }
     if (req.auth.roleId === "admin") {
-      return denyResponse(ctx, req, res, 403, "FILE_DOWNLOAD_DENIED", "System administrators cannot read business file content.", deniedAction, file.objectType, file.objectId, file.projectId);
+      return denyResponse(ctx, req, res, 403, "FILE_DOWNLOAD_DENIED", "系统管理员不能读取业务附件内容。", deniedAction, file.objectType, file.objectId, file.projectId);
     }
     if (!isOrgReaderRole(req.auth.roleId) || !canReadProject(req, project)) {
-      return denyResponse(ctx, req, res, 403, action === "read" ? "FILE_DOWNLOAD_DENIED" : "FILE_WRITE_DENIED", "Current role cannot access this file.", deniedAction, file.objectType, file.objectId, file.projectId);
+      return denyResponse(ctx, req, res, 403, action === "read" ? "FILE_DOWNLOAD_DENIED" : "FILE_WRITE_DENIED", "当前角色无权访问该附件。", deniedAction, file.objectType, file.objectId, file.projectId);
     }
     if (action === "write" && isAuditReaderRoleId(req.auth.roleId) && !isProcurementMaintainerRole(req.auth.roleId)) {
-      return denyResponse(ctx, req, res, 403, "FILE_WRITE_DENIED", "Auditors can only read file metadata and content.", deniedAction, file.objectType, file.objectId, file.projectId);
+      return denyResponse(ctx, req, res, 403, "FILE_WRITE_DENIED", "审计角色只能读取附件信息和内容。", deniedAction, file.objectType, file.objectId, file.projectId);
     }
     return true;
   }
   if (file.objectType === "supplier") {
     if (isSupplierRole(req.auth.roleId)) {
       if (!supplierIdMatches(req.auth.user, file.objectId)) {
-        return denyResponse(ctx, req, res, 403, "SUPPLIER_FILE_DOWNLOAD_DENIED", "Supplier can only access own qualification files.", deniedAction, file.objectType, file.objectId);
+        return denyResponse(ctx, req, res, 403, "SUPPLIER_FILE_DOWNLOAD_DENIED", "供应商只能访问本企业资质附件。", deniedAction, file.objectType, file.objectId);
       }
       return action === "read" || file.uploadedBy === req.auth.user.id;
     }
     if (req.auth.roleId === "admin") {
-      return denyResponse(ctx, req, res, 403, "FILE_DOWNLOAD_DENIED", "System administrators cannot read supplier file content.", deniedAction, file.objectType, file.objectId);
+      return denyResponse(ctx, req, res, 403, "FILE_DOWNLOAD_DENIED", "系统管理员不能读取供应商附件内容。", deniedAction, file.objectType, file.objectId);
     }
     if (!isOrgReaderRole(req.auth.roleId)) {
-      return denyResponse(ctx, req, res, 403, action === "read" ? "FILE_DOWNLOAD_DENIED" : "FILE_WRITE_DENIED", "Current role cannot access this supplier file.", deniedAction, file.objectType, file.objectId);
+      return denyResponse(ctx, req, res, 403, action === "read" ? "FILE_DOWNLOAD_DENIED" : "FILE_WRITE_DENIED", "当前角色无权访问该供应商附件。", deniedAction, file.objectType, file.objectId);
     }
     if (action === "write" && !isProcurementMaintainerRole(req.auth.roleId)) {
-      return denyResponse(ctx, req, res, 403, "FILE_WRITE_DENIED", "Auditors can only read file metadata and content.", deniedAction, file.objectType, file.objectId);
+      return denyResponse(ctx, req, res, 403, "FILE_WRITE_DENIED", "审计角色只能读取附件信息和内容。", deniedAction, file.objectType, file.objectId);
     }
     return true;
   }
@@ -218,25 +224,26 @@ function assertFileAccess(ctx: AppContext, req: Request, res: Response, file: St
     }
     if (isSupplierRole(req.auth.roleId)) {
       if (!supplierIdMatches(req.auth.user, order.supplierId) || !supplierIdMatches(req.auth.user, file.supplierId)) {
-        return denyResponse(ctx, req, res, 403, "SUPPLIER_FILE_DOWNLOAD_DENIED", "Supplier can only access own mall order files.", deniedAction, file.objectType, file.objectId);
+        return denyResponse(ctx, req, res, 403, "SUPPLIER_FILE_DOWNLOAD_DENIED", "供应商只能访问本企业订单附件。", deniedAction, file.objectType, file.objectId);
       }
       return action === "read" || file.uploadedBy === req.auth.user.id;
     }
     if (req.auth.roleId === "admin") {
-      return denyResponse(ctx, req, res, 403, "FILE_DOWNLOAD_DENIED", "System administrators cannot read business file content.", deniedAction, file.objectType, file.objectId);
+      return denyResponse(ctx, req, res, 403, "FILE_DOWNLOAD_DENIED", "系统管理员不能读取业务附件内容。", deniedAction, file.objectType, file.objectId);
     }
     if (isOrgReaderRole(req.auth.roleId) && userOrgScope(req.auth.user).includes(order.orgId)) {
       if (action === "write" && !isProcurementMaintainerRole(req.auth.roleId)) {
-        return denyResponse(ctx, req, res, 403, "FILE_WRITE_DENIED", "Auditors can only read file metadata and content.", deniedAction, file.objectType, file.objectId);
+        return denyResponse(ctx, req, res, 403, "FILE_WRITE_DENIED", "审计角色只能读取附件信息和内容。", deniedAction, file.objectType, file.objectId);
       }
       return true;
     }
-    return denyResponse(ctx, req, res, 403, action === "read" ? "FILE_DOWNLOAD_DENIED" : "FILE_WRITE_DENIED", "Current role cannot access this mall order file.", deniedAction, file.objectType, file.objectId);
+    return denyResponse(ctx, req, res, 403, action === "read" ? "FILE_DOWNLOAD_DENIED" : "FILE_WRITE_DENIED", "当前角色无权访问该订单附件。", deniedAction, file.objectType, file.objectId);
   }
-  return denyResponse(ctx, req, res, 403, action === "read" ? "FILE_DOWNLOAD_DENIED" : "FILE_WRITE_DENIED", "Current role cannot access this file.", deniedAction, file.objectType, file.objectId);
+  return denyResponse(ctx, req, res, 403, action === "read" ? "FILE_DOWNLOAD_DENIED" : "FILE_WRITE_DENIED", "当前角色无权访问该附件。", deniedAction, file.objectType, file.objectId);
 }
 
 function canListFile(ctx: AppContext, req: Request, file: StoredFileRecord) {
+  if (isMallCatalogAsset(ctx, req, file)) return true;
   if (file.projectId) {
     const project = ctx.state.projects.find((item) => item.id === file.projectId);
     if (!project) return false;
@@ -252,6 +259,22 @@ function canListFile(ctx: AppContext, req: Request, file: StoredFileRecord) {
     if (!order) return false;
     if (isSupplierRole(req.auth.roleId)) return supplierIdMatches(req.auth.user, order.supplierId) && supplierIdMatches(req.auth.user, file.supplierId);
     return isOrgReaderRole(req.auth.roleId) && userOrgScope(req.auth.user).includes(order.orgId);
+  }
+  return false;
+}
+
+function isMallCatalogAsset(ctx: AppContext, req: Request, file: StoredFileRecord) {
+  if (file.objectType === "mall_product") {
+    const product = ctx.state.mallProducts.find((item) => item.id === file.objectId);
+    if (!product) return false;
+    if (isSupplierRole(req.auth.roleId)) return supplierIdMatches(req.auth.user, product.supplierId) && supplierIdMatches(req.auth.user, file.supplierId);
+    return isOrgReaderRole(req.auth.roleId) && (product.status === "listed" || isProcurementMaintainerRole(req.auth.roleId));
+  }
+  if (file.objectType === "mall_scenario_template") {
+    const template = ctx.state.mallScenarioTemplates.find((item) => item.id === file.objectId);
+    if (!template) return false;
+    if (isSupplierRole(req.auth.roleId)) return false;
+    return isOrgReaderRole(req.auth.roleId) && template.status === "active";
   }
   return false;
 }

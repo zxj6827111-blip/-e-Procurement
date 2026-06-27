@@ -4,7 +4,7 @@ import type { ApprovalRule, RoleId, User } from "../types.js";
 import { denyResponse } from "./permission-helpers.js";
 
 const adminOnlyConfigResources = new Set(["roles", "role_permissions", "system_dictionaries", "users", "approval_rules"]);
-const methodRuleReaderRoles = new Set(["buyer", "group_manager", "auditor", "admin"]);
+const methodRuleReaderRoles = new Set(["buyer", "group_manager", "hotel_buyer", "platform_operator", "auditor", "admin"]);
 const approvalRuleReaderRoles = new Set(["buyer", "group_manager", "auditor", "admin"]);
 const allowedApprovalBusinessTypes: ApprovalRule["businessType"][] = [
   "procurement_request",

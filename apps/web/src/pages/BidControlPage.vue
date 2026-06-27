@@ -22,12 +22,18 @@ interface Approval {
   approvalStatus: string;
 }
 
+interface SupplierRow {
+  id: string;
+  name: string;
+}
+
 const projects = ref<Project[]>([]);
+const suppliers = ref<SupplierRow[]>([]);
 const summary = ref<Record<string, unknown>>({});
 const approvals = ref<Approval[]>([]);
 const logs = ref<unknown[]>([]);
 const selectedProjectId = ref("p-pre");
-const targetSupplierId = ref("sup-1");
+const targetSupplierId = ref("");
 const viewContent = ref("response_file_metadata");
 const allowDownload = ref(false);
 const selectedApprovalId = ref("");
@@ -56,10 +62,30 @@ const bidResultLabels: Record<string, string> = {
   denied: "拒绝查看"
 };
 
+function projectLabel(projectId?: unknown) {
+  if (!projectId) return "-";
+  const project = projects.value.find((item) => item.id === String(projectId));
+  return project ? `${project.code} / ${project.name}` : "采购项目";
+}
+
+function supplierName(supplierId?: unknown) {
+  if (!supplierId) return "-";
+  return suppliers.value.find((item) => item.id === String(supplierId))?.name ?? "供应商";
+}
+
+function approvalLabel(approval: Approval, index: number) {
+  return `查看审批 ${index + 1} / ${supplierName(approval.targetSupplierId)} / ${approvalStatusLabels[approval.approvalStatus] ?? approval.approvalStatus}`;
+}
+
 async function load() {
-  const projectData = await apiGet<{ projects: Project[] }>("/api/projects");
+  const [projectData, supplierData] = await Promise.all([
+    apiGet<{ projects: Project[] }>("/api/projects"),
+    apiGet<{ suppliers: SupplierRow[] }>("/api/suppliers").catch(() => ({ suppliers: [] }))
+  ]);
   projects.value = projectData.projects.filter((item) => !item.externalTradeFlag);
+  suppliers.value = supplierData.suppliers;
   selectedProjectId.value ||= projects.value[0]?.id ?? "";
+  targetSupplierId.value ||= suppliers.value[0]?.id ?? "";
   if (selectedProjectId.value) {
     summary.value = await apiGet<Record<string, unknown>>(`/api/projects/${selectedProjectId.value}/bids/summary`);
   }
@@ -92,13 +118,15 @@ onMounted(load);
           <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.code }} / {{ project.name }}</option>
         </select>
       </label>
+      <button type="button" :disabled="!selectedProjectId" @click="run(() => apiPost(`/api/projects/${selectedProjectId}/bids/cutoff`, { action: 'early_cutoff', reason: 'UAT flow early cutoff' }))">提前截标</button>
       <button type="button" :disabled="!selectedProjectId" @click="run(() => apiPost(`/api/projects/${selectedProjectId}/bids/lock`))">锁定报价</button>
+      <span class="notice">{{ summary.beforeDeadline ? "报价期内：先提前截标，再锁定报价" : "已截标：可锁定报价、生成比价和评审" }}</span>
     </div>
 
     <table>
       <thead>
         <tr>
-          <th>项目编号</th>
+          <th>项目</th>
           <th>是否截止前</th>
           <th>已提交数量</th>
           <th>受邀供应商数</th>
@@ -106,7 +134,7 @@ onMounted(load);
       </thead>
       <tbody>
         <tr>
-          <td>{{ summary.projectId || "-" }}</td>
+          <td>{{ projectLabel(summary.projectId) }}</td>
           <td>{{ summary.beforeDeadline ? "是" : "否" }}</td>
           <td>{{ summary.submittedCount ?? (Array.isArray(summary.bids) ? summary.bids.length : 0) }}</td>
           <td>{{ summary.totalInvitedSuppliers ?? "-" }}</td>
@@ -117,7 +145,9 @@ onMounted(load);
     <div class="form-grid">
       <label>
         目标供应商
-        <input v-model="targetSupplierId" />
+        <select v-model="targetSupplierId">
+          <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">{{ supplier.name }}</option>
+        </select>
       </label>
       <label>
         查看内容
@@ -144,8 +174,8 @@ onMounted(load);
       <label>
         查看审批
         <select v-model="selectedApprovalId">
-          <option v-for="approval in approvals" :key="approval.id" :value="approval.id">
-            {{ approval.id }} / {{ viewContentLabels[approval.viewContent] ?? approval.viewContent }} / {{ approvalStatusLabels[approval.approvalStatus] ?? approval.approvalStatus }}
+          <option v-for="(approval, index) in approvals" :key="approval.id" :value="approval.id">
+            {{ approvalLabel(approval, index) }} / {{ viewContentLabels[approval.viewContent] ?? approval.viewContent }}
           </option>
         </select>
       </label>
@@ -165,7 +195,7 @@ onMounted(load);
     <table>
       <thead>
         <tr>
-          <th>审批单</th>
+          <th>审批</th>
           <th>查看人</th>
           <th>供应商</th>
           <th>查看内容</th>
@@ -174,9 +204,9 @@ onMounted(load);
       </thead>
       <tbody>
         <tr v-for="(log, index) in logs" :key="index">
-          <td>{{ (log as Record<string, unknown>).approvalId || "-" }}</td>
-          <td>{{ (log as Record<string, unknown>).actorId }}</td>
-          <td>{{ (log as Record<string, unknown>).supplierId }}</td>
+          <td>{{ (log as Record<string, unknown>).approvalId ? "查看审批记录" : "-" }}</td>
+          <td>{{ (log as Record<string, unknown>).actorId ? "已授权人员" : "-" }}</td>
+          <td>{{ supplierName((log as Record<string, unknown>).supplierId) }}</td>
           <td>{{ viewContentLabels[String((log as Record<string, unknown>).content)] ?? (log as Record<string, unknown>).content }}</td>
           <td>{{ bidResultLabels[String((log as Record<string, unknown>).result)] ?? (log as Record<string, unknown>).result }}</td>
         </tr>

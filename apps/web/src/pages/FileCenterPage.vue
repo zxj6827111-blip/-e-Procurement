@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import AttachmentList from "../components/AttachmentList.vue";
 import { apiGet, apiPost, replaceFile, type UploadedFileMetadata } from "../api/http";
 import { useSessionStore } from "../stores/session";
+import { businessRecordLabel } from "../utils/business-display";
 import { formatDateTime, labelStatus } from "../utils/status-labels";
 
 type FileRecord = UploadedFileMetadata & {
@@ -22,6 +23,24 @@ const busy = ref(false);
 const message = ref("");
 const fileMaintainerRoles = new Set(["group_manager", "buyer", "hotel_buyer", "platform_operator", "supplier", "supplier_admin"]);
 const canMaintainFiles = computed(() => fileMaintainerRoles.has(session.roleId));
+
+const objectTypeLabels: Record<string, string> = {
+  procurement_request: "采购申请",
+  procurement_document: "采购文件",
+  supplier: "供应商档案",
+  supplier_registration: "报名资料",
+  bid: "报价响应",
+  settlement_material: "结算资料",
+  mall_product: "商城商品",
+  mall_order: "商城订单",
+  archive_supplement_request: "补档申请",
+  external_trade_record: "外部交易备案"
+};
+
+function objectLabel(file: FileRecord) {
+  const type = objectTypeLabels[file.objectType] ?? labelStatus(file.objectType);
+  return `${type} / ${businessRecordLabel(file.objectId, "业务记录")}`;
+}
 
 async function loadFiles() {
   const data = await apiGet<{ files: FileRecord[] }>("/api/files");
@@ -101,7 +120,7 @@ onMounted(loadFiles);
           <td>
             <AttachmentList :attachments="[file]" compact />
           </td>
-          <td>{{ file.objectType }} / {{ file.objectId }}</td>
+          <td>{{ objectLabel(file) }}</td>
           <td>{{ labelStatus(file.attachmentKind) }}</td>
           <td>v{{ file.versionNo }}</td>
           <td>{{ file.uploadedBy }}</td>

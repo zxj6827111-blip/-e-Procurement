@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { apiBlob } from "../api/http";
+import { formalFileName } from "../utils/business-display";
 import { formatDateTime, isImageFile } from "../utils/status-labels";
 
 interface Attachment {
@@ -17,11 +18,18 @@ const props = defineProps<{
   prefix?: string;
   emptyText?: string;
   compact?: boolean;
+  variant?: "list" | "gallery" | "document";
+  imageOnly?: boolean;
+  showMeta?: boolean;
+  showDownload?: boolean;
 }>();
 
 const previewUrls = ref<Record<string, string>>({});
 const loading = ref<Record<string, boolean>>({});
 const errors = ref<Record<string, string>>({});
+
+const metadataVisible = computed(() => props.showMeta ?? !props.imageOnly);
+const downloadVisible = computed(() => props.showDownload ?? !props.imageOnly);
 
 const normalizedAttachments = computed(() =>
   (props.attachments ?? [])
@@ -37,7 +45,13 @@ function attachmentId(attachment: Attachment) {
 }
 
 function displayName(attachment: Attachment) {
-  return `${props.prefix ? `${props.prefix} / ` : ""}${attachment.fileName ?? attachmentId(attachment)}`;
+  return `${props.prefix ? `${props.prefix} / ` : ""}${formalFileName(attachment.fileName, attachmentId(attachment) ? "业务附件" : "附件")}`;
+}
+
+function fileExtension(attachment: Attachment) {
+  const fileName = attachment.fileName ?? "";
+  const index = fileName.lastIndexOf(".");
+  return index >= 0 ? fileName.slice(index + 1).toUpperCase() : "FILE";
 }
 
 function humanSize(value?: number) {
@@ -71,7 +85,7 @@ async function downloadAttachment(attachment: Attachment) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = attachment.fileName ?? "attachment";
+    anchor.download = formalFileName(attachment.fileName, "业务附件");
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
@@ -105,8 +119,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="normalizedAttachments.length" class="attachment-list" :class="{ compact }">
-    <div v-for="attachment in normalizedAttachments" :key="attachment.key" class="attachment-item">
+  <div
+    v-if="normalizedAttachments.length"
+    class="attachment-list"
+    :class="[{ compact, 'image-only': imageOnly }, `attachment-list-${variant ?? (compact ? 'list' : 'document')}`]"
+  >
+    <div v-for="attachment in normalizedAttachments" :key="attachment.key" class="attachment-item" :class="{ 'image-only': imageOnly }">
       <button
         v-if="isImageFile(attachment.fileName, attachment.contentType)"
         type="button"
@@ -117,12 +135,15 @@ onBeforeUnmount(() => {
         <img v-if="previewUrls[attachmentId(attachment)]" :src="previewUrls[attachmentId(attachment)]" :alt="displayName(attachment)" />
         <span v-else>{{ loading[attachmentId(attachment)] ? "加载中" : "图片" }}</span>
       </button>
-      <div class="attachment-meta">
-        <strong>{{ displayName(attachment) }}</strong>
-        <small>{{ [formatDateTime(attachment.uploadedAt), humanSize(attachment.sizeBytes)].filter(Boolean).join(" / ") }}</small>
+      <div v-else class="attachment-file-icon">{{ fileExtension(attachment) }}</div>
+      <div v-if="metadataVisible || errors[attachmentId(attachment)]" class="attachment-meta">
+        <template v-if="metadataVisible">
+          <strong>{{ displayName(attachment) }}</strong>
+          <small>{{ [formatDateTime(attachment.uploadedAt), humanSize(attachment.sizeBytes)].filter(Boolean).join(" / ") }}</small>
+        </template>
         <small v-if="errors[attachmentId(attachment)]" class="inline-error">{{ errors[attachmentId(attachment)] }}</small>
       </div>
-      <button type="button" class="secondary-button" :disabled="!attachmentId(attachment)" @click="downloadAttachment(attachment)">下载</button>
+      <button v-if="downloadVisible" type="button" class="secondary-button" :disabled="!attachmentId(attachment)" @click="downloadAttachment(attachment)">下载</button>
     </div>
   </div>
   <span v-else class="notice">{{ emptyText ?? "-" }}</span>

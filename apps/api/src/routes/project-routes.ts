@@ -11,7 +11,11 @@ import type {
 } from "../types.js";
 import { resolveAttachments } from "./file-helpers.js";
 
-const procurementMaintainerRoles = new Set(["buyer", "group_manager"]);
+const procurementMaintainerRoles = new Set(["buyer", "group_manager", "hotel_buyer", "platform_operator"]);
+const requestInitiatorRoles = new Set(["buyer", "group_manager", "hotel_buyer"]);
+const requestApprovalRoles = new Set(["buyer", "group_manager"]);
+const requestMethodDecisionRoles = new Set(["buyer", "group_manager"]);
+const supplierLikeRoles = new Set(["supplier", "supplier_admin", "supplier_quotation"]);
 
 function denyBusinessAction(ctx: AppContext, req: Request, res: Response, objectType: string, objectId: string) {
   const auditLog = ctx.auditService.record({
@@ -37,33 +41,122 @@ function ensureProcurementMaintainer(ctx: AppContext, req: Request, res: Respons
   return false;
 }
 
-function canReadOrg(req: Request, orgId: string) {
-  if (req.auth.roleId === "buyer") return req.auth.orgScope.includes(orgId);
-  if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") return req.auth.orgScope.includes(orgId);
+function denyRequestAction(ctx: AppContext, req: Request, res: Response, code: string, message: string, action: string, requestId: string, reason = code) {
+  const auditLog = ctx.auditService.record({
+    context: req.auth,
+    action,
+    objectType: "procurement_request",
+    objectId: requestId,
+    result: "denied",
+    reason
+  });
+  return res.status(403).json({ error: { code, message, auditLogId: auditLog.id } });
+}
+
+function ensureRequestInitiator(ctx: AppContext, req: Request, res: Response, requestId: string) {
+  if (requestInitiatorRoles.has(req.auth.roleId)) return true;
+  if (!procurementMaintainerRoles.has(req.auth.roleId)) {
+    denyBusinessAction(ctx, req, res, "procurement_request", requestId);
+    return false;
+  }
+  denyRequestAction(
+    ctx,
+    req,
+    res,
+    "PROCUREMENT_REQUEST_INITIATOR_REQUIRED",
+    "Only procurement initiator roles can create or submit procurement requests.",
+    "procurement-request.initiator.denied",
+    requestId
+  );
   return false;
 }
 
-function canReadProject(req: Request, project: ProcurementProject) {
-  if (req.auth.roleId === "buyer") return req.auth.user.managedProjectIds?.includes(project.id) ?? false;
+function ensureRequestApprovalRole(ctx: AppContext, req: Request, res: Response, requestId: string) {
+  if (requestApprovalRoles.has(req.auth.roleId)) return true;
+  denyRequestAction(
+    ctx,
+    req,
+    res,
+    "PROCUREMENT_REQUEST_APPROVER_REQUIRED",
+    "Only authorized procurement approval roles can approve procurement requests.",
+    "procurement-request.approver.denied",
+    requestId
+  );
+  return false;
+}
+
+function ensureRequestMethodDecisionRole(ctx: AppContext, req: Request, res: Response, requestId: string) {
+  if (requestMethodDecisionRoles.has(req.auth.roleId)) return true;
+  denyRequestAction(
+    ctx,
+    req,
+    res,
+    "PROCUREMENT_REQUEST_METHOD_DECISION_REQUIRED",
+    "Only authorized procurement roles can decide the procurement method.",
+    "procurement-request.method-decision.role.denied",
+    requestId
+  );
+  return false;
+}
+
+function assertRequestOwner(ctx: AppContext, req: Request, request: ProcurementRequest, res: Response, action: string) {
+  const normalized = normalizeRequest(request);
+  if (normalized.createdBy === req.auth.user.id) return true;
+  denyRequestAction(
+    ctx,
+    req,
+    res,
+    "PROCUREMENT_REQUEST_OWNER_REQUIRED",
+    "Only the procurement request creator can perform this draft action.",
+    action,
+    request.id,
+    `createdBy=${normalized.createdBy}`
+  );
+  return false;
+}
+
+function canReadOrg(req: Request, orgId: string) {
+  if (["buyer", "hotel_buyer", "platform_operator", "group_manager", "auditor"].includes(req.auth.roleId)) return req.auth.orgScope.includes(orgId);
+  return false;
+}
+
+function canReadProject(ctx: AppContext, req: Request, project: ProcurementProject) {
+  if (req.auth.roleId === "buyer") {
+    return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || project.buyer === req.auth.user.name;
+  }
+  if (["hotel_buyer", "platform_operator"].includes(req.auth.roleId)) {
+    return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || req.auth.orgScope.includes(project.orgId);
+  }
   if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") return req.auth.orgScope.includes(project.orgId);
-  if (req.auth.roleId === "supplier") return project.participantSupplierIds.includes(req.auth.user.supplierId ?? "");
+  if (supplierLikeRoles.has(req.auth.roleId)) return isSupplierProject(ctx, req.auth.user.supplierId ?? "", project);
   if (req.auth.roleId === "expert") return project.assignedExpertIds.includes(req.auth.user.expertId ?? "");
   return false;
+}
+
+function isSupplierProject(ctx: AppContext, supplierId: string, project: ProcurementProject) {
+  if (!supplierId) return false;
+  if (project.participantSupplierIds.includes(supplierId)) return true;
+  return (
+    ctx.state.supplierInvitations.some((item) => item.projectId === project.id && item.supplierId === supplierId) ||
+    ctx.state.supplierRegistrations.some((item) => item.projectId === project.id && item.supplierId === supplierId) ||
+    ctx.state.bids.some((item) => item.projectId === project.id && item.supplierId === supplierId) ||
+    ctx.state.purchaseOrders.some((item) => item.projectId === project.id && item.supplierId === supplierId)
+  );
 }
 
 function visibleRequests(ctx: AppContext, req: Request) {
   if (req.auth.roleId === "admin") {
     ctx.policies.adminBusinessIsolation.assertBusinessAccessAllowed(req.auth, "procurement_request", "list");
   }
-  if (req.auth.roleId === "buyer") {
+  if (["buyer", "hotel_buyer", "platform_operator"].includes(req.auth.roleId)) {
     return ctx.state.procurementRequests.filter((item) => canReadProcurementRequest(ctx, req, normalizeRequest(item)));
   }
   if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") {
     return ctx.state.procurementRequests.filter((item) => req.auth.orgScope.includes(item.orgId));
   }
-  if (req.auth.roleId === "supplier") {
+  if (supplierLikeRoles.has(req.auth.roleId)) {
     const supplierId = req.auth.user.supplierId ?? "";
-    const projectIds = ctx.state.projects.filter((project) => project.participantSupplierIds.includes(supplierId)).map((project) => project.id);
+    const projectIds = ctx.state.projects.filter((project) => isSupplierProject(ctx, supplierId, project)).map((project) => project.id);
     return ctx.state.procurementRequests.filter((item) => item.projectId && projectIds.includes(item.projectId));
   }
   if (req.auth.roleId === "expert") {
@@ -75,17 +168,20 @@ function visibleRequests(ctx: AppContext, req: Request) {
 }
 
 function canReadProcurementRequest(ctx: AppContext, req: Request, request: ProcurementRequest) {
-  if (req.auth.roleId === "buyer") {
+  const normalized = normalizeRequest(request);
+  if (["buyer", "hotel_buyer", "platform_operator"].includes(req.auth.roleId)) {
     if (request.projectId) {
       const project = ctx.state.projects.find((item) => item.id === request.projectId);
-      return project ? canReadProject(req, project) : false;
+      return project ? canReadProject(ctx, req, project) : false;
     }
-    return req.auth.orgScope.includes(request.orgId) && request.createdBy === req.auth.user.id;
+    if (req.auth.orgScope.includes(request.orgId) && normalized.createdBy === req.auth.user.id) return true;
+    if (req.auth.roleId === "buyer" && req.auth.orgScope.includes(request.orgId) && normalized.status !== "draft") return true;
+    return false;
   }
   if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") return req.auth.orgScope.includes(request.orgId);
   if (!request.projectId) return false;
   const project = ctx.state.projects.find((item) => item.id === request.projectId);
-  return project ? canReadProject(req, project) : false;
+  return project ? canReadProject(ctx, req, project) : false;
 }
 
 function normalizeRequest(request: ProcurementRequest): ProcurementRequest {
@@ -206,7 +302,7 @@ function assertRequestReadable(ctx: AppContext, req: Request, request: Procureme
 }
 
 function assertProjectReadable(ctx: AppContext, req: Request, project: ProcurementProject, res: Response) {
-  if (canReadProject(req, project)) return true;
+  if (canReadProject(ctx, req, project)) return true;
   const auditLog = ctx.auditService.record({
     context: req.auth,
     action: "project.scope.denied",
@@ -269,6 +365,28 @@ function assertSequentialProjectTransition(project: ProcurementProject, nextStat
   return currentIndex >= 0 && nextIndex === currentIndex + 1;
 }
 
+function workflowStatusTerminal(status: string | undefined) {
+  return ["approved", "rejected", "returned", "revoked", "cancelled"].includes(String(status ?? ""));
+}
+
+function hasVisiblePendingApprovalTask(ctx: AppContext, req: Request, requestId: string) {
+  return ctx.r8WorkflowTaskRepository
+    .listTasks(req.auth.user, req.auth.roleId)
+    .some((task) => task.businessType === "procurement_request" && task.businessId === requestId && task.status === "pending");
+}
+
+function workflowErrorBody(error: unknown) {
+  if (error && typeof error === "object") {
+    const maybe = error as { code?: unknown; status?: unknown; message?: unknown };
+    return {
+      status: typeof maybe.status === "number" ? maybe.status : 400,
+      code: typeof maybe.code === "string" ? maybe.code : "PROCUREMENT_REQUEST_WORKFLOW_ACTION_BLOCKED",
+      message: typeof maybe.message === "string" ? maybe.message : "Procurement request workflow action was blocked."
+    };
+  }
+  return { status: 400, code: "PROCUREMENT_REQUEST_WORKFLOW_ACTION_BLOCKED", message: "Procurement request workflow action was blocked." };
+}
+
 export function projectRoutes(ctx: AppContext) {
   const router = Router();
 
@@ -277,12 +395,12 @@ export function projectRoutes(ctx: AppContext) {
     if (req.auth.roleId === "admin") {
       ctx.policies.adminBusinessIsolation.assertBusinessAccessAllowed(req.auth, "project", "list");
     }
-    if (req.auth.roleId === "supplier") {
-      projects = projects.filter((project) => project.participantSupplierIds.includes(req.auth.user.supplierId ?? ""));
+    if (supplierLikeRoles.has(req.auth.roleId)) {
+      projects = projects.filter((project) => isSupplierProject(ctx, req.auth.user.supplierId ?? "", project));
     } else if (req.auth.roleId === "expert") {
       projects = projects.filter((project) => project.assignedExpertIds.includes(req.auth.user.expertId ?? ""));
-    } else if (req.auth.roleId === "buyer") {
-      projects = projects.filter((project) => req.auth.user.managedProjectIds?.includes(project.id));
+    } else if (["buyer", "hotel_buyer", "platform_operator"].includes(req.auth.roleId)) {
+      projects = projects.filter((project) => canReadProject(ctx, req, project));
     } else if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") {
       projects = projects.filter((project) => req.auth.orgScope.includes(project.orgId));
     }
@@ -291,6 +409,7 @@ export function projectRoutes(ctx: AppContext) {
 
   router.post("/projects", (req, res) => {
     if (!ensureProcurementMaintainer(ctx, req, res, "project", "new")) return;
+    if (!ensureRequestMethodDecisionRole(ctx, req, res, "new")) return;
     const requestId = String(req.body?.requestId ?? "");
     const sourceRequest = ensureRequest(ctx, requestId, res);
     if (!sourceRequest) return;
@@ -370,7 +489,7 @@ export function projectRoutes(ctx: AppContext) {
     if (req.auth.roleId === "expert") {
       ctx.policies.expertAssignment.assertExpertProjectAccess(req.auth, project.id);
     }
-    if (req.auth.roleId === "supplier" && !project.participantSupplierIds.includes(req.auth.user.supplierId ?? "")) {
+    if (req.auth.roleId === "supplier" && !isSupplierProject(ctx, req.auth.user.supplierId ?? "", project)) {
       ctx.policies.supplierDataIsolation.assertSupplierAccess(req.auth, "not-participant", "project", project.id);
     }
     return res.json({ project });
@@ -431,7 +550,7 @@ export function projectRoutes(ctx: AppContext) {
   router.get("/procurement-requests", (req, res) => res.json({ procurementRequests: visibleRequests(ctx, req).map(normalizeRequest) }));
 
   router.post("/procurement-requests", (req, res) => {
-    if (!ensureProcurementMaintainer(ctx, req, res, "procurement_request", "new")) return;
+    if (!ensureRequestInitiator(ctx, req, res, "new")) return;
     const title = String(req.body?.title ?? "").trim();
     const orgId = String(req.body?.orgId ?? req.auth.user.orgId);
     if (!title) {
@@ -483,11 +602,12 @@ export function projectRoutes(ctx: AppContext) {
   });
 
   router.patch("/procurement-requests/:requestId", (req, res) => {
-    if (!ensureProcurementMaintainer(ctx, req, res, "procurement_request", req.params.requestId)) return;
+    if (!ensureRequestInitiator(ctx, req, res, req.params.requestId)) return;
     const procurementRequest = ensureRequest(ctx, req.params.requestId, res);
     if (!procurementRequest) return;
     const normalized = normalizeRequest(procurementRequest);
     if (!assertRequestReadable(ctx, req, normalized, res)) return;
+    if (!assertRequestOwner(ctx, req, procurementRequest, res, "procurement-request.update.owner.denied")) return;
     if (normalized.status !== "draft") {
       return res.status(400).json({ error: { code: "PROCUREMENT_REQUEST_LOCKED", message: "Only draft requests can be edited." } });
     }
@@ -514,11 +634,12 @@ export function projectRoutes(ctx: AppContext) {
   });
 
   router.delete("/procurement-requests/:requestId", (req, res) => {
-    if (!ensureProcurementMaintainer(ctx, req, res, "procurement_request", req.params.requestId)) return;
+    if (!ensureRequestInitiator(ctx, req, res, req.params.requestId)) return;
     const procurementRequest = ensureRequest(ctx, req.params.requestId, res);
     if (!procurementRequest) return;
     const normalized = normalizeRequest(procurementRequest);
     if (!assertRequestReadable(ctx, req, normalized, res)) return;
+    if (!assertRequestOwner(ctx, req, procurementRequest, res, "procurement-request.delete.owner.denied")) return;
     if (normalized.status !== "draft") {
       const auditLog = ctx.auditService.record({
         context: req.auth,
@@ -543,11 +664,12 @@ export function projectRoutes(ctx: AppContext) {
   });
 
   router.post("/procurement-requests/:requestId/cancel", (req, res) => {
-    if (!ensureProcurementMaintainer(ctx, req, res, "procurement_request", req.params.requestId)) return;
+    if (!ensureRequestInitiator(ctx, req, res, req.params.requestId)) return;
     const procurementRequest = ensureRequest(ctx, req.params.requestId, res);
     if (!procurementRequest) return;
     const normalized = normalizeRequest(procurementRequest);
     if (!assertRequestReadable(ctx, req, normalized, res)) return;
+    if (!assertRequestOwner(ctx, req, procurementRequest, res, "procurement-request.cancel.owner.denied")) return;
     if (normalized.status === "project_created") {
       const auditLog = ctx.auditService.record({
         context: req.auth,
@@ -582,11 +704,12 @@ export function projectRoutes(ctx: AppContext) {
   });
 
   router.post("/procurement-requests/:requestId/submit", (req, res) => {
-    if (!ensureProcurementMaintainer(ctx, req, res, "procurement_request", req.params.requestId)) return;
+    if (!ensureRequestInitiator(ctx, req, res, req.params.requestId)) return;
     const procurementRequest = ensureRequest(ctx, req.params.requestId, res);
     if (!procurementRequest) return;
     const normalized = normalizeRequest(procurementRequest);
     if (!assertRequestReadable(ctx, req, normalized, res)) return;
+    if (!assertRequestOwner(ctx, req, procurementRequest, res, "procurement-request.submit.owner.denied")) return;
     if (!nextStatusAllowed(normalized.status as ProcurementRequestStatus, "submitted")) {
       return res.status(400).json({ error: { code: "PROCUREMENT_REQUEST_STATUS_INVALID", message: "Request cannot be submitted from current status." } });
     }
@@ -609,6 +732,7 @@ export function projectRoutes(ctx: AppContext) {
         projectId: procurementRequest.projectId ?? undefined,
         orgId: procurementRequest.orgId,
         initiator: req.auth.user,
+        assigneeRoleId: req.auth.roleId === "hotel_buyer" ? "buyer" : undefined,
         sourceJson: { route: "procurement_request.submit", requestStatus: normalized.status }
       });
     } catch (error) {
@@ -628,33 +752,59 @@ export function projectRoutes(ctx: AppContext) {
   });
 
   router.post("/procurement-requests/:requestId/approve", (req, res) => {
-    if (!ensureProcurementMaintainer(ctx, req, res, "procurement_request", req.params.requestId)) return;
+    if (!ensureRequestApprovalRole(ctx, req, res, req.params.requestId)) return;
     const procurementRequest = ensureRequest(ctx, req.params.requestId, res);
     if (!procurementRequest) return;
     const normalized = normalizeRequest(procurementRequest);
     if (!assertRequestReadable(ctx, req, normalized, res)) return;
+    if (normalized.createdBy === req.auth.user.id) {
+      return denyRequestAction(
+        ctx,
+        req,
+        res,
+        "PROCUREMENT_REQUEST_SELF_APPROVAL_DENIED",
+        "Procurement request creators cannot approve or reject their own requests.",
+        "procurement-request.self-approval.denied",
+        procurementRequest.id,
+        `createdBy=${normalized.createdBy}`
+      );
+    }
     if (!["submitted", "rejected"].includes(String(normalized.approvalStatus))) {
       return res.status(400).json({
         error: { code: "PROCUREMENT_REQUEST_APPROVAL_INVALID", message: "Current request is not in an approvable state." }
       });
     }
+    const instance = ctx.r8WorkflowTaskRepository.getApprovalInstanceByBusiness("procurement_request", procurementRequest.id);
+    if (instance && !workflowStatusTerminal(instance.approvalStatus) && !hasVisiblePendingApprovalTask(ctx, req, procurementRequest.id)) {
+      return denyRequestAction(
+        ctx,
+        req,
+        res,
+        "PROCUREMENT_REQUEST_APPROVAL_TASK_DENIED",
+        "Current user does not have the pending approval task for this procurement request.",
+        "procurement-request.approval-task.denied",
+        procurementRequest.id,
+        `workflow=${instance.id};currentRole=${instance.currentRoleId ?? ""}`
+      );
+    }
     const approved = Boolean(req.body?.approved ?? true);
-    procurementRequest.approvalStatus = approved ? "approved" : "rejected";
-    procurementRequest.approvalOpinion = String(req.body?.opinion ?? (approved ? "approved" : "rejected"));
-    procurementRequest.approvalBy = req.auth.user.id;
-    procurementRequest.approvedAt = new Date().toISOString();
-    procurementRequest.updatedAt = procurementRequest.approvedAt;
     try {
-      ctx.r8WorkflowTaskRepository.recordApprovalAction({
+      const workflow = ctx.r8WorkflowTaskRepository.recordApprovalAction({
         businessType: "procurement_request",
         businessId: procurementRequest.id,
         actor: req.auth.user,
         action: approved ? "approve" : "reject",
-        opinion: procurementRequest.approvalOpinion,
+        opinion: String(req.body?.opinion ?? (approved ? "approved" : "rejected")),
         sourceJson: { route: "procurement_request.approve" }
       });
-    } catch {
-      // Legacy approval API remains compatible; strict R8 assignee checks live on /workflow actions.
+      procurementRequest.approvalStatus = workflow.approvalInstance.approvalStatus === "approved" ? "approved" : "rejected";
+      procurementRequest.approvalOpinion = String(req.body?.opinion ?? (approved ? "approved" : "rejected"));
+      procurementRequest.approvalBy = workflow.approvalInstance.completedBy ?? req.auth.user.id;
+      procurementRequest.approvedAt = workflow.approvalInstance.completedAt ?? new Date().toISOString();
+      procurementRequest.updatedAt = procurementRequest.approvedAt;
+    } catch (error) {
+      const workflowError = workflowErrorBody(error);
+      return res.status(workflowError.status).json({ error: { code: workflowError.code, message: workflowError.message } });
     }
     ctx.r4SourcingRepository.upsertProcurementRequest(procurementRequest);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(
@@ -669,7 +819,7 @@ export function projectRoutes(ctx: AppContext) {
   });
 
   router.post("/procurement-requests/:requestId/method-decision", (req, res) => {
-    if (!ensureProcurementMaintainer(ctx, req, res, "procurement_request", req.params.requestId)) return;
+    if (!ensureRequestMethodDecisionRole(ctx, req, res, req.params.requestId)) return;
     const procurementRequest = ensureRequest(ctx, req.params.requestId, res);
     if (!procurementRequest) return;
     const normalized = normalizeRequest(procurementRequest);

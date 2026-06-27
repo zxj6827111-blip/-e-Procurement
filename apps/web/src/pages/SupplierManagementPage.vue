@@ -13,6 +13,8 @@ interface Attachment {
   contentType?: string;
   sizeBytes?: number;
   uploadedAt: string;
+  qualificationType?: string;
+  validUntil?: string;
 }
 
 interface ServiceRegion {
@@ -30,6 +32,7 @@ interface AdmissionReview {
   score?: number;
   opinion: string;
   reviewedAt: string;
+  reviewer?: string;
 }
 
 interface SealSample {
@@ -37,9 +40,12 @@ interface SealSample {
   sampleName: string;
   specification: string;
   confirmedBy: string;
+  confirmedAt?: string;
   uploadedAt?: string;
   fileId?: string;
   fileName?: string;
+  contentType?: string;
+  imageFileName?: string;
 }
 
 interface Supplier {
@@ -57,13 +63,21 @@ interface Supplier {
   qualificationAttachments?: Attachment[];
   admissionReviews?: AdmissionReview[];
   sealSamples?: SealSample[];
+  evaluationScore?: number | null;
 }
+
+type SupplierTab = "basic" | "qualifications" | "samples" | "reviews" | "evaluations";
 
 const session = useSessionStore();
 const suppliers = ref<Supplier[]>([]);
 const selectedSupplierId = ref("");
+const activeTab = ref<SupplierTab>("basic");
+const showActionPanel = ref(false);
+const actionMode = ref<"supplier" | "profile" | "review" | "sample">("profile");
 const auditLogId = ref("");
 const error = ref("");
+const searchText = ref("");
+const statusFilter = ref("全部");
 
 const newSupplierName = ref("新增供应商");
 const newSupplierCategory = ref("客房一次性用品");
@@ -94,13 +108,35 @@ const sealSampleName = ref("封样图片");
 const sealSampleSpec = ref("标准样");
 const sealSampleFile = ref<File | null>(null);
 const sealSampleFileName = ref("");
+const pendingSelectedSupplierId = ref("");
 
-const supplierMaintainerRoles = new Set(["buyer", "group_manager", "platform_operator"]);
+const supplierMaintainerRoles = new Set(["buyer", "group_manager", "hotel_buyer", "platform_operator"]);
 const supplierAdminRoles = new Set(["supplier", "supplier_admin"]);
 const canMaintainSupplier = computed(() => supplierMaintainerRoles.has(session.roleId));
 const canEditOwnSupplier = computed(() => supplierAdminRoles.has(session.roleId) || canMaintainSupplier.value);
-const visibleSuppliers = computed(() => suppliers.value);
-const selectedSupplier = computed(() => visibleSuppliers.value.find((item) => item.id === selectedSupplierId.value) ?? null);
+
+const statusOptions = computed(() => ["全部", ...Array.from(new Set(suppliers.value.map((item) => labelStatus(item.admissionStatus || item.status))))]);
+const visibleSuppliers = computed(() =>
+  suppliers.value.filter((supplier) => {
+    if (isTestSupplier(supplier)) return false;
+    const keywordMatched = [supplier.name, supplier.contactName, supplier.contactPhone, supplier.categoryAuth.join(" "), serviceRegionSummary(supplier)]
+      .join(" ")
+      .toLowerCase()
+      .includes(searchText.value.trim().toLowerCase());
+    const statusMatched = statusFilter.value === "全部" || labelStatus(supplier.admissionStatus || supplier.status) === statusFilter.value;
+    return keywordMatched && statusMatched;
+  })
+);
+const selectedSupplier = computed(() => visibleSuppliers.value.find((item) => item.id === selectedSupplierId.value) ?? visibleSuppliers.value[0] ?? null);
+const supplierStats = computed(() => {
+  const list = visibleSuppliers.value;
+  return {
+    total: list.length,
+    admitted: list.filter((item) => ["admitted", "已准入"].includes(item.admissionStatus || item.status)).length,
+    qualifications: list.reduce((sum, item) => sum + (item.qualificationAttachments?.length ?? 0), 0),
+    samples: list.reduce((sum, item) => sum + (item.sealSamples?.length ?? 0), 0)
+  };
+});
 
 const reviewTypeLabels: Record<string, string> = {
   qualification_initial_review: "资质初审",
@@ -108,6 +144,19 @@ const reviewTypeLabels: Record<string, string> = {
   regularization_review: "转正评审",
   periodic_assessment: "周期考核"
 };
+
+const tabs: Array<{ key: SupplierTab; label: string }> = [
+  { key: "basic", label: "基础信息" },
+  { key: "qualifications", label: "资质证照" },
+  { key: "samples", label: "封样样品" },
+  { key: "reviews", label: "准入评审" },
+  { key: "evaluations", label: "评价记录" }
+];
+
+function openAction(mode: "supplier" | "profile" | "review" | "sample") {
+  actionMode.value = mode;
+  showActionPanel.value = true;
+}
 
 function resetProfileForm(supplier: Supplier | null) {
   profileName.value = supplier?.name ?? "";
@@ -122,10 +171,51 @@ function resetProfileForm(supplier: Supplier | null) {
 }
 
 function syncSelectedSupplier() {
-  if (!visibleSuppliers.value.some((item) => item.id === selectedSupplierId.value)) {
+  if (pendingSelectedSupplierId.value && visibleSuppliers.value.some((item) => item.id === pendingSelectedSupplierId.value)) {
+    selectedSupplierId.value = pendingSelectedSupplierId.value;
+    pendingSelectedSupplierId.value = "";
+  } else if (!visibleSuppliers.value.some((item) => item.id === selectedSupplierId.value)) {
     selectedSupplierId.value = visibleSuppliers.value[0]?.id ?? "";
   }
   resetProfileForm(selectedSupplier.value);
+}
+
+function selectSupplier(supplier: Supplier) {
+  selectedSupplierId.value = supplier.id;
+  activeTab.value = "basic";
+  resetProfileForm(supplier);
+}
+
+function isTestSupplier(supplier: Supplier) {
+  return [supplier.name, supplier.contactName, supplier.contactPhone].some((value) => /stage\s*\d|阶段\s*\d|runtime|uat|mock|test/i.test(String(value ?? "")));
+}
+
+function serviceRegionSummary(supplier: Supplier | null) {
+  if (!supplier?.serviceRegions?.length) return "暂无服务区域";
+  return supplier.serviceRegions.map((item) => `${item.region}/${item.storeName}`).join("，");
+}
+
+function sealSampleAttachments(sample: SealSample): Attachment[] {
+  const id = sample.fileId ?? "";
+  if (!id) return [];
+  return [
+    {
+      id,
+      fileName: sample.fileName ?? sample.imageFileName ?? `${sample.sampleName}.png`,
+      contentType: sample.contentType ?? "image/png",
+      uploadedAt: sample.uploadedAt ?? sample.confirmedAt ?? ""
+    }
+  ];
+}
+
+function supplierStatus(supplier: Supplier | null) {
+  return labelStatus(supplier?.admissionStatus || supplier?.status);
+}
+
+function riskLabel(value?: string) {
+  if (!value) return "-";
+  if (value === "pending_review") return "待复核";
+  return labelStatus(value);
 }
 
 function onQualificationChange(event: Event, mode: "create" | "profile" | "seal") {
@@ -171,8 +261,8 @@ async function run(action: () => Promise<{ auditLogId?: string }>) {
 }
 
 async function createSupplier() {
-  await run(async () =>
-    apiPost("/api/suppliers/admissions", {
+  await run(async () => {
+    const result = await apiPost<{ supplier?: Supplier; auditLogId?: string }>("/api/suppliers/admissions", {
       name: newSupplierName.value,
       category: newSupplierCategory.value,
       contactName: newSupplierContactName.value,
@@ -185,11 +275,16 @@ async function createSupplier() {
           category: newSupplierCategory.value
         }
       ],
-      qualificationAttachments: await uploadList(qualificationFile.value, `pending-supplier-${Date.now()}`, "supplier_qualification")
-    })
-  );
+      qualificationAttachments: await uploadList(qualificationFile.value, `pending-supplier-${Date.now()}`, "supplier_qualification"),
+      qualification: "有效",
+      admissionStatus: "admitted"
+    });
+    pendingSelectedSupplierId.value = result.supplier?.id ?? "";
+    return result;
+  });
   qualificationFile.value = null;
   qualificationFileName.value = "";
+  showActionPanel.value = false;
 }
 
 async function saveProfile() {
@@ -240,199 +335,256 @@ async function submitSealSample() {
 }
 
 onMounted(async () => {
-  await session.loadMe(session.user?.id);
+  if (!session.user) await session.loadMe();
   await load();
 });
 </script>
 
 <template>
-  <section class="panel">
-    <h2>{{ session.roleId === "supplier" ? "供应商资料维护" : "供应商准入管理" }}</h2>
-
-    <div v-if="canMaintainSupplier" class="form-grid">
-      <label>
-        供应商名称
-        <input v-model="newSupplierName" />
-      </label>
-      <label>
-        业务品类
-        <input v-model="newSupplierCategory" />
-      </label>
-      <label>
-        联系人
-        <input v-model="newSupplierContactName" />
-      </label>
-      <label>
-        联系电话
-        <input v-model="newSupplierContactPhone" />
-      </label>
-      <label>
-        联系邮箱
-        <input v-model="newSupplierContactEmail" />
-      </label>
-      <label>
-        服务区域
-        <input v-model="newSupplierRegion" />
-      </label>
-      <label>
-        门店 / 服务点
-        <input v-model="newSupplierStore" />
-      </label>
-      <label>
-        资质附件
-        <input type="file" @change="(event) => onQualificationChange(event, 'create')" />
-      </label>
-      <div class="notice">{{ qualificationFileName || "未选择文件" }}</div>
-      <button type="button" @click="createSupplier">新增供应商</button>
+  <section class="page-surface">
+    <div class="page-title-row">
+      <div>
+        <p class="eyebrow">供应商档案</p>
+        <h2>{{ session.roleId === "supplier" ? "供应商资料维护" : "供应商档案中心" }}</h2>
+      </div>
+      <div class="summary-strip">
+        <span><strong>{{ supplierStats.total }}</strong> 档案</span>
+        <span><strong>{{ supplierStats.admitted }}</strong> 已准入</span>
+        <span><strong>{{ supplierStats.qualifications }}</strong> 资质</span>
+        <span><strong>{{ supplierStats.samples }}</strong> 封样</span>
+      </div>
     </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th>名称</th>
-          <th>准入状态</th>
-          <th>品类</th>
-          <th>联系人</th>
-          <th>联系电话</th>
-          <th>服务区域</th>
-          <th>资质附件</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="supplier in visibleSuppliers" :key="supplier.id">
-          <td>{{ supplier.name }}</td>
-          <td>{{ labelStatus(supplier.admissionStatus || supplier.status) }}</td>
-          <td>{{ supplier.categoryAuth.join("，") || "-" }}</td>
-          <td>{{ supplier.contactName || "-" }}</td>
-          <td>{{ supplier.contactPhone || "-" }}</td>
-          <td>{{ supplier.serviceRegions?.map((item) => `${item.region}/${item.storeName}`).join("，") || "-" }}</td>
-          <td>
-            <AttachmentList :attachments="supplier.qualificationAttachments" compact />
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div v-if="selectedSupplierId || visibleSuppliers.length" class="form-grid">
+    <div class="filter-bar">
       <label>
-        当前供应商
-        <select v-model="selectedSupplierId" @change="resetProfileForm(selectedSupplier)">
-          <option v-for="supplier in visibleSuppliers" :key="supplier.id" :value="supplier.id">{{ supplier.name }}</option>
+        状态
+        <select v-model="statusFilter">
+          <option v-for="status in statusOptions" :key="status">{{ status }}</option>
         </select>
       </label>
-      <label>
-        供应商名称
-        <input v-model="profileName" :disabled="!canEditOwnSupplier" />
+      <label class="filter-keyword">
+        关键词
+        <input v-model="searchText" placeholder="供应商、联系人、品类" />
       </label>
-      <label>
-        联系人
-        <input v-model="profileContactName" :disabled="!canEditOwnSupplier" />
-      </label>
-      <label>
-        联系电话
-        <input v-model="profileContactPhone" :disabled="!canEditOwnSupplier" />
-      </label>
-      <label>
-        联系邮箱
-        <input v-model="profileContactEmail" :disabled="!canEditOwnSupplier" />
-      </label>
-      <label>
-        品类
-        <input v-model="profileCategory" :disabled="!canEditOwnSupplier" />
-      </label>
-      <label>
-        服务区域
-        <input v-model="profileRegion" :disabled="!canEditOwnSupplier" />
-      </label>
-      <label>
-        门店 / 服务点
-        <input v-model="profileStore" :disabled="!canEditOwnSupplier" />
-      </label>
-      <label v-if="canEditOwnSupplier">
-        更新资质附件
-        <input type="file" @change="(event) => onQualificationChange(event, 'profile')" />
-      </label>
-      <div v-if="canEditOwnSupplier" class="notice">{{ profileQualificationFileName || "未选择文件" }}</div>
-      <button v-if="canEditOwnSupplier" type="button" :disabled="!selectedSupplierId" @click="saveProfile">保存资料</button>
+      <button v-if="canMaintainSupplier" type="button" @click="openAction('supplier')">新增供应商</button>
     </div>
-
-    <div v-if="canMaintainSupplier && selectedSupplierId" class="form-grid">
-      <label>
-        评审类型
-        <select v-model="reviewType">
-          <option value="qualification_initial_review">资质初审</option>
-          <option value="admission_assessment">准入评审</option>
-          <option value="regularization_review">转正评审</option>
-          <option value="periodic_assessment">周期考核</option>
-        </select>
-      </label>
-      <label>
-        评审结果
-        <select v-model="reviewStatus">
-          <option value="passed">通过</option>
-          <option value="rejected">驳回</option>
-          <option value="pending">待定</option>
-        </select>
-      </label>
-      <label>
-        评分
-        <input v-model.number="reviewScore" type="number" />
-      </label>
-      <label>
-        评审意见
-        <input v-model="reviewOpinion" />
-      </label>
-      <button type="button" @click="submitReview">提交评审</button>
-    </div>
-
-    <div v-if="selectedSupplierId && canEditOwnSupplier" class="form-grid">
-      <label>
-        封样名称
-        <input v-model="sealSampleName" />
-      </label>
-      <label>
-        规格说明
-        <input v-model="sealSampleSpec" />
-      </label>
-      <label>
-        封样附件
-        <input type="file" @change="(event) => onQualificationChange(event, 'seal')" />
-      </label>
-      <div class="notice">{{ sealSampleFileName || "未选择文件" }}</div>
-      <button type="button" @click="submitSealSample">上传封样</button>
-    </div>
-
-    <div v-if="selectedSupplier" class="workbench-grid">
-      <section class="section-block">
-        <h3>准入评审记录</h3>
-        <div v-if="selectedSupplier.admissionReviews?.length">
-          <div v-for="review in selectedSupplier.admissionReviews" :key="review.id" class="stack-item">
-            <strong>{{ reviewTypeLabels[review.reviewType] ?? review.reviewType }} / {{ labelStatus(review.status) }}</strong>
-            <span>{{ review.opinion || "-" }}</span>
-            <small>{{ formatDateTime(review.reviewedAt) }} / 评分 {{ review.score ?? "-" }}</small>
-          </div>
-        </div>
-        <p v-else class="notice">暂无评审记录。</p>
-      </section>
-
-      <section class="section-block">
-        <h3>封样与样品</h3>
-        <div v-if="selectedSupplier.sealSamples?.length">
-          <div v-for="sample in selectedSupplier.sealSamples" :key="sample.id" class="stack-item">
-            <strong>{{ sample.sampleName }}</strong>
-            <span>{{ sample.specification || "-" }}</span>
-            <AttachmentList
-              :attachments="sample.fileId ? [{ id: sample.fileId, fileName: sample.fileName, uploadedAt: sample.uploadedAt }] : []"
-              compact
-            />
-            <small>{{ sample.confirmedBy }} / {{ formatDateTime(sample.uploadedAt) }}</small>
-          </div>
-        </div>
-        <p v-else class="notice">暂无封样资料。</p>
-      </section>
-    </div>
-
-    <AuditLogRef :audit-log-id="auditLogId" />
-    <ErrorAlert v-if="error" :message="error" />
   </section>
+
+  <section class="supplier-layout formal-supplier-layout">
+    <aside class="supplier-card-list">
+      <button
+        v-for="supplier in visibleSuppliers"
+        :key="supplier.id"
+        type="button"
+        class="supplier-card"
+        :class="{ selected: supplier.id === selectedSupplier?.id }"
+        @click="selectSupplier(supplier)"
+      >
+        <strong>{{ supplier.name }}</strong>
+        <small>{{ supplier.contactName || "暂无联系人" }} / {{ supplier.contactPhone || "暂无电话" }}</small>
+        <span class="tag">{{ labelStatus(supplier.admissionStatus || supplier.status) }}</span>
+        <div class="supplier-card-tags">
+          <span v-for="category in supplier.categoryAuth" :key="category" class="tag">{{ category }}</span>
+        </div>
+        <small>{{ serviceRegionSummary(supplier) }}</small>
+      </button>
+    </aside>
+
+    <div v-if="selectedSupplier" class="supplier-detail">
+      <section class="business-panel">
+        <div class="detail-header">
+          <div>
+            <p class="eyebrow">当前档案</p>
+            <h2>{{ selectedSupplier.name }}</h2>
+          </div>
+          <div class="actions">
+            <span class="tag">{{ supplierStatus(selectedSupplier) }}</span>
+            <button v-if="canEditOwnSupplier" type="button" class="secondary-button" @click="openAction('profile')">维护资料</button>
+            <button v-if="canMaintainSupplier" type="button" class="secondary-button" @click="openAction('review')">记录评审</button>
+            <button v-if="canEditOwnSupplier" type="button" class="secondary-button" @click="openAction('sample')">上传封样</button>
+          </div>
+        </div>
+
+        <div class="detail-summary-grid">
+          <div><span>联系人</span><strong>{{ selectedSupplier.contactName || "-" }}</strong></div>
+          <div><span>联系电话</span><strong>{{ selectedSupplier.contactPhone || "-" }}</strong></div>
+          <div><span>主营品类</span><strong>{{ selectedSupplier.categoryAuth.join("，") || "-" }}</strong></div>
+          <div><span>服务范围</span><strong>{{ serviceRegionSummary(selectedSupplier) }}</strong></div>
+        </div>
+      </section>
+
+      <section v-if="showActionPanel" class="business-panel action-panel">
+        <div class="panel-head">
+          <h3>
+            {{
+              actionMode === "supplier"
+                ? "新增供应商"
+                : actionMode === "profile"
+                  ? "档案资料维护"
+                  : actionMode === "review"
+                    ? "记录准入评审"
+                    : "上传封样样品"
+            }}
+          </h3>
+          <button type="button" class="secondary-button" @click="showActionPanel = false">收起</button>
+        </div>
+
+        <div v-if="actionMode === 'supplier'" class="form-grid">
+          <label>供应商名称<input v-model="newSupplierName" /></label>
+          <label>业务品类<input v-model="newSupplierCategory" /></label>
+          <label>联系人<input v-model="newSupplierContactName" /></label>
+          <label>联系电话<input v-model="newSupplierContactPhone" /></label>
+          <label>联系邮箱<input v-model="newSupplierContactEmail" /></label>
+          <label>服务区域<input v-model="newSupplierRegion" /></label>
+          <label>门店 / 服务点<input v-model="newSupplierStore" /></label>
+          <label>首份资质附件<input type="file" @change="(event) => onQualificationChange(event, 'create')" /></label>
+          <div class="notice">{{ qualificationFileName || "未选择文件" }}</div>
+          <button type="button" @click="createSupplier">新增供应商</button>
+        </div>
+
+        <div v-else-if="actionMode === 'profile'" class="form-grid">
+          <label>供应商名称<input v-model="profileName" /></label>
+          <label>联系人<input v-model="profileContactName" /></label>
+          <label>联系电话<input v-model="profileContactPhone" /></label>
+          <label>联系邮箱<input v-model="profileContactEmail" /></label>
+          <label>主营品类<input v-model="profileCategory" /></label>
+          <label>服务区域<input v-model="profileRegion" /></label>
+          <label>门店 / 服务点<input v-model="profileStore" /></label>
+          <label>追加资质附件<input type="file" @change="(event) => onQualificationChange(event, 'profile')" /></label>
+          <div class="notice">{{ profileQualificationFileName || "未选择文件" }}</div>
+          <button type="button" :disabled="!selectedSupplierId" @click="saveProfile">保存资料</button>
+        </div>
+
+        <div v-else-if="actionMode === 'review'" class="form-grid">
+          <label>
+            评审类型
+            <select v-model="reviewType">
+              <option value="qualification_initial_review">资质初审</option>
+              <option value="admission_assessment">准入评审</option>
+              <option value="regularization_review">转正评审</option>
+              <option value="periodic_assessment">周期考核</option>
+            </select>
+          </label>
+          <label>
+            评审结果
+            <select v-model="reviewStatus">
+              <option value="passed">通过</option>
+              <option value="rejected">驳回</option>
+              <option value="pending">待定</option>
+            </select>
+          </label>
+          <label>评分<input v-model.number="reviewScore" type="number" /></label>
+          <label>评审意见<input v-model="reviewOpinion" /></label>
+          <button type="button" @click="submitReview">提交评审</button>
+        </div>
+
+        <div v-else class="form-grid">
+          <label>封样名称<input v-model="sealSampleName" /></label>
+          <label>规格说明<input v-model="sealSampleSpec" /></label>
+          <label>封样附件<input type="file" accept="image/*" @change="(event) => onQualificationChange(event, 'seal')" /></label>
+          <div class="notice">{{ sealSampleFileName || "未选择文件" }}</div>
+          <button type="button" @click="submitSealSample">上传封样</button>
+        </div>
+      </section>
+
+      <section class="business-panel">
+        <div class="tabbar">
+          <button v-for="tab in tabs" :key="tab.key" type="button" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">
+            {{ tab.label }}
+          </button>
+        </div>
+
+        <div v-if="activeTab === 'basic'" class="tab-content">
+          <div class="detail-summary-grid">
+            <div><span>联系邮箱</span><strong>{{ selectedSupplier.contactEmail || "-" }}</strong></div>
+            <div><span>风险提示</span><strong>{{ riskLabel(selectedSupplier.risk) }}</strong></div>
+            <div><span>资质状态</span><strong>{{ selectedSupplier.qualification || "-" }}</strong></div>
+            <div><span>评价分</span><strong>{{ selectedSupplier.evaluationScore ?? "-" }}</strong></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>区域</th>
+                  <th>门店 / 服务点</th>
+                  <th>品类</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="region in selectedSupplier.serviceRegions" :key="region.id">
+                  <td>{{ region.region }}</td>
+                  <td>{{ region.storeName }}</td>
+                  <td>{{ region.category }}</td>
+                  <td>{{ labelStatus(region.status) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div v-else-if="activeTab === 'qualifications'" class="tab-content">
+          <div class="panel-head">
+            <h3>资质证照</h3>
+            <span class="tag">共 {{ selectedSupplier.qualificationAttachments?.length ?? 0 }} 份</span>
+          </div>
+          <AttachmentList :attachments="selectedSupplier.qualificationAttachments" variant="document" empty-text="暂无资质文件" />
+        </div>
+
+        <div v-else-if="activeTab === 'samples'" class="tab-content">
+          <div class="panel-head">
+            <h3>封样样品</h3>
+            <span class="tag">共 {{ selectedSupplier.sealSamples?.length ?? 0 }} 件</span>
+          </div>
+          <div v-if="selectedSupplier.sealSamples?.length" class="seal-sample-grid">
+            <article v-for="sample in selectedSupplier.sealSamples" :key="sample.id" class="seal-sample-card">
+              <div class="sample-visual">
+                <AttachmentList
+                  v-if="sealSampleAttachments(sample).length"
+                  :attachments="sealSampleAttachments(sample)"
+                  variant="gallery"
+                  image-only
+                  empty-text="暂无封样图片"
+                />
+                <div v-else class="visual-placeholder">
+                  <strong>封样</strong>
+                  <span>{{ sample.sampleName }}</span>
+                </div>
+              </div>
+              <strong>{{ sample.sampleName }}</strong>
+              <span>{{ sample.specification || "-" }}</span>
+              <small>{{ sample.confirmedBy }} / {{ formatDateTime(sample.uploadedAt ?? sample.confirmedAt) }}</small>
+            </article>
+          </div>
+          <p v-else class="notice">暂无封样资料。</p>
+        </div>
+
+        <div v-else-if="activeTab === 'reviews'" class="tab-content">
+          <div v-if="selectedSupplier.admissionReviews?.length" class="timeline-list">
+            <article v-for="review in selectedSupplier.admissionReviews" :key="review.id" class="timeline-row">
+              <span class="tag">{{ labelStatus(review.status) }}</span>
+              <strong>{{ reviewTypeLabels[review.reviewType] ?? review.reviewType }}</strong>
+              <p>{{ review.opinion || "-" }}</p>
+              <small>{{ review.reviewer || "评审人" }} / {{ formatDateTime(review.reviewedAt) }} / 评分 {{ review.score ?? "-" }}</small>
+            </article>
+          </div>
+          <p v-else class="notice">暂无评审记录。</p>
+        </div>
+
+        <div v-else class="tab-content">
+          <div class="detail-summary-grid">
+            <div><span>综合评分</span><strong>{{ selectedSupplier.evaluationScore ?? "-" }}</strong></div>
+            <div><span>准入状态</span><strong>{{ supplierStatus(selectedSupplier) }}</strong></div>
+            <div><span>风险状态</span><strong>{{ selectedSupplier.risk || "-" }}</strong></div>
+            <div><span>最近评审</span><strong>{{ formatDateTime(selectedSupplier.admissionReviews?.[0]?.reviewedAt) }}</strong></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div v-else class="empty">当前角色暂无可见供应商档案。</div>
+  </section>
+
+  <AuditLogRef :audit-log-id="auditLogId" />
+  <ErrorAlert v-if="error" :message="error" />
 </template>

@@ -1,5 +1,5 @@
 import type { SeedState } from "../seed/data.js";
-import { createSeedState } from "../seed/data.js";
+import { createSeedState, enrichSeedState } from "../seed/data.js";
 import type { BusinessTableStore } from "./business-table-store.js";
 import type { RuntimeDb } from "./runtime-db.js";
 
@@ -15,11 +15,13 @@ export class RuntimeStateStore {
     const row = this.runtimeDb.db.prepare("select payload_json from runtime_state where state_key = ?").get(STATE_KEY) as { payload_json: string } | undefined;
     if (!row) {
       const seed = createSeedState();
+      enrichSeedState(seed);
       if (seedOnBoot) this.saveState(seed);
-      this.businessTableStore?.syncState(seed);
+      else this.businessTableStore?.syncState(seed);
       return seed;
     }
     const state = JSON.parse(row.payload_json) as SeedState;
+    enrichSeedState(state);
     this.businessTableStore?.syncState(state);
     return state;
   }

@@ -1,5 +1,5 @@
 import type { RuntimeDb } from "../runtime/index.js";
-import type { MallSettlementInvoice, PurchaseOrder, RoleId, SettlementMaterial, SettlementMaterialType, User } from "../types.js";
+import type { MallSettlementInvoice, PurchaseOrder, PurchaseOrderLineItem, RoleId, SettlementMaterial, SettlementMaterialType, User } from "../types.js";
 import { isFinanceReviewRole, isOrgReaderRole, isSupplierRole, supplierIdMatches, userOrgScope } from "../role-groups.js";
 
 type SqlValue = string | number | bigint | null | Uint8Array;
@@ -34,6 +34,7 @@ export interface SettlementBill {
   id: string;
   billNo: string;
   purchaseOrderId: string;
+  purchaseOrderNo?: string;
   projectId: string;
   supplierId: string;
   orgId?: string;
@@ -181,7 +182,294 @@ export function isFundLedgerStatus(value: string): value is FundLedgerEntry["sta
 export class R7SettlementFinanceRepository {
   constructor(private readonly runtimeDb: RuntimeDb) {}
 
+  ensureBusinessSettlementSamples() {
+    this.ensureSupplierSettlementScenario();
+    const order = this.orderRow("po-food-1");
+    if (!order) return;
+    const hasBill = this.runtimeDb.db.prepare("select id from r2_settlement_bills where id = ?").get("sb-food-202607") as Row | undefined;
+    if (hasBill) {
+      this.ensureBusinessSettlementMaterials("sb-food-202607");
+      this.ensureBusinessSettlementInvoice("sb-food-202607");
+      this.ensureBusinessFundLedger("sb-food-202607");
+      return;
+    }
+
+    const period = "2026-07";
+    const timestamp = "2026-07-02T10:00:00.000Z";
+    const metrics = this.calculateOrderMetrics("po-food-1", 0);
+    if (metrics.settlementAmount <= 0) return;
+
+    run(
+      this.runtimeDb.db.prepare(
+        `insert into r2_settlement_bills (
+          id, bill_no, purchase_order_id, project_id, supplier_id, org_id, department_id,
+          settlement_period, bill_status, order_amount, received_amount, return_amount,
+          service_fee, settlement_amount, source_json, created_by, created_at, submitted_by,
+          submitted_at, approved_by, approved_at, approval_opinion, updated_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ),
+      [
+        "sb-food-202607",
+        "JS-202607-0003",
+        "po-food-1",
+        String(order.project_id),
+        String(order.supplier_id),
+        optionalString(order.org_id) ?? "org-hotel",
+        optionalString(order.department_id) ?? null,
+        period,
+        "approved",
+        metrics.orderAmount,
+        metrics.receivedAmount,
+        metrics.returnAmount,
+        metrics.serviceFee,
+        metrics.settlementAmount,
+        JSON.stringify({ orderNo: order.order_no, source: "business_seed" }),
+        "u9",
+        timestamp,
+        "u11",
+        "2026-07-02T10:20:00.000Z",
+        "u9",
+        "2026-07-02T11:10:00.000Z",
+        "资料齐全，金额与验收记录一致",
+        "2026-07-02T11:10:00.000Z"
+      ]
+    );
+
+    const itemStatement = this.runtimeDb.db.prepare(
+      `insert into r2_settlement_bill_items (
+        id, settlement_bill_id, purchase_order_id, order_line_item_id, receipt_id, return_id,
+        item_name, ordered_quantity, received_quantity, returned_quantity, unit_price,
+        order_amount, received_amount, return_amount, payable_amount, source_json, updated_at
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    for (const item of metrics.items) {
+      run(itemStatement, [
+        item.id.replace("__bill__", "sb-food-202607"),
+        "sb-food-202607",
+        "po-food-1",
+        item.orderLineItemId,
+        item.receiptId ?? "rrc-food-1",
+        item.returnId ?? null,
+        item.itemName,
+        item.orderedQuantity,
+        item.receivedQuantity,
+        item.returnedQuantity,
+        item.unitPrice,
+        item.orderAmount,
+        item.receivedAmount,
+        item.returnAmount,
+        item.payableAmount,
+        JSON.stringify({ generatedFrom: "seeded received order" }),
+        "2026-07-02T10:00:00.000Z"
+      ]);
+    }
+
+    this.ensureBusinessSettlementMaterials("sb-food-202607");
+    this.ensureBusinessSettlementInvoice("sb-food-202607");
+    this.ensureBusinessFundLedger("sb-food-202607");
+    this.upsertReconciliation("sb-food-202607");
+  }
+
+  private ensureSupplierSettlementScenario() {
+    const timestamp = "2026-07-03T10:00:00.000Z";
+    const order = this.orderRow("po-linen-202607");
+    if (!order) {
+      run(
+        this.runtimeDb.db.prepare(
+          `insert into r2_purchase_orders (
+            id, project_id, supplier_id, contract_id, source_request_id, award_approval_id,
+            selected_bid_id, order_no, order_status, payment_status, buyer_id, org_id,
+            department_id, total_amount, expected_delivery_at, receiving_location,
+            invoice_title, confirmed_at, created_by, created_at, updated_at, synced_at
+          ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ),
+        [
+          "po-linen-202607",
+          "p-award",
+          "sup-1",
+          "cl-award-1",
+          "req-award",
+          "aa-award-1",
+          "bid-award-1",
+          "PO-2026-0002",
+          "received",
+          "payment_reserved",
+          "u8",
+          "org-hotel",
+          null,
+          278400,
+          "2026-07-05",
+          "上海滨江华礼酒店客房仓",
+          "华礼酒店集团",
+          "2026-06-28T14:00:00.000Z",
+          "u8",
+          "2026-06-28T13:20:00.000Z",
+          "2026-07-03T09:30:00.000Z",
+          timestamp
+        ]
+      );
+    }
+
+    const lineStatement = this.runtimeDb.db.prepare(
+      `insert into r2_order_line_items (
+        id, order_id, product_id, sku_id, item_name, specification, quantity, unit,
+        unit_price, tax_rate, total_price, received_quantity, price_source_type,
+        price_source_id, price_source_item_id, updated_at
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      on conflict(id) do update set
+        received_quantity = excluded.received_quantity,
+        total_price = excluded.total_price,
+        updated_at = excluded.updated_at`
+    );
+    const lines: Array<[string, string, string, number, string, number, number]> = [
+      ["po-linen-202607-line-1", "高支纱床品套装", "80s 纯棉床单/被套组合", 800, "套", 198, 158400],
+      ["po-linen-202607-line-2", "酒店浴巾", "650g 白色长绒棉", 2000, "条", 60, 120000]
+    ];
+    for (const [id, itemName, specification, quantity, unit, unitPrice, totalPrice] of lines) {
+      run(lineStatement, [
+        id,
+        "po-linen-202607",
+        null,
+        null,
+        itemName,
+        specification,
+        quantity,
+        unit,
+        unitPrice,
+        0.13,
+        totalPrice,
+        quantity,
+        "supplier_quotation",
+        "bid-award-1",
+        null,
+        timestamp
+      ]);
+    }
+
+    const hasReceipt = this.runtimeDb.db.prepare("select id from r2_receipts where id = ?").get("rrc-linen-202607") as Row | undefined;
+    if (!hasReceipt) {
+      run(
+        this.runtimeDb.db.prepare(
+          `insert into r2_receipts (
+            id, purchase_order_id, project_id, supplier_id, receipt_type, exception_type,
+            acceptance_result, handling_status, summary, attachment_file_ids_json, receipt_at,
+            operator_id, created_by, created_at, updated_at
+          ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ),
+        [
+          "rrc-linen-202607",
+          "po-linen-202607",
+          "p-award",
+          "sup-1",
+          "full",
+          null,
+          "accepted",
+          "none",
+          "床品与浴巾已按订单数量完成验收。",
+          JSON.stringify([]),
+          "2026-07-03T09:30:00.000Z",
+          "u8",
+          "u8",
+          "2026-07-03T09:30:00.000Z",
+          timestamp
+        ]
+      );
+      const receiptLineStatement = this.runtimeDb.db.prepare(
+        `insert into r2_receipt_line_items (
+          id, receipt_id, order_line_item_id, item_name, received_quantity, unit,
+          accepted_flag, updated_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?)`
+      );
+      for (const [id, itemName, , quantity, unit] of lines) {
+        run(receiptLineStatement, [`rrc-linen-202607:${id}`, "rrc-linen-202607", id, itemName, quantity, unit, 1, timestamp]);
+      }
+    }
+
+    const hasBill = this.runtimeDb.db.prepare("select id from r2_settlement_bills where id = ?").get("sb-linen-202607") as Row | undefined;
+    if (!hasBill) {
+      const currentOrder = this.orderRow("po-linen-202607");
+      if (!currentOrder) return;
+      const metrics = this.calculateOrderMetrics("po-linen-202607", 0);
+      run(
+        this.runtimeDb.db.prepare(
+          `insert into r2_settlement_bills (
+            id, bill_no, purchase_order_id, project_id, supplier_id, org_id, department_id,
+            settlement_period, bill_status, order_amount, received_amount, return_amount,
+            service_fee, settlement_amount, source_json, created_by, created_at, submitted_by,
+            submitted_at, approved_by, approved_at, approval_opinion, updated_at
+          ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ),
+        [
+          "sb-linen-202607",
+          "JS-202607-0002",
+          "po-linen-202607",
+          "p-award",
+          "sup-1",
+          "org-hotel",
+          null,
+          "2026-07",
+          "submitted",
+          metrics.orderAmount,
+          metrics.receivedAmount,
+          metrics.returnAmount,
+          metrics.serviceFee,
+          metrics.settlementAmount,
+          JSON.stringify({ orderNo: currentOrder.order_no, source: "business_seed" }),
+          "u11",
+          "2026-07-03T10:10:00.000Z",
+          "u11",
+          "2026-07-03T10:20:00.000Z",
+          null,
+          null,
+          null,
+          "2026-07-03T10:20:00.000Z"
+        ]
+      );
+
+      const itemStatement = this.runtimeDb.db.prepare(
+        `insert into r2_settlement_bill_items (
+          id, settlement_bill_id, purchase_order_id, order_line_item_id, receipt_id, return_id,
+          item_name, ordered_quantity, received_quantity, returned_quantity, unit_price,
+          order_amount, received_amount, return_amount, payable_amount, source_json, updated_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      );
+      for (const item of metrics.items) {
+        run(itemStatement, [
+          item.id.replace("__bill__", "sb-linen-202607"),
+          "sb-linen-202607",
+          "po-linen-202607",
+          item.orderLineItemId,
+          item.receiptId ?? "rrc-linen-202607",
+          null,
+          item.itemName,
+          item.orderedQuantity,
+          item.receivedQuantity,
+          item.returnedQuantity,
+          item.unitPrice,
+          item.orderAmount,
+          item.receivedAmount,
+          item.returnAmount,
+          item.payableAmount,
+          JSON.stringify({ generatedFrom: "seeded supplier received order" }),
+          "2026-07-03T10:10:00.000Z"
+        ]);
+      }
+    }
+
+    this.ensureSupplierSettlementMaterials("sb-linen-202607");
+    this.ensureSupplierSettlementInvoice("sb-linen-202607");
+    this.upsertReconciliation("sb-linen-202607");
+  }
+
   syncSettlementFinanceState(state: R7StateShape) {
+    const purchaseOrders = this.listPurchaseOrdersForSync();
+    const purchaseOrderById = new Map(state.purchaseOrders.map((item) => [item.id, item]));
+    for (const order of purchaseOrders) {
+      const existing = purchaseOrderById.get(order.id);
+      if (existing) Object.assign(existing, order);
+      else state.purchaseOrders.push(order);
+    }
+
     const materials = this.listSettlementMaterials();
     const materialById = new Map(state.settlementMaterials.map((item) => [item.id, item]));
     for (const material of materials) {
@@ -196,6 +484,212 @@ export class R7SettlementFinanceRepository {
       if (existing) Object.assign(existing, invoice);
       else state.mallSettlementInvoices.push(invoice);
     }
+  }
+
+  private ensureBusinessSettlementMaterials(settlementBillId: string) {
+    const materialRows: Array<[string, SettlementMaterialType, string, string, string, string | null, string | null]> = [
+      ["sm-food-invoice-final", "invoice", "verified", "inv-food-202607-file", "鲜达食材增值税发票.pdf", "u9", "发票抬头、金额与结算单一致"],
+      ["sm-food-delivery-final", "delivery_note", "verified", "sm-food-delivery-file", "鲜达食材送货单.pdf", "u2", "送货单齐全"],
+      ["sm-food-acceptance-final", "acceptance_record", "verified", "sm-food-acceptance-file", "食材验收记录.pdf", "u2", "异常数量已在验收记录中说明"]
+    ];
+    const timestamp = "2026-07-02T09:40:00.000Z";
+    const statement = this.runtimeDb.db.prepare(
+      `insert into r2_settlement_materials (
+        id, settlement_bill_id, purchase_order_id, project_id, supplier_id, material_type,
+        material_status, file_id, file_name, uploaded_by, uploaded_at, verified_by,
+        verified_at, verification_opinion, updated_at
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      on conflict(id) do update set
+        settlement_bill_id = excluded.settlement_bill_id,
+        material_status = excluded.material_status,
+        file_id = excluded.file_id,
+        file_name = excluded.file_name,
+        verified_by = excluded.verified_by,
+        verified_at = excluded.verified_at,
+        verification_opinion = excluded.verification_opinion,
+        updated_at = excluded.updated_at`
+    );
+    for (const [id, type, status, fileId, fileName, verifiedBy, opinion] of materialRows) {
+      run(statement, [
+        id,
+        settlementBillId,
+        "po-food-1",
+        "p-food",
+        "sup-3",
+        type,
+        status,
+        fileId,
+        fileName,
+        "u11",
+        timestamp,
+        verifiedBy,
+        "2026-07-02T11:00:00.000Z",
+        opinion,
+        "2026-07-02T11:00:00.000Z"
+      ]);
+    }
+  }
+
+  private ensureSupplierSettlementMaterials(settlementBillId: string) {
+    const materialRows: Array<[string, SettlementMaterialType, string, string, string, string | null, string | null]> = [
+      ["sm-linen-invoice-final", "invoice", "pending_verification", "inv-linen-202607-file", "华礼布草增值税发票.pdf", null, null],
+      ["sm-linen-delivery-final", "delivery_note", "verified", "sm-linen-delivery-file", "华礼布草送货单.pdf", "u8", "送货单数量与验收记录一致"],
+      ["sm-linen-acceptance-final", "acceptance_record", "verified", "sm-linen-acceptance-file", "华礼布草验收单.pdf", "u8", "验收单已签收"]
+    ];
+    const statement = this.runtimeDb.db.prepare(
+      `insert into r2_settlement_materials (
+        id, settlement_bill_id, purchase_order_id, project_id, supplier_id, material_type,
+        material_status, file_id, file_name, uploaded_by, uploaded_at, verified_by,
+        verified_at, verification_opinion, updated_at
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      on conflict(id) do update set
+        settlement_bill_id = excluded.settlement_bill_id,
+        material_status = excluded.material_status,
+        file_id = excluded.file_id,
+        file_name = excluded.file_name,
+        verified_by = excluded.verified_by,
+        verified_at = excluded.verified_at,
+        verification_opinion = excluded.verification_opinion,
+        updated_at = excluded.updated_at`
+    );
+    for (const [id, type, status, fileId, fileName, verifiedBy, opinion] of materialRows) {
+      run(statement, [
+        id,
+        settlementBillId,
+        "po-linen-202607",
+        "p-award",
+        "sup-1",
+        type,
+        status,
+        fileId,
+        fileName,
+        "u11",
+        "2026-07-03T10:25:00.000Z",
+        verifiedBy,
+        verifiedBy ? "2026-07-03T11:00:00.000Z" : null,
+        opinion,
+        "2026-07-03T11:00:00.000Z"
+      ]);
+    }
+  }
+
+  private ensureBusinessSettlementInvoice(settlementBillId: string) {
+    const bill = this.getSettlementBill(settlementBillId);
+    if (!bill) return;
+    const existing = this.runtimeDb.db.prepare("select id from r2_invoices where id = ?").get("inv-food-202607") as Row | undefined;
+    if (existing) return;
+    const invoiceAmount = roundMoney(bill.settlementAmount);
+    const taxRate = 0.09;
+    const taxAmount = roundMoney((invoiceAmount * taxRate) / (1 + taxRate));
+    run(
+      this.runtimeDb.db.prepare(
+        `insert into r2_invoices (
+          id, settlement_bill_id, order_id, supplier_id, invoice_no, invoice_type,
+          issue_date, invoice_status, file_id, file_name, amount, tax_rate, tax_amount,
+          uploaded_by, uploaded_at, verified_by, verified_at, verification_opinion, updated_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ),
+      [
+        "inv-food-202607",
+        settlementBillId,
+        bill.purchaseOrderId,
+        bill.supplierId,
+        "FP-202607-0003",
+        "增值税专用发票",
+        "2026-07-02",
+        "verified",
+        "inv-food-202607-file",
+        "鲜达食材增值税发票.pdf",
+        invoiceAmount,
+        taxRate,
+        taxAmount,
+        "u11",
+        "2026-07-02T10:30:00.000Z",
+        "u9",
+        "2026-07-02T11:20:00.000Z",
+        "发票已核验",
+        "2026-07-02T11:20:00.000Z"
+      ]
+    );
+    this.ensureBusinessSettlementMaterials(settlementBillId);
+    this.upsertReconciliation(settlementBillId);
+  }
+
+  private ensureSupplierSettlementInvoice(settlementBillId: string) {
+    const bill = this.getSettlementBill(settlementBillId);
+    if (!bill) return;
+    const existing = this.runtimeDb.db.prepare("select id from r2_invoices where id = ?").get("inv-linen-202607") as Row | undefined;
+    if (existing) return;
+    const invoiceAmount = roundMoney(bill.settlementAmount);
+    const taxRate = 0.13;
+    const taxAmount = roundMoney((invoiceAmount * taxRate) / (1 + taxRate));
+    run(
+      this.runtimeDb.db.prepare(
+        `insert into r2_invoices (
+          id, settlement_bill_id, order_id, supplier_id, invoice_no, invoice_type,
+          issue_date, invoice_status, file_id, file_name, amount, tax_rate, tax_amount,
+          uploaded_by, uploaded_at, verified_by, verified_at, verification_opinion, updated_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ),
+      [
+        "inv-linen-202607",
+        settlementBillId,
+        bill.purchaseOrderId,
+        bill.supplierId,
+        "FP-202607-0002",
+        "增值税专用发票",
+        "2026-07-03",
+        "pending_verification",
+        "inv-linen-202607-file",
+        "华礼布草增值税发票.pdf",
+        invoiceAmount,
+        taxRate,
+        taxAmount,
+        "u11",
+        "2026-07-03T10:28:00.000Z",
+        null,
+        null,
+        null,
+        "2026-07-03T10:28:00.000Z"
+      ]
+    );
+    this.ensureSupplierSettlementMaterials(settlementBillId);
+    this.upsertReconciliation(settlementBillId);
+  }
+
+  private ensureBusinessFundLedger(settlementBillId: string) {
+    const bill = this.getSettlementBill(settlementBillId);
+    if (!bill) return;
+    const existing = this.runtimeDb.db.prepare("select id from r2_fund_ledger_entries where id = ?").get("fle-food-202607") as Row | undefined;
+    if (existing) return;
+    run(
+      this.runtimeDb.db.prepare(
+        `insert into r2_fund_ledger_entries (
+          id, ledger_no, settlement_bill_id, supplier_id, org_id, department_id,
+          amount, direction, entry_type, ledger_status, created_by, created_at,
+          operated_by, operated_at, note, updated_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ),
+      [
+        "fle-food-202607",
+        "FK-202607-0003",
+        settlementBillId,
+        bill.supplierId,
+        bill.orgId ?? "org-hotel",
+        bill.departmentId ?? null,
+        bill.settlementAmount,
+        "outbound",
+        "payment_request",
+        "payment_requested",
+        "u9",
+        "2026-07-02T11:30:00.000Z",
+        "u9",
+        "2026-07-02T11:30:00.000Z",
+        "结算单审核通过，进入付款排程",
+        "2026-07-02T11:30:00.000Z"
+      ]
+    );
+    this.runtimeDb.db.prepare("update r2_settlement_bills set bill_status = ?, updated_at = ? where id = ?").run("payable", "2026-07-02T11:30:00.000Z", settlementBillId);
   }
 
   listOverview(user: User, roleId: RoleId): R7Overview {
@@ -725,10 +1219,14 @@ export class R7SettlementFinanceRepository {
   private billFromRow(row: Row): SettlementBill {
     const id = String(row.id);
     const itemRows = this.runtimeDb.db.prepare("select * from r2_settlement_bill_items where settlement_bill_id = ? order by id").all(id) as Row[];
+    const purchaseOrderId = String(row.purchase_order_id);
+    const source = json<{ orderNo?: string }>(row.source_json, {});
+    const order = this.orderRow(purchaseOrderId);
     return {
       id,
       billNo: String(row.bill_no ?? row.id),
-      purchaseOrderId: String(row.purchase_order_id),
+      purchaseOrderId,
+      purchaseOrderNo: optionalString(order?.order_no) ?? source.orderNo,
       projectId: String(row.project_id),
       supplierId: String(row.supplier_id),
       orgId: optionalString(row.org_id),
@@ -830,6 +1328,59 @@ export class R7SettlementFinanceRepository {
 
   private orderRow(orderId: string) {
     return this.runtimeDb.db.prepare("select * from r2_purchase_orders where id = ?").get(orderId) as Row | undefined;
+  }
+
+  private listPurchaseOrdersForSync(): PurchaseOrder[] {
+    const rows = this.runtimeDb.db.prepare("select * from r2_purchase_orders order by created_at").all() as Row[];
+    return rows.map((row) => this.purchaseOrderFromRow(row));
+  }
+
+  private purchaseOrderFromRow(row: Row): PurchaseOrder {
+    const orderId = String(row.id);
+    const lineRows = this.runtimeDb.db.prepare("select * from r2_order_line_items where order_id = ? order by id").all(orderId) as Row[];
+    return {
+      id: orderId,
+      projectId: String(row.project_id),
+      supplierId: String(row.supplier_id),
+      contractId: optionalString(row.contract_id),
+      sourceRequestId: optionalString(row.source_request_id),
+      awardApprovalId: optionalString(row.award_approval_id),
+      selectedBidId: optionalString(row.selected_bid_id),
+      orderNo: String(row.order_no),
+      status: String(row.order_status) as PurchaseOrder["status"],
+      paymentStatus: optionalString(row.payment_status),
+      buyerId: optionalString(row.buyer_id),
+      orgId: optionalString(row.org_id),
+      departmentId: optionalString(row.department_id),
+      totalAmount: Number(row.total_amount),
+      lineItems: lineRows.map((line) => this.purchaseOrderLineFromRow(line)),
+      expectedDeliveryAt: String(row.expected_delivery_at),
+      receivingLocation: String(row.receiving_location),
+      invoiceTitle: optionalString(row.invoice_title),
+      confirmedAt: row.confirmed_at === null || row.confirmed_at === undefined ? null : String(row.confirmed_at),
+      createdBy: String(row.created_by),
+      createdAt: String(row.created_at),
+      updatedAt: String(row.updated_at)
+    };
+  }
+
+  private purchaseOrderLineFromRow(row: Row): PurchaseOrderLineItem {
+    return {
+      id: String(row.id),
+      productId: optionalString(row.product_id),
+      skuId: optionalString(row.sku_id),
+      itemName: String(row.item_name),
+      specification: String(row.specification),
+      quantity: Number(row.quantity),
+      unit: String(row.unit),
+      unitPrice: Number(row.unit_price),
+      taxRate: Number(row.tax_rate),
+      totalPrice: Number(row.total_price),
+      receivedQuantity: Number(row.received_quantity),
+      priceSourceType: optionalString(row.price_source_type) as PurchaseOrderLineItem["priceSourceType"],
+      priceSourceId: optionalString(row.price_source_id),
+      priceSourceItemId: optionalString(row.price_source_item_id)
+    };
   }
 
   private isOrderSettleable(orderId: string, status: string) {

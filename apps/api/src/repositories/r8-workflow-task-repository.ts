@@ -829,7 +829,9 @@ export class R8WorkflowTaskRepository {
     if (isSupplierRole(roleId)) return Boolean(item.supplierId && supplierIdMatches(user, item.supplierId));
     if (roleId === "expert") return item.currentUserId === user.id || item.currentRoleId === "expert";
     if (roleId === "group_manager") return !item.orgId || userOrgScope(user).includes(item.orgId);
-    if (isProcurementBuyerRole(roleId)) return Boolean(item.startedBy === user.id || item.currentUserId === user.id || this.canBuyerReadScopedObject(user, item.projectId, item.orgId));
+    if (isProcurementBuyerRole(roleId)) {
+      return Boolean(item.startedBy === user.id || item.currentUserId === user.id || this.canBuyerReadScopedObject(user, item.projectId, item.orgId, item.businessType));
+    }
     if (isOrgReaderRole(roleId)) return !item.orgId || userOrgScope(user).includes(item.orgId);
     return false;
   }
@@ -841,8 +843,9 @@ export class R8WorkflowTaskRepository {
     if (isSupplierRole(roleId)) return roleMatchesAssignee(roleId, task.assigneeRoleId) && Boolean(task.supplierId && supplierIdMatches(user, task.supplierId));
     if (roleId === "expert") return task.assigneeRoleId === "expert" && (!task.sourceJson?.expertId || task.sourceJson.expertId === user.expertId);
     if (roleId === "group_manager" && task.assigneeRoleId === "group_manager") return !task.orgId || userOrgScope(user).includes(task.orgId);
+    if (task.assigneeRoleId === "buyer" && roleId !== "buyer") return false;
     if (!roleMatchesAssignee(roleId, task.assigneeRoleId)) return false;
-    if (isProcurementBuyerRole(roleId)) return this.canBuyerReadScopedObject(user, task.projectId, task.orgId);
+    if (isProcurementBuyerRole(roleId)) return this.canBuyerReadScopedObject(user, task.projectId, task.orgId, task.businessType);
     if (isOrgReaderRole(roleId)) return !task.orgId || userOrgScope(user).includes(task.orgId);
     return false;
   }
@@ -853,8 +856,9 @@ export class R8WorkflowTaskRepository {
     if (isSupplierRole(actor.roleId)) return roleMatchesAssignee(actor.roleId, task.assigneeRoleId) && supplierIdMatches(actor, task.supplierId);
     if (actor.roleId === "expert") return task.assigneeRoleId === "expert" && (!task.sourceJson?.expertId || task.sourceJson.expertId === actor.expertId);
     if (actor.roleId === "group_manager" && task.assigneeRoleId === "group_manager") return !task.orgId || userOrgScope(actor).includes(task.orgId);
+    if (task.assigneeRoleId === "buyer" && actor.roleId !== "buyer") return false;
     if (!roleMatchesAssignee(actor.roleId, task.assigneeRoleId)) return false;
-    if (isProcurementBuyerRole(actor.roleId) && !this.canBuyerReadScopedObject(actor, task.projectId, task.orgId)) return false;
+    if (isProcurementBuyerRole(actor.roleId) && !this.canBuyerReadScopedObject(actor, task.projectId, task.orgId, task.businessType)) return false;
     if (task.orgId && !userOrgScope(actor).includes(task.orgId)) return false;
     return true;
   }
@@ -862,18 +866,22 @@ export class R8WorkflowTaskRepository {
   private canReadNotification(user: User, roleId: RoleId, message: WorkflowNotification) {
     if (roleId === "admin" || roleId === "system") return false;
     if (message.recipientUserId) return message.recipientUserId === user.id;
+    if (message.recipientRoleId === "buyer" && roleId !== "buyer") return false;
     if (roleMatchesAssignee(roleId, message.recipientRoleId)) {
       if (message.orgId && !userOrgScope(user).includes(message.orgId)) return false;
       if (isSupplierRole(roleId) && message.supplierId && !supplierIdMatches(user, message.supplierId)) return false;
-      if (isProcurementBuyerRole(roleId) && !this.canBuyerReadScopedObject(user, message.projectId, message.orgId)) return false;
+      if (isProcurementBuyerRole(roleId) && !this.canBuyerReadScopedObject(user, message.projectId, message.orgId, message.businessType)) return false;
       return true;
     }
     return false;
   }
 
-  private canBuyerReadScopedObject(user: User, projectId?: string, orgId?: string) {
+  private canBuyerReadScopedObject(user: User, projectId?: string, orgId?: string, businessType?: ApprovalBusinessType) {
     if (projectId) {
       return user.managedProjectIds?.includes(projectId) ?? false;
+    }
+    if (businessType === "procurement_request" && user.roleId === "buyer") {
+      return !orgId || userOrgScope(user).includes(orgId);
     }
     if (!orgId) return true;
     return userOrgScope(user).includes(orgId);

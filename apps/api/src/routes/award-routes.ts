@@ -212,9 +212,7 @@ function buildPricingReport(ctx: AppContext, req: Request, project: ProcurementP
 
 function publicResultForSupplier(ctx: AppContext, notification: ResultNotification, supplierId: string) {
   if (notification.scope !== "supplier_self") return null;
-  const approval =
-    ctx.state.awardApprovals.find((item) => item.id === notification.awardApprovalId && item.approvalStatus === "approved") ??
-    ctx.state.awardApprovals.find((item) => item.projectId === notification.projectId && item.approvalStatus === "approved");
+  const approval = ctx.state.awardApprovals.find((item) => item.id === notification.awardApprovalId && item.approvalStatus === "approved");
   const selfSelected = approval?.selectedSupplierId === supplierId;
   return {
     id: notification.id,
@@ -226,6 +224,32 @@ function publicResultForSupplier(ctx: AppContext, notification: ResultNotificati
     winnerName: notification.visibilityConfig === "show_winner_name" ? ctx.state.suppliers.find((item) => item.id === approval?.selectedSupplierId)?.name : undefined,
     contentSummary: selfSelected ? notification.contentSummary : "supplier self result only"
   };
+}
+
+function latestApprovedAwardApproval(ctx: AppContext, projectId: string) {
+  return [...ctx.state.awardApprovals].reverse().find((item) => item.projectId === projectId && item.approvalStatus === "approved");
+}
+
+function latestSupplierResultNotifications(ctx: AppContext, project: ProcurementProject, supplierId: string) {
+  const approval = latestApprovedAwardApproval(ctx, project.id);
+  if (!approval) return [];
+  const latestBySupplier = new Map<string, ResultNotification>();
+  for (const notification of ctx.state.resultNotifications) {
+    if (
+      notification.projectId !== project.id ||
+      notification.awardApprovalId !== approval.id ||
+      notification.supplierId !== supplierId ||
+      notification.scope !== "supplier_self" ||
+      notification.status !== "sent"
+    ) {
+      continue;
+    }
+    const existing = latestBySupplier.get(supplierId);
+    const existingTime = existing ? new Date(existing.sentAt ?? existing.createdAt).getTime() : -Infinity;
+    const currentTime = new Date(notification.sentAt ?? notification.createdAt).getTime();
+    if (!existing || currentTime >= existingTime) latestBySupplier.set(supplierId, notification);
+  }
+  return Array.from(latestBySupplier.values());
 }
 
 export function awardRoutes(ctx: AppContext) {
@@ -389,7 +413,7 @@ export function awardRoutes(ctx: AppContext) {
     const project = ensureProject(ctx, req.params.projectId, res);
     if (!project) return;
     if (!assertAwardMaintainer(ctx, req, res, project, "result_notification.create.denied")) return;
-    const approval = [...ctx.state.awardApprovals].reverse().find((item) => item.projectId === project.id && item.approvalStatus === "approved");
+    const approval = latestApprovedAwardApproval(ctx, project.id);
     if (!approval) {
       return denyResponse(ctx, req, res, 400, "AWARD_APPROVAL_NOT_APPROVED", "Approved award approval is required before result notification.", "result_notification.approval.denied", "project", project.id, project.id);
     }
@@ -441,8 +465,7 @@ export function awardRoutes(ctx: AppContext) {
         return denyResponse(ctx, req, res, 403, "SUPPLIER_RESULT_SCOPE_DENIED", "Supplier can only read own project result notification.", "result_notification.supplier_scope.denied", "project", project.id, project.id);
       }
       return res.json({
-        notifications: ctx.state.resultNotifications
-          .filter((item) => item.projectId === project.id && item.supplierId === supplierId && item.scope === "supplier_self" && item.status === "sent")
+        notifications: latestSupplierResultNotifications(ctx, project, supplierId)
           .map((item) => publicResultForSupplier(ctx, item, supplierId))
           .filter(Boolean)
       });
@@ -455,7 +478,7 @@ export function awardRoutes(ctx: AppContext) {
     const project = ensureProject(ctx, req.params.projectId, res);
     if (!project) return;
     if (!assertAwardMaintainer(ctx, req, res, project, "internal_publicity.create.denied")) return;
-    const approval = [...ctx.state.awardApprovals].reverse().find((item) => item.projectId === project.id && item.approvalStatus === "approved");
+    const approval = latestApprovedAwardApproval(ctx, project.id);
     if (!approval) {
       return denyResponse(ctx, req, res, 400, "AWARD_APPROVAL_NOT_APPROVED", "Approved award approval is required before internal publicity.", "internal_publicity.approval.denied", "project", project.id, project.id);
     }

@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import { apiGet, apiPatch, apiPost, uploadFile } from "../api/http";
 import AuditLogRef from "../components/AuditLogRef.vue";
 import ErrorAlert from "../components/ErrorAlert.vue";
+import { isTestLikeText } from "../utils/business-display";
 import { formatDateTime, labelStatus } from "../utils/status-labels";
 
 interface Project {
@@ -17,6 +18,7 @@ interface Bid {
   id: string;
   projectId: string;
   supplierId: string;
+  supplierName?: string;
   amount?: number;
   taxRate?: number;
   taxInclusive?: boolean;
@@ -32,6 +34,7 @@ interface Bid {
 
 const projects = ref<Project[]>([]);
 const bids = ref<Bid[]>([]);
+const suppliers = ref<Array<{ id: string; name: string }>>([]);
 const selectedProjectId = ref("p-pre");
 const selectedBidId = ref("");
 const amount = ref(188800);
@@ -45,6 +48,19 @@ const responseFile = ref<File | null>(null);
 const responseFileName = ref("");
 const auditLogId = ref("");
 const error = ref("");
+
+function projectLabel(projectId: string) {
+  const project = projects.value.find((item) => item.id === projectId);
+  return project ? `${project.code} / ${project.name}` : "采购项目";
+}
+
+function supplierName(supplierId: string, fallback?: string) {
+  return fallback ?? suppliers.value.find((item) => item.id === supplierId)?.name ?? "供应商";
+}
+
+function bidLabel(bid: Bid, index?: number) {
+  return `报价单${index === undefined ? "" : ` ${index + 1}`} / ${supplierName(bid.supplierId, bid.supplierName)} / ${labelStatus(bid.status)}`;
+}
 
 function onFileChange(event: Event) {
   const target = event.target as HTMLInputElement;
@@ -75,8 +91,12 @@ async function bidPayload() {
 }
 
 async function load() {
-  const projectData = await apiGet<{ projects: Project[] }>("/api/projects");
-  projects.value = projectData.projects.filter((item) => !item.externalTradeFlag);
+  const [projectData, supplierData] = await Promise.all([
+    apiGet<{ projects: Project[] }>("/api/projects"),
+    apiGet<{ suppliers: Array<{ id: string; name: string }> }>("/api/suppliers").catch(() => ({ suppliers: [] }))
+  ]);
+  projects.value = projectData.projects.filter((item) => !item.externalTradeFlag && !isTestLikeText(item.name));
+  suppliers.value = supplierData.suppliers;
   if (!projects.value.some((item) => item.id === selectedProjectId.value)) {
     selectedProjectId.value = projects.value[0]?.id ?? "";
   }
@@ -160,7 +180,7 @@ onMounted(load);
       <thead>
         <tr>
           <th>项目</th>
-          <th>报价单</th>
+          <th>供应商</th>
           <th>金额</th>
           <th>税率</th>
           <th>交付</th>
@@ -172,8 +192,8 @@ onMounted(load);
       </thead>
       <tbody>
         <tr v-for="bid in bids" :key="bid.id">
-          <td>{{ bid.projectId }}</td>
-          <td>{{ bid.id }}</td>
+          <td>{{ projectLabel(bid.projectId) }}</td>
+          <td>{{ supplierName(bid.supplierId, bid.supplierName) }}</td>
           <td>{{ bid.amount ?? "-" }}</td>
           <td>{{ bid.taxRate ?? "-" }}</td>
           <td>{{ bid.deliveryDays ? `${bid.deliveryDays} 天` : "-" }}</td>
@@ -189,7 +209,7 @@ onMounted(load);
       <label>
         报价单
         <select v-model="selectedBidId">
-          <option v-for="bid in bids" :key="bid.id" :value="bid.id">{{ bid.id }} / {{ labelStatus(bid.status) }}</option>
+          <option v-for="(bid, index) in bids" :key="bid.id" :value="bid.id">{{ bidLabel(bid, index) }}</option>
         </select>
       </label>
       <button type="button" :disabled="!selectedBidId" @click="run(async () => apiPatch(`/api/bids/${selectedBidId}`, await bidPayload()))">更新草稿</button>
