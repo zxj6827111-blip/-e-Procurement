@@ -65,6 +65,8 @@ export function createAppContext(options: AppContextOptions = {}): AppContext {
   r5ReviewAwardRepository.syncReviewAwardState(state);
   r6OrderFulfillmentRepository.syncOrderFulfillmentState(state);
   r7SettlementFinanceRepository.syncSettlementFinanceState(state);
+  r7SettlementFinanceRepository.ensureBusinessSettlementSamples();
+  r7SettlementFinanceRepository.syncSettlementFinanceState(state);
   r8WorkflowTaskRepository.syncWorkflowState(state);
   const authStore = new AuthStore(runtimeDb);
   authStore.seedAccounts(state.users, config.allowLocalPasswordLogin);

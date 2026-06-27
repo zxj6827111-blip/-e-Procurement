@@ -8,10 +8,22 @@ export function setCurrentMockUserId(userId: string) {
 function buildHeaders(userId: string, hasBody: boolean) {
   const headers: Record<string, string> = {};
   if (hasBody) headers["content-type"] = "application/json";
-  if (import.meta.env.DEV && localStorage.getItem("mockAuthEnabled") === "true") {
+  if (import.meta.env.DEV && sessionStorage.getItem("demoAuthActive") === "true") {
     headers["x-mock-user-id"] = userId;
   }
   return headers;
+}
+
+function normalizeErrorMessage(message: string, status: number, path: string) {
+  const value = message || "";
+  if (/Current role cannot access this file/i.test(value)) return "当前角色无权访问该附件。";
+  if (/Current role cannot access this supplier file/i.test(value)) return "当前角色无权访问该供应商附件。";
+  if (/Current role cannot access this mall order file/i.test(value)) return "当前角色无权访问该订单附件。";
+  if (/Supplier can only access own/i.test(value)) return "供应商只能访问本企业资料。";
+  if (/System administrators cannot read/i.test(value)) return "系统管理员不能读取业务附件内容。";
+  if (/Login is required/i.test(value)) return "请先登录。";
+  if (value.startsWith("API ")) return `请求失败（${status}）。`;
+  return value || `请求失败（${status}）：${path}`;
 }
 
 async function apiRequest<T>(method: string, path: string, userId = currentMockUserId, body?: unknown): Promise<T> {
@@ -23,7 +35,7 @@ async function apiRequest<T>(method: string, path: string, userId = currentMockU
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as { error?: { message?: string; auditLogId?: string } } | null;
-    const error = new Error(payload?.error?.message ?? `API ${path} failed with ${response.status}`);
+    const error = new Error(normalizeErrorMessage(payload?.error?.message ?? "", response.status, path));
     Object.assign(error, { auditLogId: payload?.error?.auditLogId, status: response.status });
     throw error;
   }
@@ -54,7 +66,7 @@ export async function apiBlob(path: string, userId = currentMockUserId): Promise
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as { error?: { message?: string; auditLogId?: string } } | null;
-    const error = new Error(payload?.error?.message ?? `API ${path} failed with ${response.status}`);
+    const error = new Error(normalizeErrorMessage(payload?.error?.message ?? "", response.status, path));
     Object.assign(error, { auditLogId: payload?.error?.auditLogId, status: response.status });
     throw error;
   }
@@ -71,7 +83,7 @@ async function multipartRequest<T>(path: string, formData: FormData, userId = cu
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as { error?: { message?: string; auditLogId?: string } } | null;
-    const error = new Error(payload?.error?.message ?? `API ${path} failed with ${response.status}`);
+    const error = new Error(normalizeErrorMessage(payload?.error?.message ?? "", response.status, path));
     Object.assign(error, { auditLogId: payload?.error?.auditLogId, status: response.status });
     throw error;
   }

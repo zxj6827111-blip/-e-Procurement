@@ -56,9 +56,11 @@ export function authMiddleware(ctx: AppContext) {
   return (req: Request, _res: Response, next: NextFunction) => {
     const cookies = parseCookies(req.header("cookie"));
     const sessionId = cookies[ctx.config.sessionCookieName];
-    const session = sessionId ? ctx.authStore.getSession(sessionId) : null;
     const fallbackUserId = ctx.config.mockAuthEnabled ? req.header("x-mock-user-id") ?? req.header("x-user-id") ?? undefined : undefined;
-    const userId = session?.user_id ?? fallbackUserId;
+    const prefersMockHeader =
+      ctx.config.mockAuthEnabled && (req.path === "/api/auth/mock-login" || (req.path === "/api/me/mock-role-switch" && Boolean(fallbackUserId)));
+    const session = sessionId && !prefersMockHeader ? ctx.authStore.getSession(sessionId) : null;
+    const userId = prefersMockHeader ? fallbackUserId : session?.user_id ?? fallbackUserId;
     req.sessionId = session?.session_id;
     req.auth = buildAuthContext(ctx, userId);
     next();

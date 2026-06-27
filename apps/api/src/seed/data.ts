@@ -272,6 +272,34 @@ export const users: User[] = [
     ]
   },
   {
+    "id": "u14",
+    "name": "苏州洁雅供应商管理员",
+    "roleId": "supplier_admin",
+    "supplierId": "sup-2",
+    "orgId": "org-hotel"
+  },
+  {
+    "id": "u15",
+    "name": "苏州洁雅供应商报价人员",
+    "roleId": "supplier_quotation",
+    "supplierId": "sup-2",
+    "orgId": "org-hotel"
+  },
+  {
+    "id": "u16",
+    "name": "杭州鲜达供应商管理员",
+    "roleId": "supplier_admin",
+    "supplierId": "sup-3",
+    "orgId": "org-hotel"
+  },
+  {
+    "id": "u17",
+    "name": "杭州鲜达供应商报价人员",
+    "roleId": "supplier_quotation",
+    "supplierId": "sup-3",
+    "orgId": "org-hotel"
+  },
+  {
     "id": "system",
     "name": "系统",
     "roleId": "system",
@@ -2250,9 +2278,72 @@ export const awardApprovals: AwardApproval[] = [
 
 export const pricingReports: PricingReport[] = [];
 
-export const resultNotifications: ResultNotification[] = [];
+export const resultNotifications: ResultNotification[] = [
+  {
+    "id": "rn-award-sup-1",
+    "projectId": "p-award",
+    "awardApprovalId": "aa-award-1",
+    "supplierId": "sup-1",
+    "scope": "supplier_self",
+    "status": "sent",
+    "visibilityConfig": "supplier_self_only",
+    "contentSummary": "贵司已被确定为客房布草集中采购项目成交供应商，请按订单履约。",
+    "sentAt": "2026-06-20T11:30:00.000Z",
+    "createdBy": "u2",
+    "createdAt": "2026-06-20T11:20:00.000Z"
+  },
+  {
+    "id": "rn-award-sup-2",
+    "projectId": "p-award",
+    "awardApprovalId": "aa-award-1",
+    "supplierId": "sup-2",
+    "scope": "supplier_self",
+    "status": "sent",
+    "visibilityConfig": "supplier_self_only",
+    "contentSummary": "感谢参与客房布草集中采购项目，本次未中选。",
+    "sentAt": "2026-06-20T11:32:00.000Z",
+    "createdBy": "u2",
+    "createdAt": "2026-06-20T11:20:00.000Z"
+  },
+  {
+    "id": "rn-food-sup-3",
+    "projectId": "p-food",
+    "awardApprovalId": "aa-food-1",
+    "supplierId": "sup-3",
+    "scope": "supplier_self",
+    "status": "sent",
+    "visibilityConfig": "supplier_self_only",
+    "contentSummary": "贵司已被确定为食材供应商比选项目成交供应商。",
+    "sentAt": "2026-06-20T17:20:00.000Z",
+    "createdBy": "u2",
+    "createdAt": "2026-06-20T17:10:00.000Z"
+  }
+];
 
-export const internalPublicityRecords: InternalPublicityRecord[] = [];
+export const internalPublicityRecords: InternalPublicityRecord[] = [
+  {
+    "id": "ipr-award-1",
+    "projectId": "p-award",
+    "awardApprovalId": "aa-award-1",
+    "status": "published",
+    "visibilityConfig": "internal_only",
+    "contentSummary": "客房布草集中采购定标结果已完成内部公示。",
+    "publishedAt": "2026-06-20T12:00:00.000Z",
+    "createdBy": "u2",
+    "createdAt": "2026-06-20T11:55:00.000Z"
+  },
+  {
+    "id": "ipr-food-1",
+    "projectId": "p-food",
+    "awardApprovalId": "aa-food-1",
+    "status": "published",
+    "visibilityConfig": "internal_only",
+    "contentSummary": "上海滨江酒店食材供应商比选结果已完成内部公示。",
+    "publishedAt": "2026-06-20T17:30:00.000Z",
+    "createdBy": "u2",
+    "createdAt": "2026-06-20T17:25:00.000Z"
+  }
+];
 
 export const externalTradeRecords: ExternalTradeRecord[] = [
   {
@@ -2261,11 +2352,11 @@ export const externalTradeRecords: ExternalTradeRecord[] = [
     "externalPlatformName": "外部公共资源交易平台",
     "externalProjectCode": "EXT-PLAT-2026-004",
     "internalApprovalStatus": "recorded",
-    "internalApprovalOpinion": "internal filing approved",
+    "internalApprovalOpinion": "外部交易备案内部审批已完成。",
     "announcementMaterialMetadata": [
       {
         "id": "ext-ann-1",
-        "fileName": "external-announcement-record.pdf",
+        "fileName": "外部交易公告备案材料.pdf",
         "contentType": "application/pdf",
         "sizeBytes": 1024,
         "uploadedAt": "2026-06-20T10:00:00.000Z"
@@ -2274,7 +2365,7 @@ export const externalTradeRecords: ExternalTradeRecord[] = [
     "resultMaterialMetadata": [
       {
         "id": "ext-result-1",
-        "fileName": "external-result-record.pdf",
+        "fileName": "外部交易结果备案材料.pdf",
         "contentType": "application/pdf",
         "sizeBytes": 2048,
         "uploadedAt": "2026-06-21T10:00:00.000Z"
@@ -2296,7 +2387,7 @@ export const contractLedgers: ContractLedger[] = [
     "contractNo": "HT-2026-0001",
     "amount": 1286000,
     "status": "registered",
-    "contractSystemLink": "mock-contract-system://contracts/HT-2026-0001",
+    "contractSystemLink": "contract-ledger://contracts/HT-2026-0001",
     "attachmentMetadata": [
       {
         "id": "contract-att-1",
@@ -2318,7 +2409,7 @@ export const performanceNodes: PerformanceNode[] = [
     "contractId": "cl-award-1",
     "projectId": "p-award",
     "supplierId": "sup-1",
-    "nodeName": "first delivery",
+    "nodeName": "首批到货",
     "planDate": "2026-07-01",
     "status": "planned",
     "attachmentMetadata": [],
@@ -2696,6 +2787,387 @@ export const archiveSupplementRequests: ArchiveSupplementRequest[] = [
   }
 ];
 
+export const projectSampleReceipts: ProjectSampleReceipt[] = [
+  {
+    "id": "psr-pre-amenity-1",
+    "projectId": "p-pre",
+    "supplierId": "sup-2",
+    "sampleName": "环保牙具套装投标样品",
+    "quantity": 3,
+    "status": "received",
+    "receivedBy": "u2",
+    "receivedAt": "2026-06-22T10:20:00.000Z",
+    "returnRequired": true,
+    "attachmentMetadata": [
+      {
+        "id": "file-project-sample-amenity",
+        "fileName": "项目样品-环保牙具套装.jpg",
+        "contentType": "image/jpeg",
+        "sizeBytes": 102400,
+        "uploadedAt": "2026-06-22T10:20:00.000Z"
+      }
+    ],
+    "handlingNote": "样品外包装完整，已贴样品编号并入柜。"
+  },
+  {
+    "id": "psr-award-linen-1",
+    "projectId": "p-award",
+    "supplierId": "sup-1",
+    "sampleName": "高支纱床单封样复核样",
+    "quantity": 2,
+    "status": "returned",
+    "receivedBy": "u2",
+    "receivedAt": "2026-06-13T15:00:00.000Z",
+    "returnRequired": true,
+    "returnedBy": "u2",
+    "returnedAt": "2026-06-21T16:30:00.000Z",
+    "attachmentMetadata": [
+      {
+        "id": "file-project-sample-linen",
+        "fileName": "项目样品-布草复核样.jpg",
+        "contentType": "image/jpeg",
+        "sizeBytes": 102400,
+        "uploadedAt": "2026-06-13T15:00:00.000Z"
+      }
+    ],
+    "handlingNote": "评审结束后已按封样流转单退回供应商。"
+  }
+];
+
+export const mallProducts: MallProduct[] = [
+  {
+    "id": "mp-amenity-kit",
+    "name": "客房环保洗漱套装",
+    "category": "客房一次性用品",
+    "brand": "华礼优选",
+    "unit": "套",
+    "skuCode": "SKU-HL-AMENITY-001",
+    "specification": "竹柄牙刷+牙膏+梳子+护理包",
+    "packingQuantity": 200,
+    "minOrderQty": 1000,
+    "taxRate": 0.13,
+    "invoiceName": "客房一次性用品",
+    "taxClassificationCode": "106050902",
+    "detailDescription": "适合中高端连锁酒店客房，外包装可按酒店品牌定制。",
+    "acceptanceGuide": "核验外包装、批次、环保材质说明和抽检数量。",
+    "tags": ["客房物资", "环保", "开业包"],
+    "status": "listed",
+    "supplierId": "sup-2",
+    "serviceRegions": ["华东", "上海"],
+    "procurementCategory": "客房一次性用品",
+    "imageFileIds": ["file-mall-amenity-main"],
+    "attachmentFileIds": ["file-mall-amenity-spec"],
+    "createdBy": "u10",
+    "createdAt": "2026-06-20T09:00:00.000Z",
+    "updatedAt": "2026-06-24T09:00:00.000Z"
+  },
+  {
+    "id": "mp-linen-sheet",
+    "name": "高支纱酒店床单",
+    "category": "客房布草",
+    "brand": "棉织严选",
+    "unit": "条",
+    "skuCode": "SKU-HL-LINEN-280",
+    "specification": "80s 纯棉 280x280cm",
+    "packingQuantity": 20,
+    "minOrderQty": 200,
+    "taxRate": 0.13,
+    "invoiceName": "酒店布草",
+    "taxClassificationCode": "104020101",
+    "detailDescription": "适用于华礼酒店标准大床房和行政房，支持区域仓分批配送。",
+    "acceptanceGuide": "检查织物克重、尺寸、色差和封样一致性。",
+    "tags": ["布草", "封样一致", "区域集采"],
+    "status": "listed",
+    "supplierId": "sup-1",
+    "serviceRegions": ["华东", "上海"],
+    "procurementCategory": "客房布草",
+    "imageFileIds": ["file-mall-linen-main"],
+    "attachmentFileIds": ["file-mall-linen-spec"],
+    "createdBy": "u10",
+    "createdAt": "2026-06-18T09:30:00.000Z",
+    "updatedAt": "2026-06-24T09:30:00.000Z"
+  },
+  {
+    "id": "mp-breakfast-fruit",
+    "name": "早餐鲜切水果盒",
+    "category": "食材供应",
+    "brand": "鲜达优配",
+    "unit": "盒",
+    "skuCode": "SKU-HL-FOOD-250",
+    "specification": "A级混合果盘 250g 冷链配送",
+    "packingQuantity": 80,
+    "minOrderQty": 400,
+    "taxRate": 0.09,
+    "invoiceName": "鲜切水果",
+    "taxClassificationCode": "101011201",
+    "detailDescription": "早餐厅和会议茶歇通用规格，支持每日 06:00 前送达。",
+    "acceptanceGuide": "核验温控记录、生产批次、数量和外观新鲜度。",
+    "tags": ["早餐", "冷链", "每日配送"],
+    "status": "listed",
+    "supplierId": "sup-3",
+    "serviceRegions": ["长三角", "上海"],
+    "procurementCategory": "食材供应",
+    "imageFileIds": ["file-mall-fruit-main"],
+    "attachmentFileIds": ["file-mall-fruit-spec"],
+    "createdBy": "u10",
+    "createdAt": "2026-06-19T08:30:00.000Z",
+    "updatedAt": "2026-06-24T08:30:00.000Z"
+  }
+];
+
+export const mallPrices: MallPrice[] = [
+  {
+    "id": "mprice-amenity-kit-1",
+    "productId": "mp-amenity-kit",
+    "supplierId": "sup-2",
+    "price": 8.6,
+    "purchasePrice": 7.9,
+    "salePrice": 8.6,
+    "taxRate": 0.13,
+    "deliveryDays": 5,
+    "effectiveFrom": "2026-06-20T00:00:00.000Z",
+    "effectiveTo": "2099-12-31T23:59:59.000Z",
+    "approvalStatus": "approved",
+    "versionNo": 1,
+    "createdBy": "u10",
+    "createdAt": "2026-06-20T10:00:00.000Z"
+  },
+  {
+    "id": "mprice-linen-sheet-1",
+    "productId": "mp-linen-sheet",
+    "supplierId": "sup-1",
+    "price": 128,
+    "purchasePrice": 118,
+    "salePrice": 128,
+    "taxRate": 0.13,
+    "deliveryDays": 12,
+    "effectiveFrom": "2026-06-18T00:00:00.000Z",
+    "effectiveTo": "2099-12-31T23:59:59.000Z",
+    "approvalStatus": "approved",
+    "versionNo": 1,
+    "createdBy": "u10",
+    "createdAt": "2026-06-18T10:00:00.000Z"
+  },
+  {
+    "id": "mprice-breakfast-fruit-1",
+    "productId": "mp-breakfast-fruit",
+    "supplierId": "sup-3",
+    "price": 12.8,
+    "purchasePrice": 11.6,
+    "salePrice": 12.8,
+    "taxRate": 0.09,
+    "deliveryDays": 1,
+    "effectiveFrom": "2026-06-19T00:00:00.000Z",
+    "effectiveTo": "2099-12-31T23:59:59.000Z",
+    "approvalStatus": "approved",
+    "versionNo": 1,
+    "createdBy": "u10",
+    "createdAt": "2026-06-19T10:00:00.000Z"
+  }
+];
+
+export const mallOrders: MallOrder[] = [
+  {
+    "id": "mo-seed-amenity-1",
+    "orderNo": "MO-20260624-00001",
+    "buyerId": "u8",
+    "orgId": "org-hotel",
+    "supplierId": "sup-2",
+    "status": "shipped",
+    "lineItems": [
+      {
+        "productId": "mp-amenity-kit",
+        "productName": "客房环保洗漱套装",
+        "quantity": 1200,
+        "unit": "套",
+        "unitPrice": 8.6,
+        "totalPrice": 10320
+      }
+    ],
+    "totalAmount": 10320,
+    "shippingAddress": "上海滨江华礼酒店后勤仓",
+    "invoiceTitle": "上海滨江华礼酒店有限公司",
+    "paymentStatus": "payment_reserved",
+    "paymentReservedAmount": 10320,
+    "createdAt": "2026-06-24T11:00:00.000Z",
+    "updatedAt": "2026-06-24T15:20:00.000Z"
+  }
+];
+
+export const mallShipments: MallShipment[] = [
+  {
+    "id": "ms-seed-amenity-1",
+    "orderId": "mo-seed-amenity-1",
+    "supplierId": "sup-2",
+    "carrier": "洁雅自配送",
+    "trackingNo": "JY-20260624-001",
+    "status": "shipped",
+    "shippedAt": "2026-06-24T15:20:00.000Z"
+  }
+];
+
+export const mallSettlementInvoices: MallSettlementInvoice[] = [
+  {
+    "id": "mi-seed-amenity-1",
+    "orderId": "mo-seed-amenity-1",
+    "supplierId": "sup-2",
+    "status": "pending_verification",
+    "fileId": "file-mall-invoice-amenity",
+    "fileName": "洁雅洗漱套装发票.pdf",
+    "amount": 10320,
+    "uploadedBy": "u11",
+    "uploadedAt": "2026-06-24T16:10:00.000Z",
+    "taxRate": 0.13,
+    "taxAmount": 1187.26,
+    "verificationAdapterBoundary": "本地演示发票校验：仅展示发票上传和待审核状态，未连接真实税务系统。"
+  }
+];
+
+export const mallQuestionnaires: MallQuestionnaire[] = [
+  {
+    "id": "mq-opening-readiness-1",
+    "title": "开业物资供应保障问卷",
+    "scope": "样板间与新店开业包",
+    "status": "published",
+    "questions": [
+      { "id": "mq-q1", "prompt": "是否可在 7 天内完成开业包首批交付？", "type": "single_choice", "options": ["可以", "需分批", "暂无法承诺"] },
+      { "id": "mq-q2", "prompt": "可支持的日均补货能力", "type": "number" },
+      { "id": "mq-q3", "prompt": "请说明异常响应机制", "type": "text" }
+    ],
+    "targetSupplierIds": ["sup-1", "sup-2", "sup-3"],
+    "submissions": [
+      {
+        "id": "mqs-opening-readiness-1",
+        "questionnaireId": "mq-opening-readiness-1",
+        "respondentUserId": "u11",
+        "supplierId": "sup-2",
+        "answers": [
+          { "questionId": "mq-q1", "answer": "可以" },
+          { "questionId": "mq-q2", "answer": 3000 },
+          { "questionId": "mq-q3", "answer": "开业前驻场 1 名物资协调员，异常 2 小时响应。" }
+        ],
+        "score": 16,
+        "status": "scored",
+        "submittedAt": "2026-06-23T10:00:00.000Z",
+        "scoredBy": "system",
+        "scoredAt": "2026-06-23T10:00:00.000Z"
+      }
+    ],
+    "createdBy": "u10",
+    "createdAt": "2026-06-22T09:00:00.000Z"
+  }
+];
+
+export const mallScenarioTemplates: MallScenarioTemplate[] = [
+  {
+    "id": "mst-sample-room-1",
+    "templateType": "sample_room",
+    "name": "标准大床房样板间物资包",
+    "status": "active",
+    "productIds": ["mp-amenity-kit", "mp-linen-sheet"],
+    "packageItems": [
+      { "productId": "mp-amenity-kit", "quantity": 120 },
+      { "productId": "mp-linen-sheet", "quantity": 24 }
+    ],
+    "applicableBrands": ["华礼"],
+    "applicableHotelTypes": ["中高端商务酒店", "城市精选酒店"],
+    "applicableHotelIds": ["org-hotel"],
+    "roomCount": 20,
+    "budgetAmount": 4100,
+    "description": "用于样板间、试运营房和开业前小批量铺货。",
+    "generatedOrderIds": ["mo-seed-amenity-1"],
+    "attachmentFileIds": ["file-scenario-sample-room"],
+    "createdBy": "u10",
+    "createdAt": "2026-06-22T11:00:00.000Z"
+  },
+  {
+    "id": "mst-opening-package-1",
+    "templateType": "opening_package",
+    "name": "新店开业客房基础包",
+    "status": "active",
+    "productIds": ["mp-amenity-kit", "mp-linen-sheet", "mp-breakfast-fruit"],
+    "packageItems": [
+      { "productId": "mp-amenity-kit", "quantity": 3000 },
+      { "productId": "mp-linen-sheet", "quantity": 420 },
+      { "productId": "mp-breakfast-fruit", "quantity": 600 }
+    ],
+    "applicableBrands": ["华礼", "华礼精选"],
+    "applicableHotelTypes": ["新开业酒店", "翻牌改造酒店"],
+    "applicableHotelIds": ["org-hotel"],
+    "roomCount": 120,
+    "budgetAmount": 86520,
+    "description": "覆盖新店开业前 7 天客房物资和早餐首批供应。",
+    "generatedOrderIds": [],
+    "attachmentFileIds": ["file-scenario-opening-package"],
+    "createdBy": "u10",
+    "createdAt": "2026-06-22T12:00:00.000Z"
+  }
+];
+
+export const mallFundAccounts: MallFundAccount[] = [
+  {
+    "id": "mfa-org-hotel",
+    "orgId": "org-hotel",
+    "balance": 180000,
+    "creditLimit": 300000,
+    "occupiedAmount": 10320,
+    "status": "active",
+    "ledgerEntries": [
+      {
+        "id": "mfl-org-hotel-opening",
+        "accountId": "mfa-org-hotel",
+        "orgId": "org-hotel",
+        "direction": "inbound",
+        "entryType": "opening_balance",
+        "amount": 180000,
+        "status": "simulated",
+        "createdBy": "system",
+        "createdAt": "2026-06-20T00:00:00.000Z",
+        "note": "本地演示资金账户期初余额。"
+      },
+      {
+        "id": "mfl-org-hotel-reserve-1",
+        "accountId": "mfa-org-hotel",
+        "orgId": "org-hotel",
+        "orderId": "mo-seed-amenity-1",
+        "direction": "occupy",
+        "entryType": "payment_reserve",
+        "amount": 10320,
+        "status": "reserved",
+        "createdBy": "u8",
+        "createdAt": "2026-06-24T11:00:00.000Z",
+        "note": "商城订单提交后占用本地模拟额度。"
+      }
+    ],
+    "adapterBoundary": "本地模拟资金账户台账：完成余额、充值、授信、支付占用、退款/冲正留痕；未连接真实支付、银行、授信或财务系统。",
+    "updatedAt": "2026-06-24T11:00:00.000Z"
+  },
+  {
+    "id": "mfa-org-east",
+    "orgId": "org-east",
+    "balance": 420000,
+    "creditLimit": 600000,
+    "occupiedAmount": 0,
+    "status": "active",
+    "ledgerEntries": [
+      {
+        "id": "mfl-org-east-opening",
+        "accountId": "mfa-org-east",
+        "orgId": "org-east",
+        "direction": "inbound",
+        "entryType": "opening_balance",
+        "amount": 420000,
+        "status": "simulated",
+        "createdBy": "system",
+        "createdAt": "2026-06-20T00:00:00.000Z",
+        "note": "本地演示区域公司资金账户期初余额。"
+      }
+    ],
+    "adapterBoundary": "本地模拟资金账户台账：完成余额、充值、授信、支付占用、退款/冲正留痕；未连接真实支付、银行、授信或财务系统。",
+    "updatedAt": "2026-06-20T00:00:00.000Z"
+  }
+];
+
 export const auditLogs: AuditLog[] = [
   {
     "id": "audit-seed-1",
@@ -2720,6 +3192,90 @@ export const auditLogs: AuditLog[] = [
     "objectId": "p-award",
     "result": "recorded",
     "createdAt": "2026-06-18T17:00:00.000Z"
+  },
+  {
+    "id": "audit-seed-3",
+    "actorId": "u2",
+    "roleId": "buyer",
+    "orgId": "org-east",
+    "projectId": "p-award",
+    "action": "supplier-invitation.send",
+    "objectType": "supplier_invitation",
+    "objectId": "inv-award-sup-1",
+    "result": "recorded",
+    "createdAt": "2026-06-13T09:40:00.000Z"
+  },
+  {
+    "id": "audit-seed-4",
+    "actorId": "u3",
+    "roleId": "supplier",
+    "orgId": "org-hotel",
+    "projectId": "p-award",
+    "action": "registration.submit",
+    "objectType": "registration",
+    "objectId": "reg-award-sup-1",
+    "result": "recorded",
+    "createdAt": "2026-06-13T10:00:00.000Z"
+  },
+  {
+    "id": "audit-seed-5",
+    "actorId": "u4",
+    "roleId": "expert",
+    "orgId": "org-group",
+    "projectId": "p-award",
+    "action": "scoring_sheet.save",
+    "objectType": "scoring_sheet",
+    "objectId": "score-award-exp1-sup1",
+    "result": "recorded",
+    "createdAt": "2026-06-19T11:20:00.000Z"
+  },
+  {
+    "id": "audit-seed-6",
+    "actorId": "u2",
+    "roleId": "buyer",
+    "orgId": "org-east",
+    "projectId": "p-award",
+    "action": "award_approval.submit",
+    "objectType": "award_approval",
+    "objectId": "aa-award-1",
+    "result": "recorded",
+    "createdAt": "2026-06-20T09:20:00.000Z"
+  },
+  {
+    "id": "audit-seed-7",
+    "actorId": "u3",
+    "roleId": "supplier",
+    "orgId": "org-hotel",
+    "projectId": "p-award",
+    "action": "purchase_order.confirm",
+    "objectType": "purchase_order",
+    "objectId": "po-award-1",
+    "result": "recorded",
+    "createdAt": "2026-06-22T14:00:00.000Z"
+  },
+  {
+    "id": "audit-seed-8",
+    "actorId": "u13",
+    "roleId": "finance_reviewer",
+    "orgId": "org-group",
+    "projectId": "p-award",
+    "action": "settlement_material.verify",
+    "objectType": "settlement_material",
+    "objectId": "sm-award-1",
+    "result": "recorded",
+    "createdAt": "2026-06-23T15:30:00.000Z"
+  },
+  {
+    "id": "audit-seed-9",
+    "actorId": "u9",
+    "roleId": "hotel_finance",
+    "orgId": "org-hotel",
+    "projectId": "p-food",
+    "action": "mall_fund.recharge",
+    "objectType": "mall_fund_account",
+    "objectId": "mfa-org-hotel",
+    "result": "recorded",
+    "createdAt": "2026-06-24T09:10:00.000Z"
   }
 ];
 
@@ -2739,7 +3295,7 @@ export function createSeedState() {
     procurementDocuments: structuredClone(procurementDocuments),
     procurementAnnouncements: structuredClone(procurementAnnouncements),
     inquirySheets: [] as InquirySheet[],
-    projectSampleReceipts: [] as ProjectSampleReceipt[],
+    projectSampleReceipts: structuredClone(projectSampleReceipts),
     supplierInvitations: structuredClone(supplierInvitations),
     supplierRegistrations: structuredClone(supplierRegistrations),
     bids: structuredClone(bids),
@@ -2768,18 +3324,186 @@ export function createSeedState() {
     archiveTemplates: structuredClone(archiveTemplates),
     archiveItems: structuredClone(archiveItems),
     archiveSupplementRequests: structuredClone(archiveSupplementRequests),
-    mallProducts: [] as MallProduct[],
-    mallPrices: [] as MallPrice[],
+    mallProducts: structuredClone(mallProducts),
+    mallPrices: structuredClone(mallPrices),
     mallCartItems: [] as MallCartItem[],
-    mallOrders: [] as MallOrder[],
-    mallShipments: [] as MallShipment[],
+    mallOrders: structuredClone(mallOrders),
+    mallShipments: structuredClone(mallShipments),
     mallReturnRequests: [] as MallReturnRequest[],
-    mallSettlementInvoices: [] as MallSettlementInvoice[],
-    mallQuestionnaires: [] as MallQuestionnaire[],
-    mallScenarioTemplates: [] as MallScenarioTemplate[],
-    mallFundAccounts: [] as MallFundAccount[],
+    mallSettlementInvoices: structuredClone(mallSettlementInvoices),
+    mallQuestionnaires: structuredClone(mallQuestionnaires),
+    mallScenarioTemplates: structuredClone(mallScenarioTemplates),
+    mallFundAccounts: structuredClone(mallFundAccounts),
     auditLogs: structuredClone(auditLogs),
   };
 }
 
 export type SeedState = ReturnType<typeof createSeedState>;
+
+export function enrichSeedState(state: SeedState) {
+  upsertById(state.users, users);
+  upsertById(state.organizations, organizations);
+  upsertRolePermissions(state.rolePermissions, rolePermissions);
+  upsertById(state.suppliers, suppliers);
+  state.procurementRequests ??= [];
+  state.procurementMethodRules ??= [];
+  state.approvalRules ??= [];
+  state.projects ??= [];
+  state.projectPackages ??= [];
+  state.procurementDocuments ??= [];
+  state.procurementAnnouncements ??= [];
+  state.inquirySheets ??= [];
+  state.supplierInvitations ??= [];
+  state.supplierRegistrations ??= [];
+  state.bids ??= [];
+  state.bidVersions ??= [];
+  state.bidViewApprovals ??= [];
+  state.bidViewLogs ??= [];
+  state.experts ??= [];
+  state.expertAssignments ??= [];
+  state.scoringTemplates ??= [];
+  state.scoringSheets ??= [];
+  state.scoringVersions ??= [];
+  state.reviewReports ??= [];
+  state.comparisonReports ??= [];
+  state.awardApprovals ??= [];
+  state.projectSampleReceipts ??= [];
+  state.resultNotifications ??= [];
+  state.internalPublicityRecords ??= [];
+  state.externalTradeRecords ??= [];
+  state.contractLedgers ??= [];
+  state.performanceNodes ??= [];
+  state.purchaseOrders ??= [];
+  state.receiptRecords ??= [];
+  state.acceptancePaymentRecords ??= [];
+  state.settlementMaterials ??= [];
+  state.supplierEvaluations ??= [];
+  state.archiveTemplates ??= [];
+  state.archiveItems ??= [];
+  state.archiveSupplementRequests ??= [];
+  state.pricingReports ??= [];
+  state.mallProducts ??= [];
+  state.mallPrices ??= [];
+  state.mallCartItems ??= [];
+  state.mallOrders ??= [];
+  state.mallShipments ??= [];
+  state.mallReturnRequests ??= [];
+  state.mallSettlementInvoices ??= [];
+  state.mallQuestionnaires ??= [];
+  state.mallScenarioTemplates ??= [];
+  state.mallFundAccounts ??= [];
+  state.auditLogs ??= [];
+  backfillById(state.procurementRequests, procurementRequests);
+  upsertById(state.procurementMethodRules, procurementMethodRules);
+  upsertById(state.approvalRules, approvalRules);
+  backfillById(state.projects, projects);
+  backfillById(state.projectPackages, projectPackages);
+  backfillById(state.procurementDocuments, procurementDocuments);
+  backfillById(state.procurementAnnouncements, procurementAnnouncements);
+  backfillById(state.supplierInvitations, supplierInvitations);
+  backfillById(state.supplierRegistrations, supplierRegistrations);
+  backfillById(state.bids, bids);
+  backfillById(state.bidVersions, bidVersions);
+  backfillById(state.bidViewApprovals, bidViewApprovals);
+  backfillById(state.bidViewLogs, bidViewLogs);
+  upsertById(state.experts, experts);
+  backfillById(state.expertAssignments, expertAssignments);
+  backfillById(state.scoringTemplates, scoringTemplates);
+  backfillById(state.scoringSheets, scoringSheets);
+  backfillById(state.scoringVersions, scoringVersions);
+  backfillById(state.reviewReports, reviewReports);
+  backfillById(state.comparisonReports, comparisonReports);
+  backfillById(state.awardApprovals, awardApprovals);
+  backfillById(state.projectSampleReceipts, projectSampleReceipts);
+  backfillById(state.pricingReports, pricingReports);
+  backfillById(state.resultNotifications, resultNotifications);
+  backfillById(state.internalPublicityRecords, internalPublicityRecords);
+  backfillById(state.externalTradeRecords, externalTradeRecords);
+  backfillById(state.contractLedgers, contractLedgers);
+  backfillById(state.performanceNodes, performanceNodes);
+  backfillById(state.purchaseOrders, purchaseOrders);
+  backfillById(state.receiptRecords, receiptRecords);
+  backfillById(state.acceptancePaymentRecords, acceptancePaymentRecords);
+  backfillById(state.settlementMaterials, settlementMaterials);
+  backfillById(state.supplierEvaluations, supplierEvaluations);
+  backfillById(state.archiveTemplates, archiveTemplates);
+  backfillById(state.archiveItems, archiveItems);
+  backfillById(state.archiveSupplementRequests, archiveSupplementRequests);
+  upsertById(state.mallProducts, mallProducts);
+  upsertById(state.mallPrices, mallPrices);
+  upsertById(state.mallOrders, mallOrders);
+  upsertById(state.mallShipments, mallShipments);
+  upsertById(state.mallSettlementInvoices, mallSettlementInvoices);
+  upsertById(state.mallQuestionnaires, mallQuestionnaires);
+  upsertById(state.mallScenarioTemplates, mallScenarioTemplates);
+  upsertById(state.mallFundAccounts, mallFundAccounts);
+  backfillById(state.auditLogs, auditLogs);
+  ensureSupplierSealSampleFiles(state);
+}
+
+function upsertById<T extends { id: string }>(target: T[], source: T[]) {
+  for (const item of source) {
+    const existing = target.find((entry) => entry.id === item.id);
+    if (existing) Object.assign(existing, structuredClone(item));
+    else target.push(structuredClone(item));
+  }
+}
+
+function backfillById<T extends { id: string }>(target: T[], source: T[]) {
+  for (const item of source) {
+    const existing = target.find((entry) => entry.id === item.id);
+    if (!existing) {
+      target.push(structuredClone(item));
+      continue;
+    }
+    const snapshot = structuredClone(item) as Record<string, unknown>;
+    const record = existing as Record<string, unknown>;
+    for (const [key, value] of Object.entries(snapshot)) {
+      const current = record[key];
+      if (current === undefined || current === null || (Array.isArray(current) && current.length === 0)) {
+        record[key] = value;
+      }
+    }
+  }
+}
+
+function upsertRolePermissions(target: Array<{ roleId: string; menus: string[]; actions: string[] }>, source: Array<{ roleId: string; menus: string[]; actions: string[] }>) {
+  for (const item of source) {
+    const existing = target.find((entry) => entry.roleId === item.roleId);
+    if (existing) Object.assign(existing, structuredClone(item));
+    else target.push(structuredClone(item));
+  }
+}
+
+function ensureSupplierSealSampleFiles(state: SeedState) {
+  const sampleFiles: Record<string, { fileId: string; fileName: string; contentType: string; uploadedAt: string }> = {
+    "ss-sup-1-linen": {
+      fileId: "file-seal-linen",
+      fileName: "封样-高支纱床单.png",
+      contentType: "image/png",
+      uploadedAt: "2026-05-20T14:00:00.000Z"
+    },
+    "ss-sup-2-amenity": {
+      fileId: "file-seal-amenity",
+      fileName: "封样-环保牙具套装.png",
+      contentType: "image/png",
+      uploadedAt: "2026-05-21T11:00:00.000Z"
+    },
+    "ss-sup-3-food": {
+      fileId: "file-seal-fruit",
+      fileName: "封样-早餐鲜切水果.png",
+      contentType: "image/png",
+      uploadedAt: "2026-05-22T10:30:00.000Z"
+    }
+  };
+  for (const supplier of state.suppliers) {
+    for (const sample of supplier.sealSamples ?? []) {
+      const file = sampleFiles[sample.id];
+      if (!file) continue;
+      sample.fileId = file.fileId;
+      sample.fileName = file.fileName;
+      sample.contentType = file.contentType;
+      sample.uploadedAt = file.uploadedAt;
+    }
+  }
+}

@@ -108,8 +108,10 @@ function fileMetadata(ctx: AppContext, fileIds: string[]) {
 function productResponse(ctx: AppContext, product: MallProduct, user = ctx.state.users[0]!) {
   const offer = ctx.r6OrderFulfillmentRepository.listOffers([product], ctx.state.mallPrices, user).at(0);
   const priceSource = offer?.priceSource ?? null;
+  const supplier = ctx.state.suppliers.find((item) => item.id === product.supplierId);
   return {
     ...product,
+    supplierName: supplier?.name ?? product.supplierId,
     imageFileMetadata: fileMetadata(ctx, product.imageFileIds),
     attachmentFileMetadata: fileMetadata(ctx, product.attachmentFileIds),
     activePrice: priceSource
@@ -138,6 +140,13 @@ function productResponse(ctx: AppContext, product: MallProduct, user = ctx.state
     saleable: Boolean(offer?.saleable),
     blockReasons: offer?.blockReasons ?? [],
     statusLabel: offer?.statusLabel ?? product.status
+  };
+}
+
+function scenarioTemplateResponse(ctx: AppContext, template: MallScenarioTemplate) {
+  return {
+    ...template,
+    attachmentFileMetadata: fileMetadata(ctx, template.attachmentFileIds)
   };
 }
 
@@ -1092,14 +1101,14 @@ export function mallRoutes(ctx: AppContext) {
 
   router.get("/mall/scenario-templates", (req, res) => {
     if (!assertReader(ctx, req, res)) return;
-    return res.json({ templates: ctx.state.mallScenarioTemplates });
+    return res.json({ templates: ctx.state.mallScenarioTemplates.map((template) => scenarioTemplateResponse(ctx, template)) });
   });
 
   router.get("/mall/scenario-templates/:templateId", (req, res) => {
     if (!assertReader(ctx, req, res)) return;
     const template = ctx.state.mallScenarioTemplates.find((item) => item.id === req.params.templateId);
     if (!template) return res.status(404).json({ error: { code: "MALL_TEMPLATE_NOT_FOUND", message: "Mall scenario template was not found." } });
-    return res.json({ template });
+    return res.json({ template: scenarioTemplateResponse(ctx, template) });
   });
 
   router.post("/mall/scenario-templates/:templateId/cart", (req, res) => {

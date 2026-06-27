@@ -33,6 +33,7 @@ interface ProcurementRequest {
   code?: string;
   title: string;
   orgId: string;
+  createdBy?: string;
   category?: string;
   status?: string;
   approvalStatus: string;
@@ -55,9 +56,15 @@ interface MethodRule {
   resultMethod: string;
 }
 
+interface ProjectRow {
+  id: string;
+  name?: string;
+}
+
 const session = useSessionStore();
 const requests = ref<ProcurementRequest[]>([]);
 const rules = ref<MethodRule[]>([]);
+const projects = ref<ProjectRow[]>([]);
 const selectedRequestId = ref("");
 const selectedRuleId = ref("");
 const attachmentFile = ref<File | null>(null);
@@ -85,9 +92,24 @@ const lineItemBudgetAmount = ref<number | null>(3600);
 const lineItemRequiredByDate = ref("2026-07-10");
 const lineItemRemark = ref("首批采购");
 
-const canMaintain = computed(() => ["buyer", "group_manager"].includes(session.roleId));
-const activeRequests = computed(() => requests.value.filter((item) => item.status !== "cancelled"));
+const canCreateRequest = computed(() => ["buyer", "group_manager", "hotel_buyer"].includes(session.roleId));
+const canApproveRequest = computed(() => ["buyer", "group_manager"].includes(session.roleId));
+const canDecideMethod = computed(() => ["buyer", "group_manager"].includes(session.roleId));
+const canActOnRequests = computed(() => canCreateRequest.value || canApproveRequest.value || canDecideMethod.value);
+const visibleRequests = computed(() => requests.value.filter((item) => item.status !== "cancelled" && !isTestRecord([item.title, item.requestDepartment, item.requesterName])));
+const activeRequests = computed(() => visibleRequests.value);
+const selectedRequest = computed(() => activeRequests.value.find((item) => item.id === selectedRequestId.value));
+const canSubmitSelected = computed(() => Boolean(selectedRequest.value && canCreateRequest.value && selectedRequest.value.status === "draft" && selectedRequest.value.createdBy === session.user?.id));
+const canApproveSelected = computed(() =>
+  Boolean(selectedRequest.value && canApproveRequest.value && selectedRequest.value.approvalStatus === "submitted" && selectedRequest.value.createdBy !== session.user?.id)
+);
+const canDecideSelectedMethod = computed(() =>
+  Boolean(selectedRequest.value && canDecideMethod.value && selectedRequest.value.status === "submitted" && selectedRequest.value.approvalStatus === "approved")
+);
 
+function isTestRecord(values: Array<string | undefined | null>) {
+  return values.some((value) => /stage\s*\d|阶段\s*\d|runtime|uat|mock|test/i.test(String(value ?? "")));
+}
 
 function onAttachmentChange(event: Event) {
   const target = event.target as HTMLInputElement;
@@ -123,16 +145,23 @@ function buildLineItems() {
 }
 
 async function load() {
-  const [requestData, ruleData] = await Promise.all([
+  const [requestData, ruleData, projectData] = await Promise.all([
     apiGet<{ procurementRequests: ProcurementRequest[] }>("/api/procurement-requests"),
-    apiGet<{ procurementMethodRules: MethodRule[] }>("/api/procurement-method-rules")
+    apiGet<{ procurementMethodRules: MethodRule[] }>("/api/procurement-method-rules"),
+    apiGet<{ projects: ProjectRow[] }>("/api/projects").catch(() => ({ projects: [] }))
   ]);
   requests.value = requestData.procurementRequests;
   rules.value = ruleData.procurementMethodRules;
+  projects.value = projectData.projects;
   if (!activeRequests.value.some((item) => item.id === selectedRequestId.value)) {
     selectedRequestId.value = activeRequests.value[0]?.id ?? "";
   }
   selectedRuleId.value ||= rules.value[0]?.id ?? "";
+}
+
+function projectName(projectId: string | null) {
+  if (!projectId) return "待发起";
+  return projects.value.find((item) => item.id === projectId)?.name ?? "已发起项目";
 }
 
 async function run(action: () => Promise<{ auditLogId?: string }>) {
@@ -178,7 +207,7 @@ onMounted(async () => {
   <section class="panel">
     <h2>采购申请</h2>
 
-    <div v-if="canMaintain" class="form-grid">
+    <div v-if="canCreateRequest" class="form-grid">
       <label>
         申请标题
         <input v-model="title" />
@@ -217,7 +246,7 @@ onMounted(async () => {
       </label>
     </div>
 
-    <div v-if="canMaintain" class="form-grid">
+    <div v-if="canCreateRequest" class="form-grid">
       <label>
         明细名称
         <input v-model="lineItemName" />
@@ -256,7 +285,7 @@ onMounted(async () => {
       </label>
     </div>
 
-    <div v-if="canMaintain" class="form-grid">
+    <div v-if="canCreateRequest" class="form-grid">
       <label>
         申请附件
         <input type="file" @change="onAttachmentChange" />
@@ -281,22 +310,22 @@ onMounted(async () => {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="item in requests" :key="item.id">
+        <tr v-for="item in visibleRequests" :key="item.id">
           <td>{{ item.code || item.id }}</td>
           <td>{{ item.title }}</td>
           <td>{{ item.requestDepartment || "-" }} / {{ item.requesterName || "-" }}</td>
           <td>{{ labelStatus(item.status || "draft") }}</td>
           <td>{{ labelStatus(item.approvalStatus) }}</td>
-          <td>{{ item.methodSuggestion }}</td>
-          <td>{{ item.budgetAmount ?? "-" }}</td>
+          <td>{{ labelStatus(item.methodSuggestion) }}</td>
+          <td>{{ item.budgetAmount === undefined ? "-" : `¥${Number(item.budgetAmount).toLocaleString("zh-CN")}` }}</td>
           <td>
             <AttachmentList :attachments="item.attachments" compact />
           </td>
-          <td>{{ item.projectId || "-" }}</td>
+          <td>{{ projectName(item.projectId) }}</td>
           <td>
-            <button v-if="item.status === 'draft' && canMaintain" type="button" @click="run(() => apiDelete(`/api/procurement-requests/${item.id}`))">删除</button>
+            <button v-if="item.status === 'draft' && canCreateRequest && item.createdBy === session.user?.id" type="button" @click="run(() => apiDelete(`/api/procurement-requests/${item.id}`))">删除</button>
             <button
-              v-else-if="item.status !== 'project_created' && item.status !== 'cancelled' && canMaintain"
+              v-else-if="item.status !== 'project_created' && item.status !== 'cancelled' && canCreateRequest && item.createdBy === session.user?.id"
               type="button"
               @click="run(() => apiPost(`/api/procurement-requests/${item.id}/cancel`, { reason: '页面撤销采购申请' }))"
             >
@@ -308,27 +337,28 @@ onMounted(async () => {
       </tbody>
     </table>
 
-    <div v-if="canMaintain" class="form-grid">
+    <div v-if="canActOnRequests" class="form-grid">
       <label>
         当前申请
         <select v-model="selectedRequestId">
           <option v-for="item in activeRequests" :key="item.id" :value="item.id">{{ item.title }} / {{ labelStatus(item.approvalStatus) }}</option>
         </select>
       </label>
-      <button type="button" :disabled="!selectedRequestId" @click="run(() => apiPost(`/api/procurement-requests/${selectedRequestId}/submit`))">提交审批</button>
-      <button type="button" :disabled="!selectedRequestId" @click="run(() => apiPost(`/api/procurement-requests/${selectedRequestId}/approve`, { approved: true, opinion: '页面审批通过' }))">
+      <button v-if="canSubmitSelected" type="button" :disabled="!selectedRequestId" @click="run(() => apiPost(`/api/procurement-requests/${selectedRequestId}/submit`))">提交审批</button>
+      <button v-if="canApproveSelected" type="button" :disabled="!selectedRequestId" @click="run(() => apiPost(`/api/procurement-requests/${selectedRequestId}/approve`, { approved: true, opinion: '页面审批通过' }))">
         审批通过
       </button>
-      <button type="button" :disabled="!selectedRequestId" @click="run(() => apiPost(`/api/procurement-requests/${selectedRequestId}/approve`, { approved: false, opinion: '页面审批驳回' }))">
+      <button v-if="canApproveSelected" type="button" :disabled="!selectedRequestId" @click="run(() => apiPost(`/api/procurement-requests/${selectedRequestId}/approve`, { approved: false, opinion: '页面审批驳回' }))">
         审批驳回
       </button>
-      <label>
+      <label v-if="canDecideSelectedMethod">
         采购方式规则
         <select v-model="selectedRuleId">
           <option v-for="rule in rules" :key="rule.id" :value="rule.id">{{ rule.ruleName || rule.resultMethod }}</option>
         </select>
       </label>
       <button
+        v-if="canDecideSelectedMethod"
         type="button"
         :disabled="!selectedRequestId || !selectedRuleId"
         @click="run(() => apiPost(`/api/procurement-requests/${selectedRequestId}/method-decision`, { ruleId: selectedRuleId, externalTradeFlag }))"

@@ -42,10 +42,16 @@ interface SupplierInvitation {
   notificationStatus: string;
 }
 
+interface SupplierRow {
+  id: string;
+  name: string;
+}
+
 const projects = ref<Project[]>([]);
 const documents = ref<ProcurementDocument[]>([]);
 const announcements = ref<Announcement[]>([]);
 const invitations = ref<SupplierInvitation[]>([]);
+const suppliers = ref<SupplierRow[]>([]);
 const selectedProjectId = ref("");
 const selectedDocumentId = ref("");
 const selectedAnnouncementId = ref("");
@@ -54,9 +60,9 @@ const procurementMethod = ref("internal_open");
 const scope = ref("public_internal");
 const registrationDeadlineAt = ref("2099-12-20T17:00:00.000Z");
 const quoteDeadlineAt = ref("2099-12-31T17:00:00.000Z");
-const deliveryWindow = ref("7 days");
-const openingLocation = ref("regional center");
-const supplierIds = ref("sup-1,sup-2");
+const deliveryWindow = ref("7天");
+const openingLocation = ref("华东区域集采中心");
+const selectedSupplierIds = ref<string[]>([]);
 const auditLogId = ref("");
 const error = ref("");
 
@@ -72,31 +78,35 @@ function announcementLabel(announcementId: string) {
   return announcements.value.find((item) => item.id === announcementId)?.title ?? announcementId;
 }
 
+function supplierName(supplierId: string) {
+  return suppliers.value.find((item) => item.id === supplierId)?.name ?? "供应商";
+}
+
 function formatDateTime(value: string) {
   return value ? value.replace("T", " ").slice(0, 16) : "-";
 }
 
-function selectedSupplierIds() {
-  return supplierIds.value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+function invitationSupplierIds() {
+  return selectedSupplierIds.value.length ? selectedSupplierIds.value : suppliers.value.slice(0, 2).map((item) => item.id);
 }
 
 async function load() {
-  const [projectData, documentData, announcementData, invitationData] = await Promise.all([
+  const [projectData, documentData, announcementData, invitationData, supplierData] = await Promise.all([
     apiGet<{ projects: Project[] }>("/api/projects"),
     apiGet<{ procurementDocuments: ProcurementDocument[] }>("/api/procurement-documents"),
     apiGet<{ announcements: Announcement[] }>("/api/announcements"),
-    apiGet<{ supplierInvitations: SupplierInvitation[] }>("/api/supplier-invitations")
+    apiGet<{ supplierInvitations: SupplierInvitation[] }>("/api/supplier-invitations"),
+    apiGet<{ suppliers: SupplierRow[] }>("/api/suppliers").catch(() => ({ suppliers: [] }))
   ]);
   projects.value = projectData.projects;
   documents.value = documentData.procurementDocuments;
   announcements.value = announcementData.announcements;
   invitations.value = invitationData.supplierInvitations;
+  suppliers.value = supplierData.suppliers;
   selectedProjectId.value ||= internalProjects.value[0]?.id ?? "";
   selectedDocumentId.value = lockedDocuments.value[0]?.id ?? selectedDocumentId.value;
   selectedAnnouncementId.value ||= announcements.value[0]?.id ?? "";
+  if (!selectedSupplierIds.value.length) selectedSupplierIds.value = suppliers.value.slice(0, 2).map((item) => item.id);
   const currentProject = internalProjects.value.find((item) => item.id === selectedProjectId.value);
   procurementMethod.value = currentProject?.type === "comparison" ? "comparison" : "internal_open";
 }
@@ -234,12 +244,14 @@ onMounted(load);
       </label>
       <label>
         邀请供应商
-        <input v-model="supplierIds" />
+        <select v-model="selectedSupplierIds" multiple>
+          <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">{{ supplier.name }}</option>
+        </select>
       </label>
-      <button type="button" :disabled="!selectedAnnouncementId" @click="run(() => apiPost(`/api/announcements/${selectedAnnouncementId}/publish`, { supplierIds: selectedSupplierIds() }))">
+      <button type="button" :disabled="!selectedAnnouncementId" @click="run(() => apiPost(`/api/announcements/${selectedAnnouncementId}/publish`, { supplierIds: invitationSupplierIds() }))">
         发布公告
       </button>
-      <button type="button" :disabled="!selectedAnnouncementId" @click="run(() => apiPost(`/api/announcements/${selectedAnnouncementId}/invitations`, { supplierIds: selectedSupplierIds() }))">
+      <button type="button" :disabled="!selectedAnnouncementId" @click="run(() => apiPost(`/api/announcements/${selectedAnnouncementId}/invitations`, { supplierIds: invitationSupplierIds() }))">
         发送邀请
       </button>
     </div>
@@ -256,7 +268,7 @@ onMounted(load);
       <tbody>
         <tr v-for="invitation in invitations" :key="invitation.id">
           <td>{{ announcementLabel(invitation.announcementId) }}</td>
-          <td>{{ invitation.supplierId }}</td>
+          <td>{{ supplierName(invitation.supplierId) }}</td>
           <td>{{ labelStatus(invitation.status) }}</td>
           <td>{{ labelStatus(invitation.notificationStatus) }}</td>
         </tr>

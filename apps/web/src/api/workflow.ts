@@ -60,6 +60,14 @@ export async function loadApprovalRules() {
   return data.approvalRules.map(toR8ApprovalRuleView);
 }
 
+export async function createApprovalRule(payload: Partial<R8ApprovalRuleDto>) {
+  const data = await apiPost<{ approvalRule: R8ApprovalRuleDto; auditLogId?: string }>("/api/workflow/approval-rules", payload);
+  return {
+    approvalRule: toR8ApprovalRuleView(data.approvalRule),
+    auditLogId: data.auditLogId
+  };
+}
+
 export async function updateApprovalRule(ruleId: string, patch: Partial<R8ApprovalRuleDto>) {
   const data = await apiPatch<{ approvalRule: R8ApprovalRuleDto; auditLogId?: string }>(`/api/workflow/approval-rules/${ruleId}`, patch);
   return {

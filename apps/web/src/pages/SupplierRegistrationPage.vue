@@ -6,6 +6,7 @@ import AuditLogRef from "../components/AuditLogRef.vue";
 import ErrorAlert from "../components/ErrorAlert.vue";
 import WorkflowSurfaceSummary from "../components/WorkflowSurfaceSummary.vue";
 import { useSessionStore } from "../stores/session";
+import { businessRecordLabel, isTestLikeText } from "../utils/business-display";
 import { formatDateTime } from "../utils/status-labels";
 
 interface Announcement {
@@ -37,14 +38,28 @@ interface Registration {
 
 interface SupplierProfile {
   id: string;
+  name?: string;
   admissionStatus?: string;
   status: string;
   restrictionReason?: string;
 }
 
+interface ProjectRow {
+  id: string;
+  code?: string;
+  name?: string;
+}
+
+interface SupplierRow {
+  id: string;
+  name: string;
+}
+
 const announcements = ref<Announcement[]>([]);
 const registrations = ref<Registration[]>([]);
 const currentSupplier = ref<SupplierProfile | null>(null);
+const projects = ref<ProjectRow[]>([]);
+const suppliers = ref<SupplierRow[]>([]);
 const selectedAnnouncementId = ref("");
 const materialFile = ref<File | null>(null);
 const materialName = ref("");
@@ -55,8 +70,16 @@ const error = ref("");
 const busy = ref(false);
 const session = useSessionStore();
 const supplierRoles = new Set(["supplier", "supplier_admin", "supplier_quotation"]);
-const supplierQuotationRoles = new Set(["supplier", "supplier_quotation"]);
+const supplierQuotationRoles = new Set(["supplier", "supplier_admin", "supplier_quotation"]);
 const canSubmitRegistration = computed(() => supplierQuotationRoles.has(session.roleId));
+const visibleAnnouncements = computed(() => announcements.value.filter((announcement) => !isTestAnnouncement(announcement)));
+const visibleRegistrations = computed(() =>
+  registrations.value.filter((registration) => {
+    const announcement = announcements.value.find((item) => item.id === registration.announcementId);
+    const project = projects.value.find((item) => item.id === registration.projectId);
+    return !isTestLikeText(announcement?.title) && !isTestLikeText(project?.name) && !isTestLikeText(project?.code);
+  })
+);
 const restrictedMessage = computed(() => {
   if (!currentSupplier.value || currentSupplier.value.admissionStatus !== "restricted") return "";
   return `当前供应商已列入限制名单，不能继续参与报名。${currentSupplier.value.restrictionReason ? `原因：${currentSupplier.value.restrictionReason}` : ""}`;
@@ -69,7 +92,21 @@ const registrationStatusLabels: Record<string, string> = {
 };
 
 function announcementTitle(announcementId: string) {
-  return announcements.value.find((item) => item.id === announcementId)?.title ?? announcementId;
+  return businessRecordLabel(announcements.value.find((item) => item.id === announcementId)?.title ?? announcementId, "采购公告");
+}
+
+function projectLabel(projectId: string) {
+  const project = projects.value.find((item) => item.id === projectId);
+  return project && !isTestLikeText(project.name) && !isTestLikeText(project.code) ? project.name ?? project.code ?? "采购项目" : "采购项目";
+}
+
+function supplierName(supplierId: string) {
+  return suppliers.value.find((item) => item.id === supplierId)?.name ?? currentSupplier.value?.name ?? "供应商";
+}
+
+function isTestAnnouncement(announcement: Announcement) {
+  const project = projects.value.find((item) => item.id === announcement.projectId);
+  return isTestLikeText(announcement.title) || isTestLikeText(project?.name) || isTestLikeText(project?.code);
 }
 
 function onFileChange(event: Event) {
@@ -85,13 +122,19 @@ function onSupplementFileChange(event: Event) {
 }
 
 async function load() {
-  const [announcementData, registrationData] = await Promise.all([
+  const [announcementData, registrationData, projectData, supplierData] = await Promise.all([
     apiGet<{ announcements: Announcement[] }>("/api/announcements"),
-    apiGet<{ registrations: Registration[] }>("/api/registrations")
+    apiGet<{ registrations: Registration[] }>("/api/registrations"),
+    apiGet<{ projects: ProjectRow[] }>("/api/projects").catch(() => ({ projects: [] })),
+    apiGet<{ suppliers: SupplierRow[] }>("/api/suppliers").catch(() => ({ suppliers: [] }))
   ]);
   announcements.value = announcementData.announcements;
   registrations.value = registrationData.registrations;
-  selectedAnnouncementId.value ||= announcements.value[0]?.id ?? "";
+  projects.value = projectData.projects;
+  suppliers.value = supplierData.suppliers;
+  selectedAnnouncementId.value = visibleAnnouncements.value.some((item) => item.id === selectedAnnouncementId.value)
+    ? selectedAnnouncementId.value
+    : visibleAnnouncements.value[0]?.id ?? "";
   if (supplierRoles.has(session.roleId) && session.user?.supplierId) {
     const supplierData = await apiGet<{ supplier: SupplierProfile }>(`/api/suppliers/${session.user.supplierId}`);
     currentSupplier.value = supplierData.supplier;
@@ -164,8 +207,8 @@ onMounted(load);
       <label>
         可报名公告
         <select v-model="selectedAnnouncementId">
-          <option v-for="announcement in announcements" :key="announcement.id" :value="announcement.id">
-            {{ announcement.title }} / {{ announcement.projectId }}
+          <option v-for="announcement in visibleAnnouncements" :key="announcement.id" :value="announcement.id">
+            {{ announcement.title }} / {{ projectLabel(announcement.projectId) }}
           </option>
         </select>
       </label>
@@ -189,24 +232,24 @@ onMounted(load);
     </div>
 
     <p v-if="restrictedMessage" class="inline-error">{{ restrictedMessage }}</p>
-    <p v-if="!canSubmitRegistration" class="muted">当前角色仅可查看报名记录，请切换为供应商后提交报名。</p>
+    <p v-if="!canSubmitRegistration" class="muted">当前角色仅可查看报名记录。</p>
 
     <table>
       <thead>
         <tr>
           <th>公告</th>
-          <th>项目编号</th>
-          <th>供应商编号</th>
+          <th>项目</th>
+          <th>供应商</th>
           <th>报名状态</th>
           <th>资料</th>
           <th>提交时间</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="registration in registrations" :key="registration.id">
+        <tr v-for="registration in visibleRegistrations" :key="registration.id">
           <td>{{ announcementTitle(registration.announcementId) }}</td>
-          <td>{{ registration.projectId }}</td>
-          <td>{{ registration.supplierId }}</td>
+          <td>{{ projectLabel(registration.projectId) }}</td>
+          <td>{{ supplierName(registration.supplierId) }}</td>
           <td>{{ registrationStatusLabels[registration.status] ?? registration.status }}</td>
           <td>
             <AttachmentList :attachments="registration.materialMetadata" compact />

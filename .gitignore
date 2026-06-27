@@ -15,7 +15,9 @@ apps/web/dist/
 output/
 tmp/
 .codex/
+.codex-run/
 .playwright-mcp/
+.playwright-cli/
 *.sqlite
 *.sqlite-*
 *.db

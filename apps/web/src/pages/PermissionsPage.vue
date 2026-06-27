@@ -6,6 +6,7 @@ import { labelStatus } from "../utils/status-labels";
 const menus = ref<string[]>([]);
 const actions = ref<string[]>([]);
 const users = ref<Array<{ id: string; name: string; roleId: string; orgId: string; status?: string; departmentId?: string; position?: string }>>([]);
+const organizations = ref<Array<{ id: string; name: string }>>([]);
 const approvalRules = ref<Array<{ id: string; ruleName: string; businessType: string; nodeRoleIds: string[]; actions: string[]; status: string; versionNo: number }>>([]);
 const adminLoadError = ref("");
 
@@ -53,10 +54,15 @@ const businessTypeLabels: Record<string, string> = {
   procurement_request: "采购需求审批"
 };
 
+function orgName(orgId: string) {
+  return organizations.value.find((item) => item.id === orgId)?.name ?? "组织";
+}
+
 onMounted(async () => {
   menus.value = (await apiGet<{ menus: string[] }>("/api/me/menus")).menus;
   actions.value = (await apiGet<{ actions: string[] }>("/api/me/actions")).actions;
   approvalRules.value = (await apiGet<{ approvalRules: typeof approvalRules.value }>("/api/workflow/approval-rules")).approvalRules;
+  organizations.value = (await apiGet<{ organizations: typeof organizations.value }>("/api/organizations").catch(() => ({ organizations: [] }))).organizations;
   try {
     users.value = (await apiGet<{ users: typeof users.value }>("/api/users")).users;
   } catch (error) {
@@ -122,7 +128,7 @@ onMounted(async () => {
         <tr v-for="user in users" :key="user.id">
           <td>{{ user.name }}</td>
           <td>{{ roleLabels[user.roleId] ?? labelStatus(user.roleId) }}</td>
-          <td>{{ user.orgId }}</td>
+          <td>{{ orgName(user.orgId) }}</td>
           <td>{{ user.departmentId ?? "-" }}</td>
           <td>{{ user.position ?? "-" }}</td>
           <td>{{ labelStatus(user.status ?? "active") }}</td>

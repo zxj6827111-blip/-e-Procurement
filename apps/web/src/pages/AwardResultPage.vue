@@ -7,6 +7,7 @@ import { useSessionStore } from "../stores/session";
 
 interface AwardApproval {
   id: string;
+  recommendedSupplierId?: string;
   selectedSupplierId: string;
   approvalStatus: string;
   isLowestPrice: boolean;
@@ -26,7 +27,6 @@ interface ResultNotification {
   id: string;
   supplierId?: string;
   status: string;
-  selected?: boolean;
   visibilityConfig: string;
   contentSummary: string;
   sentAt: string | null;
@@ -41,6 +41,8 @@ interface PublicityRecord {
 
 const selectedProjectId = ref("p-award");
 const selectedSupplierId = ref("sup-1");
+const projects = ref<Array<{ id: string; code: string; name: string; externalTradeFlag?: boolean }>>([]);
+const suppliers = ref<Array<{ id: string; name: string }>>([]);
 const nonLowestPriceReason = ref("服务方案与技术评分综合领先");
 const approvals = ref<AwardApproval[]>([]);
 const selectedApprovalId = ref("");
@@ -51,6 +53,13 @@ const supplierResults = ref<ResultNotification[]>([]);
 const auditLogId = ref("");
 const error = ref("");
 const session = useSessionStore();
+const awardOperationForm = ref({
+  approvalDecision: "approved",
+  approvalOpinion: "定标审批通过",
+  notificationScope: "supplier_self",
+  visibilityConfig: "supplier_self_only",
+  publicitySummary: "内部公示记录"
+});
 
 const approvalStatusLabels: Record<string, string> = {
   draft: "草稿",
@@ -70,12 +79,41 @@ const visibilityLabels: Record<string, string> = {
   internal_only: "内部可见"
 };
 
+function supplierName(supplierId?: string) {
+  if (!supplierId) return "-";
+  return suppliers.value.find((item) => item.id === supplierId)?.name ?? recommendation.value.recommendedSupplierName ?? "供应商";
+}
+
+function approvalLabel(approval: AwardApproval, index: number) {
+  return `定标审批 ${index + 1} / ${supplierName(approval.selectedSupplierId)} / ${approvalStatusLabels[approval.approvalStatus] ?? approval.approvalStatus}`;
+}
+
+function notificationLabel(index: number) {
+  return `结果通知 ${index + 1}`;
+}
+
+function publicityLabel(index: number) {
+  return `内部公示 ${index + 1}`;
+}
+
+function notificationSelected(result: ResultNotification) {
+  return Boolean(result.supplierId && result.supplierId === recommendation.value.recommendedSupplierId);
+}
+
 function formatDateTime(value: string | null) {
   return value ? value.replace("T", " ").slice(0, 16) : "-";
 }
 
 async function load() {
+  const [projectData, supplierData] = await Promise.all([
+    apiGet<{ projects: Array<{ id: string; code: string; name: string; externalTradeFlag?: boolean }> }>("/api/projects").catch(() => ({ projects: [] })),
+    apiGet<{ suppliers: Array<{ id: string; name: string }> }>("/api/suppliers").catch(() => ({ suppliers: [] }))
+  ]);
+  projects.value = projectData.projects.filter((project) => !project.externalTradeFlag);
+  suppliers.value = supplierData.suppliers;
+  if (!projects.value.some((item) => item.id === selectedProjectId.value)) selectedProjectId.value = projects.value[0]?.id ?? selectedProjectId.value;
   recommendation.value = (await apiGet<{ recommendation: AwardRecommendation }>(`/api/projects/${selectedProjectId.value}/award-recommendation`)).recommendation;
+  selectedSupplierId.value = recommendation.value.recommendedSupplierId ?? selectedSupplierId.value;
   approvals.value = (await apiGet<{ approvals: AwardApproval[] }>(`/api/projects/${selectedProjectId.value}/award-approvals`)).approvals;
   selectedApprovalId.value ||= approvals.value[0]?.id ?? "";
   notifications.value = (await apiGet<{ notifications: ResultNotification[] }>(`/api/projects/${selectedProjectId.value}/result-notifications`)).notifications;
@@ -95,6 +133,32 @@ async function run(action: () => Promise<{ auditLogId?: string; approval?: Award
   }
 }
 
+function approveSelectedAward() {
+  return run(() =>
+    apiPost(`/api/award-approvals/${selectedApprovalId.value}/mock-approve`, {
+      approved: awardOperationForm.value.approvalDecision === "approved",
+      approvalOpinion: awardOperationForm.value.approvalOpinion
+    })
+  );
+}
+
+function sendResultNotification() {
+  return run(() =>
+    apiPost(`/api/projects/${selectedProjectId.value}/result-notifications`, {
+      scope: awardOperationForm.value.notificationScope,
+      visibilityConfig: awardOperationForm.value.visibilityConfig
+    })
+  );
+}
+
+function publishInternalPublicity() {
+  return run(() =>
+    apiPost(`/api/projects/${selectedProjectId.value}/internal-publicity`, {
+      contentSummary: awardOperationForm.value.publicitySummary
+    })
+  );
+}
+
 onMounted(load);
 </script>
 
@@ -106,7 +170,7 @@ onMounted(load);
       <thead>
         <tr>
           <th>推荐供应商</th>
-          <th>推荐供应商编号</th>
+          <th>定标供应商</th>
           <th>是否最低价</th>
           <th>来源评审报告</th>
           <th>候选供应商</th>
@@ -115,10 +179,10 @@ onMounted(load);
       <tbody>
         <tr>
           <td>{{ recommendation.recommendedSupplierName || "-" }}</td>
-          <td>{{ recommendation.recommendedSupplierId || "-" }}</td>
+          <td>{{ supplierName(recommendation.recommendedSupplierId) }}</td>
           <td>{{ recommendation.isLowestPrice ? "是" : "否" }}</td>
           <td>{{ recommendation.sourceReportId || "待冻结评审报告" }}</td>
-          <td>{{ recommendation.candidateSupplierIds?.join("、") || "-" }}</td>
+          <td>{{ recommendation.candidateSupplierIds?.map((id) => supplierName(id)).join("、") || "-" }}</td>
         </tr>
       </tbody>
     </table>
@@ -126,11 +190,15 @@ onMounted(load);
     <div class="form-grid">
       <label>
         项目
-        <input v-model="selectedProjectId" />
+        <select v-model="selectedProjectId" @change="load">
+          <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.code }} / {{ project.name }}</option>
+        </select>
       </label>
       <label>
         拟定标供应商
-        <input v-model="selectedSupplierId" />
+        <select v-model="selectedSupplierId">
+          <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">{{ supplier.name }}</option>
+        </select>
       </label>
       <label>
         非最低价理由
@@ -148,22 +216,51 @@ onMounted(load);
       <label>
         审批单
         <select v-model="selectedApprovalId">
-          <option v-for="approval in approvals" :key="approval.id" :value="approval.id">{{ approval.id }} / {{ approvalStatusLabels[approval.approvalStatus] ?? approval.approvalStatus }}</option>
+          <option v-for="(approval, index) in approvals" :key="approval.id" :value="approval.id">{{ approvalLabel(approval, index) }}</option>
         </select>
       </label>
+      <label>
+        审批结论
+        <select v-model="awardOperationForm.approvalDecision">
+          <option value="approved">通过</option>
+          <option value="rejected">驳回</option>
+        </select>
+      </label>
+      <label>
+        审批意见
+        <input v-model="awardOperationForm.approvalOpinion" />
+      </label>
+      <label>
+        通知范围
+        <select v-model="awardOperationForm.notificationScope">
+          <option value="supplier_self">供应商各自可见</option>
+          <option value="internal_publicity">内部公示通知</option>
+        </select>
+      </label>
+      <label>
+        可见配置
+        <select v-model="awardOperationForm.visibilityConfig">
+          <option value="supplier_self_only">仅供应商本人可见</option>
+          <option value="show_winner_name">展示中标供应商名称</option>
+        </select>
+      </label>
+      <label>
+        内部公示摘要
+        <input v-model="awardOperationForm.publicitySummary" />
+      </label>
       <button type="button" :disabled="!selectedApprovalId" @click="run(() => apiPost(`/api/award-approvals/${selectedApprovalId}/submit`))">提交审批</button>
-      <button type="button" :disabled="!selectedApprovalId" @click="run(() => apiPost(`/api/award-approvals/${selectedApprovalId}/mock-approve`, { approved: true }))">
-        审批通过
+      <button type="button" :disabled="!selectedApprovalId" @click="approveSelectedAward">
+        记录审批结论
       </button>
-      <button type="button" @click="run(() => apiPost(`/api/projects/${selectedProjectId}/result-notifications`, { visibilityConfig: 'supplier_self_only' }))">发送结果通知</button>
-      <button type="button" @click="run(() => apiPost(`/api/projects/${selectedProjectId}/internal-publicity`, { contentSummary: '内部公示记录' }))">发布内部公示</button>
+      <button type="button" @click="sendResultNotification">发送结果通知</button>
+      <button type="button" @click="publishInternalPublicity">发布内部公示</button>
     </div>
 
     <h3>审批记录</h3>
     <table>
       <thead>
         <tr>
-          <th>审批单</th>
+          <th>审批</th>
           <th>定标供应商</th>
           <th>最低价</th>
           <th>状态</th>
@@ -171,9 +268,9 @@ onMounted(load);
         </tr>
       </thead>
       <tbody>
-        <tr v-for="approval in approvals" :key="approval.id">
-          <td>{{ approval.id }}</td>
-          <td>{{ approval.selectedSupplierId }}</td>
+        <tr v-for="(approval, index) in approvals" :key="approval.id">
+          <td>{{ approvalLabel(approval, index) }}</td>
+          <td>{{ supplierName(approval.selectedSupplierId) }}</td>
           <td>{{ approval.isLowestPrice ? "是" : "否" }}</td>
           <td>{{ approvalStatusLabels[approval.approvalStatus] ?? approval.approvalStatus }}</td>
           <td>{{ approval.nonLowestPriceReason || "-" }}</td>
@@ -193,9 +290,9 @@ onMounted(load);
         </tr>
       </thead>
       <tbody>
-        <tr v-for="notification in notifications" :key="notification.id">
-          <td>{{ notification.id }}</td>
-          <td>{{ notification.supplierId || "-" }}</td>
+        <tr v-for="(notification, index) in notifications" :key="notification.id">
+          <td>{{ notificationLabel(index) }}</td>
+          <td>{{ supplierName(notification.supplierId) }}</td>
           <td>{{ notificationStatusLabels[notification.status] ?? notification.status }}</td>
           <td>{{ visibilityLabels[notification.visibilityConfig] ?? notification.visibilityConfig }}</td>
           <td>{{ formatDateTime(notification.sentAt) }}</td>
@@ -213,9 +310,9 @@ onMounted(load);
         </tr>
       </thead>
       <tbody>
-        <tr v-for="result in supplierResults" :key="result.id">
-          <td>{{ result.id }}</td>
-          <td>{{ result.selected ? "中选" : "未中选" }}</td>
+        <tr v-for="(result, index) in supplierResults" :key="result.id">
+          <td>{{ notificationLabel(index) }}</td>
+          <td>{{ notificationSelected(result) ? "中选" : "未中选" }}</td>
           <td>{{ result.contentSummary }}</td>
         </tr>
       </tbody>
@@ -232,8 +329,8 @@ onMounted(load);
         </tr>
       </thead>
       <tbody>
-        <tr v-for="record in publicityRecords" :key="record.id">
-          <td>{{ record.id }}</td>
+        <tr v-for="(record, index) in publicityRecords" :key="record.id">
+          <td>{{ publicityLabel(index) }}</td>
           <td>{{ record.status === "published" ? "已发布" : record.status }}</td>
           <td>{{ record.contentSummary }}</td>
           <td>{{ formatDateTime(record.publishedAt) }}</td>

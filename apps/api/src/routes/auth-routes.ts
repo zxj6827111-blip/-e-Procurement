@@ -23,6 +23,20 @@ export function authRoutes(ctx: AppContext) {
     });
   });
 
+  router.get("/auth/session", (req, res) => {
+    if (req.auth.roleId === "system") {
+      return res.json({ authenticated: false, mockAuthEnabled: ctx.config.mockAuthEnabled, mode: ctx.config.appEnv });
+    }
+    return res.json({
+      authenticated: true,
+      user: req.auth.user,
+      roleId: req.auth.roleId,
+      orgScope: req.auth.orgScope,
+      mockAuthEnabled: ctx.config.mockAuthEnabled,
+      mode: ctx.config.appEnv
+    });
+  });
+
   router.post("/auth/sso/mock-callback", (req, res) => {
     if (ctx.config.appEnv === "production") {
       return res.status(403).json({ error: { code: "MOCK_SSO_DISABLED", message: "Mock SSO callback is not allowed in production." } });
@@ -106,6 +120,10 @@ export function authRoutes(ctx: AppContext) {
       return res.status(403).json({ error: { code: "MOCK_LOGIN_DISABLED", message: "Mock login is only allowed in local/test environments." } });
     }
     const userId = String(req.body?.userId ?? "u2");
+    const user = ctx.state.users.find((item) => item.id === userId && (item.status ?? "active") === "active");
+    if (!user || user.roleId === "system") {
+      return res.status(404).json({ error: { code: "MOCK_USER_NOT_FOUND", message: "Demo account was not found or is inactive." } });
+    }
     const auth = buildAuthContext(ctx, userId);
     const session = ctx.authStore.createSession(auth.user.id, ctx.config.sessionTtlMs);
     res.setHeader("set-cookie", createSessionCookie(session.sessionId, ctx.config.sessionCookieName, ctx.config.sessionTtlMs, cookieOptions));

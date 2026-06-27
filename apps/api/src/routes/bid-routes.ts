@@ -342,6 +342,13 @@ function ensureProjectDeadlineReached(ctx: AppContext, req: Request, res: Respon
   return true;
 }
 
+function assertBidProgressMaintainer(ctx: AppContext, req: Request, res: Response, project: ProcurementProject, action: string) {
+  if (!isProcurementMaintainerRole(req.auth.roleId)) {
+    return denyResponse(ctx, req, res, 403, "BID_PROGRESS_ROLE_DENIED", "Only authorized procurement roles can progress bid cutoff.", action, "project", project.id, project.id);
+  }
+  return assertProjectReadable(ctx, req, res, project);
+}
+
 export function bidRoutes(ctx: AppContext) {
   const router = Router();
 
@@ -640,6 +647,50 @@ export function bidRoutes(ctx: AppContext) {
     ctx.r4SourcingRepository.upsertProject(project);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "bid.lock", "project", project.id, project.id, `lockedCount=${bids.length}`);
     return res.json({ project, lockedCount: bids.length, auditLogId: auditLog.id });
+  });
+
+  router.post("/projects/:projectId/bids/cutoff", (req, res) => {
+    const project = ensureProject(ctx, req.params.projectId, res);
+    if (!project) return;
+    ctx.policies.externalTradeBlocking.assertInternalActionAllowed(req.auth, project, "internal_bid");
+    if (!assertBidProgressMaintainer(ctx, req, res, project, "bid.cutoff.denied")) return;
+    const action = String(req.body?.action ?? (isBeforeDeadline(project) ? "early_cutoff" : "deadline_reached"));
+    if (!["early_cutoff", "deadline_reached", "manual_cutoff"].includes(action)) {
+      return res.status(400).json({ error: { code: "BID_CUTOFF_ACTION_INVALID", message: "Cutoff action must be early_cutoff, deadline_reached or manual_cutoff." } });
+    }
+    const now = new Date();
+    const cutoffAt = req.body?.cutoffAt === undefined ? now : new Date(String(req.body.cutoffAt));
+    if (Number.isNaN(cutoffAt.getTime())) {
+      return res.status(400).json({ error: { code: "BID_CUTOFF_TIME_INVALID", message: "Cutoff time is invalid." } });
+    }
+    const previousDeadline = project.quoteDeadlineAt;
+    const effectiveCutoff = cutoffAt.getTime() > now.getTime() ? now : cutoffAt;
+    project.quoteDeadlineAt = effectiveCutoff.toISOString();
+    project.beforeDeadline = false;
+    if (!project.externalTradeFlag) {
+      project.status = "bidding_open";
+      project.displayStatus = action === "early_cutoff" ? "early bid cutoff completed" : "bid cutoff completed";
+    }
+    for (const bid of ctx.state.bids.filter((item) => item.projectId === project.id && item.status !== "locked")) {
+      bid.quoteDeadlineAt = project.quoteDeadlineAt;
+      ctx.r4SourcingRepository.upsertBid(bid);
+    }
+    ctx.r4SourcingRepository.upsertProject(project);
+    const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(
+      req.auth,
+      action === "early_cutoff" ? "bid.early_cutoff" : "bid.cutoff",
+      "project",
+      project.id,
+      project.id,
+      `previousDeadline=${previousDeadline ?? ""};cutoffAt=${project.quoteDeadlineAt};reason=${String(req.body?.reason ?? "")}`
+    );
+    return res.json({
+      project,
+      cutoffAt: project.quoteDeadlineAt,
+      beforeDeadline: isBeforeDeadline(project),
+      previousDeadline,
+      auditLogId: auditLog.id
+    });
   });
 
   router.get("/projects/:projectId/opening-room", (req, res) => {

@@ -4,9 +4,9 @@ const procurementBuyerRoles = new Set<RoleId>(["group_manager", "buyer", "hotel_
 const procurementMaintainerRoles = new Set<RoleId>(["group_manager", "buyer", "hotel_buyer", "platform_operator"]);
 const supplierRoles = new Set<RoleId>(["supplier", "supplier_admin", "supplier_quotation"]);
 const supplierAdminRoles = new Set<RoleId>(["supplier", "supplier_admin"]);
-const supplierQuotationRoles = new Set<RoleId>(["supplier", "supplier_quotation"]);
+const supplierQuotationRoles = new Set<RoleId>(["supplier", "supplier_admin", "supplier_quotation"]);
 const financeRoles = new Set<RoleId>(["group_manager", "hotel_finance", "finance_reviewer"]);
-const financeReviewRoles = new Set<RoleId>(["group_manager", "buyer", "finance_reviewer"]);
+const financeReviewRoles = new Set<RoleId>(["group_manager", "buyer", "hotel_finance", "finance_reviewer"]);
 const orgReaderRoles = new Set<RoleId>(["group_manager", "buyer", "hotel_buyer", "hotel_finance", "platform_operator", "finance_reviewer", "auditor"]);
 const auditReaderRoles = new Set<RoleId>(["group_manager", "buyer", "hotel_buyer", "hotel_finance", "platform_operator", "finance_reviewer", "auditor"]);
 

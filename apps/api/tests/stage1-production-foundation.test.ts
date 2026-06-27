@@ -118,6 +118,8 @@ describe("Stage 1 production foundation", () => {
       .get(`/api/bid-files/file-pre-1/download?approvalId=${approval.body.approval.id}`)
       .set("x-mock-user-id", "u2");
     expect(downloaded.status).toBe(200);
-    expect(Buffer.from(downloaded.body).toString("utf8")).toContain("seed file");
+    const body = Buffer.from(downloaded.body).toString("utf8");
+    expect(body).toContain("业务附件：响应文件-一次性用品.pdf");
+    expect(body).toContain("业务流转、归档和审计留痕");
   });
 });

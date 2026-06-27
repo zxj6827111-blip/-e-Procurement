@@ -70,7 +70,7 @@ export function createApp(ctx: AppContext = createAppContext()) {
 
   const api = express.Router();
   api.use((req, res, next) => {
-    const publicPaths = new Set(["/auth/login", "/auth/mock-login", "/auth/providers", "/auth/sso/mock-callback", "/suppliers/register", "/suppliers/registration-boundary"]);
+    const publicPaths = new Set(["/auth/login", "/auth/mock-login", "/auth/providers", "/auth/session", "/auth/sso/mock-callback", "/suppliers/register", "/suppliers/registration-boundary"]);
     if (publicPaths.has(req.path)) return next();
     if (!requireAuthenticated(req, res)) return;
     next();
@@ -98,7 +98,8 @@ export function createApp(ctx: AppContext = createAppContext()) {
   app.use("/api", api);
 
   app.use((_req, _res, next) => next(new NotFoundError("接口不存在或未在 P0 白名单内。")));
-  app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  app.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (res.headersSent) return next(error);
     if (error instanceof PolicyError) {
       return res.status(error.status).json(errorBody(error));
     }
