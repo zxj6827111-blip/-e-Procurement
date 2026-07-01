@@ -71,7 +71,7 @@ watch(
         <span>{{ summary.pendingTasks }} 个待办 / {{ summary.unreadMessages }} 条未读消息</span>
       </div>
       <div class="actions">
-        <RouterLink class="secondary-button link-button" to="/my-tasks">我的任务</RouterLink>
+        <RouterLink class="secondary-button link-button" to="/my-tasks">待办中心</RouterLink>
         <RouterLink class="secondary-button link-button" to="/messages">消息中心</RouterLink>
       </div>
     </div>

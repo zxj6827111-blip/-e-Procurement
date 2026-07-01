@@ -44,9 +44,14 @@ describe("Phase 9 full-flow regression paths", () => {
       .send({ selectedSupplierId: "sup-1", nonLowestPriceReason: "service and technical score lead" });
     expect(approval.status).toBe(201);
 
-    await request(runtime.app).post(`/api/award-approvals/${approval.body.approval.id}/submit`).set("x-mock-user-id", "u2");
-    const approved = await request(runtime.app).post(`/api/award-approvals/${approval.body.approval.id}/mock-approve`).set("x-mock-user-id", "u1").send({ approved: true });
-    expect(approved.body.approval.approvalStatus).toBe("approved");
+    const submitted = await request(runtime.app).post(`/api/award-approvals/${approval.body.approval.id}/submit`).set("x-mock-user-id", "u2");
+    expect(submitted.status).toBe(200);
+    const approved = await request(runtime.app)
+      .post(`/api/workflow/approval-instances/${submitted.body.workflow.approvalInstance.id}/actions`)
+      .set("x-mock-user-id", "u1")
+      .send({ action: "approve", opinion: "phase9 workflow approved" });
+    expect(approved.status).toBe(200);
+    expect(runtime.ctx.state.awardApprovals.find((item) => item.id === approval.body.approval.id)?.approvalStatus).toBe("approved");
 
     const notified = await request(runtime.app).post("/api/projects/p-award/result-notifications").set("x-mock-user-id", "u2");
     expect(notified.status).toBe(201);

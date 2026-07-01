@@ -8,6 +8,8 @@ const methodRuleReaderRoles = new Set(["buyer", "group_manager", "hotel_buyer", 
 const approvalRuleReaderRoles = new Set(["buyer", "group_manager", "auditor", "admin"]);
 const allowedApprovalBusinessTypes: ApprovalRule["businessType"][] = [
   "procurement_request",
+  "procurement_document",
+  "review_award",
   "award_approval",
   "archive_supplement",
   "price_approval",

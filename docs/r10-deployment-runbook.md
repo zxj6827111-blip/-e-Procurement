@@ -112,3 +112,24 @@ UAT 回滚：
 | HTTPS/Secure Cookie | 建议 | 必须 |
 | 备份恢复演练 | 是 | 必须，同构环境 |
 | 客户签字 | UAT 签字 | 业务/安全/运维/审计联合签字 |
+
+## 8. M6-C 最终交付检查
+
+日期：2026-06-28
+
+M6-C 后交付包进入客户 UAT 或二开评审前，除第 2 节命令外，还应执行：
+
+```powershell
+npm.cmd --workspace @eprocurement/api run test -- m6c-final-security-ops.test.ts
+npm.cmd run m6c:browser-smoke
+```
+
+新增检查标准：
+
+| 检查项 | 通过标准 |
+|---|---|
+| M6-C 安全/运维测试 | 供应商隔离、组织隔离、文件安全、流程脱敏、BPMN pilot 权限、生产 mock auth 禁用通过 |
+| 九角色浏览器验收 | 集团采购管理、采购经办、酒店采购、供应商管理员、供应商报价人员、专家、财务审核、审计监督、系统管理员均通过 |
+| 生产 Go/No-Go | `docs/m6c-final-security-ops-go-no-go-report.md` 结论已纳入客户评审 |
+
+注意：`m6c:browser-smoke` 为本地/UAT浏览器验收脚本，会启动临时 API/Web 服务并使用本地 mock 登录状态；正式生产部署不得启用 mock auth 或把该验证视为真实 SSO 证明。

@@ -21,7 +21,7 @@ const selectedFileId = ref("");
 const replacementFile = ref<File | null>(null);
 const busy = ref(false);
 const message = ref("");
-const fileMaintainerRoles = new Set(["group_manager", "buyer", "hotel_buyer", "platform_operator", "supplier", "supplier_admin"]);
+const fileMaintainerRoles = new Set(["buyer", "platform_operator", "supplier", "supplier_admin"]);
 const canMaintainFiles = computed(() => fileMaintainerRoles.has(session.roleId));
 
 const objectTypeLabels: Record<string, string> = {

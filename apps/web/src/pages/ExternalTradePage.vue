@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { apiGet, apiPost, uploadFile } from "../api/http";
 import AttachmentList from "../components/AttachmentList.vue";
 import AuditLogRef from "../components/AuditLogRef.vue";
 import ErrorAlert from "../components/ErrorAlert.vue";
+import { useSessionStore } from "../stores/session";
 import { labelStatus } from "../utils/status-labels";
 
 interface ExternalTradeListItem {
@@ -40,6 +42,9 @@ const detail = ref<ExternalTradeDetail>({});
 const blockResult = ref<{ allowed?: boolean; projectId?: string; externalTradeFlag?: boolean }>({});
 const auditLogId = ref("");
 const error = ref("");
+const session = useSessionStore();
+const route = useRoute();
+const canMaintainExternalTrade = computed(() => ["buyer", "platform_operator"].includes(session.roleId));
 const externalTradeForm = ref({
   projectName: "外部交易备案项目",
   orgId: "",
@@ -143,12 +148,27 @@ function recordExternalResult() {
   );
 }
 
-onMounted(load);
+onMounted(async () => {
+  if (!session.user) await session.loadMe();
+  selectedProjectId.value = String(route.query.projectId ?? selectedProjectId.value);
+  await load();
+});
+
+watch(
+  () => route.query.projectId,
+  (projectId) => {
+    if (!projectId || String(projectId) === selectedProjectId.value) return;
+    selectedProjectId.value = String(projectId);
+    void load();
+  }
+);
 </script>
 
 <template>
   <section class="panel">
     <h2>外部交易备案</h2>
+
+    <p v-if="!canMaintainExternalTrade" class="notice">当前账号仅查看外部备案状态；新建、登记和上传备案材料由采购经办操作。</p>
 
     <div class="form-grid">
       <label>
@@ -180,11 +200,11 @@ onMounted(load);
         <input v-model="externalTradeForm.resultRecordNote" />
       </label>
       <button type="button" @click="load">刷新</button>
-      <button type="button" @click="createExternalProject">新建外部交易项目</button>
-      <button type="button" @click="recordInternalApproval">登记内部审批</button>
+      <button v-if="canMaintainExternalTrade" type="button" @click="createExternalProject">新建外部交易项目</button>
+      <button v-if="canMaintainExternalTrade" type="button" @click="recordInternalApproval">登记内部审批</button>
     </div>
 
-    <div class="form-grid">
+    <div v-if="canMaintainExternalTrade" class="form-grid">
       <label>
         外部平台
         <input v-model="externalPlatformName" />
@@ -201,7 +221,7 @@ onMounted(load);
       </button>
     </div>
 
-    <div class="form-grid">
+    <div v-if="canMaintainExternalTrade" class="form-grid">
       <label>
         备案材料文件
         <input type="file" @change="onMaterialFileChange" />

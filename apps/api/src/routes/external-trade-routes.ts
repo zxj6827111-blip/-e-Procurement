@@ -2,8 +2,8 @@ import { Router, type Request, type Response } from "express";
 import type { AppContext } from "../app-context.js";
 import type { ExternalProjectStatus, ExternalTradeRecord, ProcurementDocumentAttachment, ProcurementProject } from "../types.js";
 
-const externalMaintainerRoles = new Set(["buyer", "group_manager"]);
-const externalReaderRoles = new Set(["buyer", "group_manager", "auditor"]);
+const externalMaintainerRoles = new Set(["buyer", "platform_operator"]);
+const externalReaderRoles = new Set(["buyer", "platform_operator", "group_manager", "auditor"]);
 
 function denyResponse(
   ctx: AppContext,
@@ -40,7 +40,9 @@ function ensureProject(ctx: AppContext, projectId: string, res: Response) {
 }
 
 function canReadProject(req: Request, project: ProcurementProject) {
-  if (req.auth.roleId === "buyer") return req.auth.user.managedProjectIds?.includes(project.id) ?? false;
+  if (req.auth.roleId === "buyer" || req.auth.roleId === "platform_operator") {
+    return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || req.auth.orgScope.includes(project.orgId);
+  }
   if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") return req.auth.orgScope.includes(project.orgId);
   return false;
 }

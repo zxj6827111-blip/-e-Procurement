@@ -11,10 +11,10 @@ import type {
 } from "../types.js";
 import { resolveAttachments } from "./file-helpers.js";
 
-const procurementMaintainerRoles = new Set(["buyer", "group_manager", "hotel_buyer", "platform_operator"]);
-const requestInitiatorRoles = new Set(["buyer", "group_manager", "hotel_buyer"]);
-const requestApprovalRoles = new Set(["buyer", "group_manager"]);
-const requestMethodDecisionRoles = new Set(["buyer", "group_manager"]);
+const procurementMaintainerRoles = new Set(["buyer", "platform_operator"]);
+const requestInitiatorRoles = new Set(["hotel_buyer"]);
+const requestApprovalRoles = new Set(["group_manager"]);
+const requestMethodDecisionRoles = new Set(["buyer", "platform_operator"]);
 const supplierLikeRoles = new Set(["supplier", "supplier_admin", "supplier_quotation"]);
 
 function denyBusinessAction(ctx: AppContext, req: Request, res: Response, objectType: string, objectId: string) {
@@ -64,7 +64,7 @@ function ensureRequestInitiator(ctx: AppContext, req: Request, res: Response, re
     req,
     res,
     "PROCUREMENT_REQUEST_INITIATOR_REQUIRED",
-    "Only procurement initiator roles can create or submit procurement requests.",
+    "Only hotel procurement request initiators can create, edit, submit or cancel procurement requests.",
     "procurement-request.initiator.denied",
     requestId
   );
@@ -122,7 +122,7 @@ function canReadOrg(req: Request, orgId: string) {
 
 function canReadProject(ctx: AppContext, req: Request, project: ProcurementProject) {
   if (req.auth.roleId === "buyer") {
-    return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || project.buyer === req.auth.user.name;
+    return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || project.buyer === req.auth.user.name || req.auth.orgScope.includes(project.orgId);
   }
   if (["hotel_buyer", "platform_operator"].includes(req.auth.roleId)) {
     return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || req.auth.orgScope.includes(project.orgId);
@@ -137,6 +137,7 @@ function isSupplierProject(ctx: AppContext, supplierId: string, project: Procure
   if (!supplierId) return false;
   if (project.participantSupplierIds.includes(supplierId)) return true;
   return (
+    ctx.state.procurementAnnouncements.some((item) => item.projectId === project.id && item.status === "published" && item.scope === "public_internal") ||
     ctx.state.supplierInvitations.some((item) => item.projectId === project.id && item.supplierId === supplierId) ||
     ctx.state.supplierRegistrations.some((item) => item.projectId === project.id && item.supplierId === supplierId) ||
     ctx.state.bids.some((item) => item.projectId === project.id && item.supplierId === supplierId) ||
@@ -148,20 +149,21 @@ function visibleRequests(ctx: AppContext, req: Request) {
   if (req.auth.roleId === "admin") {
     ctx.policies.adminBusinessIsolation.assertBusinessAccessAllowed(req.auth, "procurement_request", "list");
   }
+  if (req.auth.roleId === "expert") return [];
   if (["buyer", "hotel_buyer", "platform_operator"].includes(req.auth.roleId)) {
     return ctx.state.procurementRequests.filter((item) => canReadProcurementRequest(ctx, req, normalizeRequest(item)));
   }
   if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") {
-    return ctx.state.procurementRequests.filter((item) => req.auth.orgScope.includes(item.orgId));
+    return ctx.state.procurementRequests.filter((item) => {
+      const normalized = normalizeRequest(item);
+      if (!req.auth.orgScope.includes(normalized.orgId)) return false;
+      if (req.auth.roleId === "group_manager") return normalized.status !== "draft";
+      return true;
+    });
   }
   if (supplierLikeRoles.has(req.auth.roleId)) {
     const supplierId = req.auth.user.supplierId ?? "";
     const projectIds = ctx.state.projects.filter((project) => isSupplierProject(ctx, supplierId, project)).map((project) => project.id);
-    return ctx.state.procurementRequests.filter((item) => item.projectId && projectIds.includes(item.projectId));
-  }
-  if (req.auth.roleId === "expert") {
-    const expertId = req.auth.user.expertId ?? "";
-    const projectIds = ctx.state.projects.filter((project) => project.assignedExpertIds.includes(expertId)).map((project) => project.id);
     return ctx.state.procurementRequests.filter((item) => item.projectId && projectIds.includes(item.projectId));
   }
   return [];
@@ -175,10 +177,19 @@ function canReadProcurementRequest(ctx: AppContext, req: Request, request: Procu
       return project ? canReadProject(ctx, req, project) : false;
     }
     if (req.auth.orgScope.includes(request.orgId) && normalized.createdBy === req.auth.user.id) return true;
-    if (req.auth.roleId === "buyer" && req.auth.orgScope.includes(request.orgId) && normalized.status !== "draft") return true;
+    if (
+      procurementMaintainerRoles.has(req.auth.roleId) &&
+      req.auth.orgScope.includes(request.orgId) &&
+      normalized.status !== "draft" &&
+      normalized.approvalStatus === "approved"
+    ) {
+      return true;
+    }
     return false;
   }
-  if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") return req.auth.orgScope.includes(request.orgId);
+  if (req.auth.roleId === "group_manager") return req.auth.orgScope.includes(request.orgId) && normalized.status !== "draft";
+  if (req.auth.roleId === "auditor") return req.auth.orgScope.includes(request.orgId);
+  if (req.auth.roleId === "expert") return false;
   if (!request.projectId) return false;
   const project = ctx.state.projects.find((item) => item.id === request.projectId);
   return project ? canReadProject(ctx, req, project) : false;
@@ -228,15 +239,48 @@ function resolveRequestAttachments(
   requestId: string,
   attachments: unknown,
   projectId?: string
-): ProcurementDocumentAttachment[] {
-  return resolveAttachments(ctx, attachments, {
+): { attachments: ProcurementDocumentAttachment[] } | { error: { code: string; message: string } } {
+  const validationError = validateRequestAttachmentReferences(ctx, req, requestId, attachments, projectId);
+  if (validationError) return { error: validationError };
+  return {
+    attachments: resolveAttachments(ctx, attachments, {
     fallbackPrefix: requestId,
     objectType: "procurement_request",
     objectId: requestId,
     attachmentKind: "procurement_request_attachment",
     projectId,
     uploadedBy: req.auth.user.id
-  });
+    })
+  };
+}
+
+function validateRequestAttachmentReferences(ctx: AppContext, req: Request, requestId: string, attachments: unknown, projectId?: string) {
+  if (!Array.isArray(attachments)) return null;
+  for (const item of attachments) {
+    const value = (item ?? {}) as Record<string, unknown>;
+    if (typeof value.contentBase64 === "string" && value.contentBase64) continue;
+    const fileId = String(value.id ?? value.fileId ?? "").trim();
+    if (!fileId) {
+      return { code: "PROCUREMENT_REQUEST_ATTACHMENT_INVALID", message: "Procurement request attachment metadata must reference an uploaded file." };
+    }
+    const stored = ctx.fileStore.get(fileId);
+    if (!stored) {
+      return { code: "PROCUREMENT_REQUEST_ATTACHMENT_INVALID", message: "Procurement request attachment file was not found." };
+    }
+    if (stored.objectType !== "procurement_request" || stored.attachmentKind !== "procurement_request_attachment") {
+      return { code: "PROCUREMENT_REQUEST_ATTACHMENT_SCOPE_DENIED", message: "Attachment does not belong to procurement request scope." };
+    }
+    if (stored.uploadedBy !== req.auth.user.id) {
+      return { code: "PROCUREMENT_REQUEST_ATTACHMENT_SCOPE_DENIED", message: "Only files uploaded by the current request initiator can be attached." };
+    }
+    if (stored.objectId !== requestId && !stored.objectId.startsWith("pending-request-")) {
+      return { code: "PROCUREMENT_REQUEST_ATTACHMENT_SCOPE_DENIED", message: "Attachment cannot be linked to this procurement request." };
+    }
+    if (stored.projectId && stored.projectId !== projectId) {
+      return { code: "PROCUREMENT_REQUEST_ATTACHMENT_SCOPE_DENIED", message: "Attachment project scope does not match this procurement request." };
+    }
+  }
+  return null;
 }
 
 function requestReadyForSubmit(procurementRequest: ProcurementRequest) {
@@ -279,6 +323,38 @@ function pickMethodRule(ctx: AppContext, methodSuggestion: string) {
 
 function orgName(ctx: AppContext, orgId: string) {
   return ctx.state.organizations.find((item) => item.id === orgId)?.name ?? orgId;
+}
+
+function sourceRequestForProject(ctx: AppContext, project: ProcurementProject) {
+  return project.sourceRequestId ? ctx.state.procurementRequests.find((item) => item.id === project.sourceRequestId) : undefined;
+}
+
+function isGenericProjectTitle(value: string | undefined) {
+  const text = String(value ?? "").trim();
+  return !text || ["采购项目", "采购申请", "项目", "申请"].includes(text) || /^\d+$/.test(text);
+}
+
+function sourceRequestProjectTitle(request: ProcurementRequest | undefined) {
+  if (!request) return "";
+  if (!isGenericProjectTitle(request.title)) return request.title;
+  const firstItemName = request.lineItems?.[0]?.itemName?.trim();
+  return firstItemName ? `${firstItemName}采购项目` : "";
+}
+
+function projectDisplayName(ctx: AppContext, project: ProcurementProject) {
+  const sourceRequestTitle = sourceRequestProjectTitle(sourceRequestForProject(ctx, project));
+  const projectName = project.name.trim();
+  const meaningfulName = !isGenericProjectTitle(projectName) ? projectName : sourceRequestTitle;
+  return [project.code, meaningfulName || projectName || project.id].filter(Boolean).join(" / ");
+}
+
+function projectListRow(ctx: AppContext, project: ProcurementProject) {
+  const sourceRequestTitle = sourceRequestProjectTitle(sourceRequestForProject(ctx, project));
+  return {
+    ...project,
+    sourceRequestTitle,
+    displayName: projectDisplayName(ctx, project)
+  };
 }
 
 function assertRequestReadable(ctx: AppContext, req: Request, request: ProcurementRequest, res: Response) {
@@ -378,6 +454,13 @@ function hasVisiblePendingApprovalTask(ctx: AppContext, req: Request, requestId:
 function workflowErrorBody(error: unknown) {
   if (error && typeof error === "object") {
     const maybe = error as { code?: unknown; status?: unknown; message?: unknown };
+    if (maybe.code === "APPROVAL_RULE_NOT_MATCHED") {
+      return {
+        status: typeof maybe.status === "number" ? maybe.status : 400,
+        code: "APPROVAL_RULE_NOT_MATCHED",
+        message: "未找到适用于当前采购申请的启用审批规则，请检查审批规则的预算区间、采购方式和组织范围配置。"
+      };
+    }
     return {
       status: typeof maybe.status === "number" ? maybe.status : 400,
       code: typeof maybe.code === "string" ? maybe.code : "PROCUREMENT_REQUEST_WORKFLOW_ACTION_BLOCKED",
@@ -404,7 +487,7 @@ export function projectRoutes(ctx: AppContext) {
     } else if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") {
       projects = projects.filter((project) => req.auth.orgScope.includes(project.orgId));
     }
-    return res.json({ projects });
+    return res.json({ projects: projects.map((project) => projectListRow(ctx, project)) });
   });
 
   router.post("/projects", (req, res) => {
@@ -435,16 +518,18 @@ export function projectRoutes(ctx: AppContext) {
     const idPrefix = normalizedRequest.externalTradeFlag ? "p-ext-new" : "p-new";
     const id = `${idPrefix}-${ctx.state.projects.length + 1}`;
     const now = new Date().toISOString();
+    const requestedProjectName = String(req.body?.name ?? "").trim();
+    const projectName = !isGenericProjectTitle(requestedProjectName) ? requestedProjectName : sourceRequestProjectTitle(normalizedRequest) || normalizedRequest.title;
     const project: ProcurementProject = {
       id,
       code: `${normalizedRequest.externalTradeFlag ? "EXT" : "CG"}-${now.slice(0, 10).replaceAll("-", "")}-${String(ctx.state.projects.length + 1).padStart(3, "0")}`,
       sourceRequestId: sourceRequest.id,
-      name: String(req.body?.name ?? normalizedRequest.title),
+      name: projectName,
       orgId: normalizedRequest.orgId,
       orgName: orgName(ctx, normalizedRequest.orgId),
       type: normalizedRequest.methodSuggestion,
       status: normalizedRequest.externalTradeFlag ? "external_project_recorded" : "project_created",
-      displayStatus: normalizedRequest.externalTradeFlag ? "external trade filing recorded" : "project created",
+      displayStatus: normalizedRequest.externalTradeFlag ? "外部项目已登记" : "已发起项目",
       category: normalizedRequest.category ?? "unclassified",
       budgetLabel: normalizedRequest.budgetLabel,
       budgetAmount: normalizedRequest.budgetAmount,
@@ -476,6 +561,24 @@ export function projectRoutes(ctx: AppContext) {
     });
     req.auth.user.managedProjectIds = [...(req.auth.user.managedProjectIds ?? []), project.id];
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "project.create-from-request", "project", project.id, project.id, `request=${sourceRequest.id}`);
+    ctx.processService.recordProcurementProjectCreated({ request: normalizeRequest(sourceRequest), project, actor: req.auth.user });
+    if (!project.externalTradeFlag) {
+      ctx.eventBus.emit({
+        eventCode: "SourcingProjectCreated",
+        businessType: "project",
+        businessId: project.id,
+        businessTitle: project.name,
+        actor: req.auth.user,
+        orgId: project.orgId,
+        projectId: project.id,
+        idempotencyKey: `project:${project.id}:sourcing_created`,
+        payloadJson: {
+          projectType: project.type,
+          sourceRequestId: sourceRequest.id,
+          status: project.status
+        }
+      });
+    }
     return res.status(201).json({ project, procurementRequest: normalizeRequest(sourceRequest), auditLogId: auditLog.id });
   });
 
@@ -562,6 +665,8 @@ export function projectRoutes(ctx: AppContext) {
     const now = new Date().toISOString();
     const nextSequence = ctx.state.procurementRequests.length + 1;
     const requestId = `req-${nextSequence}`;
+    const resolvedAttachments = resolveRequestAttachments(ctx, req, requestId, req.body?.attachments);
+    if ("error" in resolvedAttachments) return res.status(400).json({ error: resolvedAttachments.error });
     const procurementRequest: ProcurementRequest = {
       id: requestId,
       code: `REQ-${now.slice(0, 10).replaceAll("-", "")}-${String(nextSequence).padStart(3, "0")}`,
@@ -578,7 +683,7 @@ export function projectRoutes(ctx: AppContext) {
       expectedArrivalAt: req.body?.expectedArrivalAt === undefined ? undefined : String(req.body.expectedArrivalAt),
       receivingLocation: req.body?.receivingLocation === undefined ? undefined : String(req.body.receivingLocation),
       lineItems: parseLineItems(req.body?.lineItems, requestId),
-      attachments: resolveRequestAttachments(ctx, req, requestId, req.body?.attachments),
+      attachments: resolvedAttachments.attachments,
       methodSuggestion: String(req.body?.methodSuggestion ?? "pending"),
       externalTradeFlag: Boolean(req.body?.externalTradeFlag ?? false),
       status: "draft",
@@ -590,6 +695,23 @@ export function projectRoutes(ctx: AppContext) {
     ctx.state.procurementRequests.push(procurementRequest);
     ctx.r4SourcingRepository.upsertProcurementRequest(procurementRequest);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "procurement-request.create", "procurement_request", procurementRequest.id);
+    ctx.processService.recordProcurementRequestCreated({ request: normalizeRequest(procurementRequest), actor: req.auth.user });
+    ctx.eventBus.emit({
+      eventCode: "ProcurementRequestCreated",
+      businessType: "procurement_request",
+      businessId: procurementRequest.id,
+      businessTitle: procurementRequest.title,
+      actor: req.auth.user,
+      orgId: procurementRequest.orgId,
+      projectId: procurementRequest.projectId ?? undefined,
+      idempotencyKey: `procurement_request:${procurementRequest.id}:created`,
+      payloadJson: {
+        status: procurementRequest.status,
+        approvalStatus: procurementRequest.approvalStatus,
+        methodSuggestion: procurementRequest.methodSuggestion,
+        externalTradeFlag: procurementRequest.externalTradeFlag
+      }
+    });
     return res.status(201).json({ procurementRequest: normalizeRequest(procurementRequest), auditLogId: auditLog.id });
   });
 
@@ -622,10 +744,11 @@ export function projectRoutes(ctx: AppContext) {
     procurementRequest.expectedArrivalAt = req.body?.expectedArrivalAt === undefined ? procurementRequest.expectedArrivalAt : String(req.body.expectedArrivalAt);
     procurementRequest.receivingLocation = req.body?.receivingLocation === undefined ? procurementRequest.receivingLocation : String(req.body.receivingLocation);
     procurementRequest.lineItems = req.body?.lineItems === undefined ? procurementRequest.lineItems : parseLineItems(req.body.lineItems);
-    procurementRequest.attachments =
-      req.body?.attachments === undefined
-        ? procurementRequest.attachments
-        : resolveRequestAttachments(ctx, req, procurementRequest.id, req.body.attachments, procurementRequest.projectId ?? undefined);
+    if (req.body?.attachments !== undefined) {
+      const resolvedAttachments = resolveRequestAttachments(ctx, req, procurementRequest.id, req.body.attachments, procurementRequest.projectId ?? undefined);
+      if ("error" in resolvedAttachments) return res.status(400).json({ error: resolvedAttachments.error });
+      procurementRequest.attachments = resolvedAttachments.attachments;
+    }
     procurementRequest.externalTradeFlag = req.body?.externalTradeFlag === undefined ? procurementRequest.externalTradeFlag : Boolean(req.body.externalTradeFlag);
     procurementRequest.updatedAt = new Date().toISOString();
     ctx.r4SourcingRepository.upsertProcurementRequest(procurementRequest);
@@ -692,6 +815,7 @@ export function projectRoutes(ctx: AppContext) {
     procurementRequest.approvalStatus = "cancelled";
     procurementRequest.updatedAt = new Date().toISOString();
     ctx.r4SourcingRepository.upsertProcurementRequest(procurementRequest);
+    ctx.r8WorkflowTaskRepository.cancelBusinessWorkflow("procurement_request", procurementRequest.id, req.auth.user, String(req.body?.reason ?? "cancelled by procurement maintainer"));
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(
       req.auth,
       "procurement-request.cancel",
@@ -732,14 +856,14 @@ export function projectRoutes(ctx: AppContext) {
         projectId: procurementRequest.projectId ?? undefined,
         orgId: procurementRequest.orgId,
         initiator: req.auth.user,
-        assigneeRoleId: req.auth.roleId === "hotel_buyer" ? "buyer" : undefined,
         sourceJson: { route: "procurement_request.submit", requestStatus: normalized.status }
       });
     } catch (error) {
+      const workflowError = workflowErrorBody(error);
       return res.status(400).json({
         error: {
-          code: "PROCUREMENT_REQUEST_WORKFLOW_BLOCKED",
-          message: error instanceof Error ? error.message : "Procurement request workflow blocked."
+          code: workflowError.code,
+          message: workflowError.message
         }
       });
     }
@@ -842,6 +966,23 @@ export function projectRoutes(ctx: AppContext) {
     procurementRequest.updatedAt = new Date().toISOString();
     ctx.r4SourcingRepository.upsertProcurementRequest(procurementRequest);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "procurement-request.method-decision", "procurement_request", procurementRequest.id, undefined, `rule=${rule.id}`);
+    ctx.eventBus.emit({
+      eventCode: "ProcurementMethodDecided",
+      businessType: "procurement_request",
+      businessId: procurementRequest.id,
+      businessTitle: procurementRequest.title,
+      actor: req.auth.user,
+      orgId: procurementRequest.orgId,
+      projectId: procurementRequest.projectId ?? undefined,
+      idempotencyKey: `procurement_request:${procurementRequest.id}:method_decided`,
+      payloadJson: {
+        status: procurementRequest.status,
+        approvalStatus: procurementRequest.approvalStatus,
+        methodRuleId: rule.id,
+        resultMethod: rule.resultMethod,
+        externalTradeFlag: procurementRequest.externalTradeFlag
+      }
+    });
     return res.json({ procurementRequest: normalizeRequest(procurementRequest), methodRule: rule, auditLogId: auditLog.id });
   });
 

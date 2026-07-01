@@ -17,6 +17,7 @@ const restoreFiles = path.join(restoreRoot, "files");
 
 const result = {
   generatedAt: new Date().toISOString(),
+  scope: "M6-B local/UAT backup restore drill",
   source: {
     dataRoot,
     sqliteFile,
@@ -42,6 +43,15 @@ const result = {
     restoredFileCount: 0,
     missingRestoredStoredFiles: 0,
     countMatch: false
+  },
+  productionBoundary: {
+    database: "SQLite copy plus PRAGMA integrity_check is a local/UAT drill only. Formal production requires customer-approved PostgreSQL/MySQL or equivalent database-native backup and restore evidence.",
+    fileStorage: "Local files directory is copied for this drill. Formal production object storage restore, lifecycle and antivirus evidence still require customer infrastructure.",
+    externalIntegrations: "integration_jobs are restored as local adapter job evidence only; this does not prove OA/ERP/WMS/finance/payment/invoice external systems are reachable."
+  },
+  goNoGo: {
+    demoUat: "conditional_go_when_integrity_and_counts_match",
+    formalProduction: "no_go_without_customer_database_object_storage_and_external_system_restore_evidence"
   },
   warnings: []
 };

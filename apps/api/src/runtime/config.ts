@@ -1,9 +1,13 @@
 import os from "node:os";
 import path from "node:path";
+import { integrationEndpointEnvMap, normalizeIntegrationProviderKey } from "../adapters/integration-contracts.js";
 
 export type AppEnv = "local" | "test" | "production";
 export type DatabaseDriver = "sqlite" | "postgres" | "mysql";
 export type FileStorageMode = "local" | "mock" | "object";
+export type WorkflowExecutionSource = "r8_workflow" | "process_layer" | "bpmn";
+export type ProcessLayerMode = "shadow" | "disabled" | "execution";
+export type BpmnPilotMode = "shadow" | "disabled" | "production";
 
 export interface RuntimeConfigOverrides {
   appEnv?: string;
@@ -14,6 +18,7 @@ export interface RuntimeConfigOverrides {
   filesRoot?: string;
   logsRoot?: string;
   seedOnBoot?: boolean;
+  cleanBusinessData?: boolean;
   mockAuthEnabled?: boolean;
   sessionCookieName?: string;
   sessionTtlMs?: number;
@@ -39,6 +44,9 @@ export interface RuntimeConfigOverrides {
   objectStorageSecretAccessKey?: string;
   antivirusScanMode?: "disabled" | "mock" | "adapter";
   csrfStrategy?: "same-site-cookie" | "double-submit" | "reverse-proxy";
+  workflowExecutionSource?: WorkflowExecutionSource;
+  processLayerMode?: ProcessLayerMode;
+  bpmnPilotMode?: BpmnPilotMode;
   buildVersion?: string;
 }
 
@@ -77,6 +85,10 @@ function parseCsv(value: string | undefined) {
     .filter(Boolean);
 }
 
+function parseIntegrationProviders(value: string | undefined) {
+  return Array.from(new Set((value ?? "").split(",").map(normalizeIntegrationProviderKey).filter(Boolean)));
+}
+
 export interface RuntimeConfig {
   appEnv: AppEnv;
   dataRoot: string;
@@ -86,6 +98,7 @@ export interface RuntimeConfig {
   filesRoot: string;
   logsRoot: string;
   seedOnBoot: boolean;
+  cleanBusinessData: boolean;
   mockAuthEnabled: boolean;
   sessionCookieName: string;
   sessionTtlMs: number;
@@ -111,6 +124,9 @@ export interface RuntimeConfig {
   objectStorageSecretAccessKey: string | null;
   antivirusScanMode: "disabled" | "mock" | "adapter";
   csrfStrategy: "same-site-cookie" | "double-submit" | "reverse-proxy";
+  workflowExecutionSource: WorkflowExecutionSource;
+  processLayerMode: ProcessLayerMode;
+  bpmnPilotMode: BpmnPilotMode;
   buildVersion: string;
 }
 
@@ -144,6 +160,7 @@ export function getRuntimeConfig(overrides: RuntimeConfigOverrides = {}): Runtim
     filesRoot: overrides.filesRoot ? path.resolve(overrides.filesRoot) : path.join(dataRoot, "files"),
     logsRoot: overrides.logsRoot ? path.resolve(overrides.logsRoot) : path.join(dataRoot, "logs"),
     seedOnBoot: overrides.seedOnBoot ?? (process.env.APP_SEED_ON_BOOT === "false" ? false : true),
+    cleanBusinessData: overrides.cleanBusinessData ?? parseBoolean(process.env.APP_CLEAN_BUSINESS_DATA, false),
     mockAuthEnabled: overrides.mockAuthEnabled ?? (["local", "test"].includes(appEnv) && process.env.DISABLE_MOCK_AUTH !== "true"),
     sessionCookieName: overrides.sessionCookieName ?? process.env.SESSION_COOKIE_NAME?.trim() ?? "eproc_session",
     sessionTtlMs: overrides.sessionTtlMs ?? Number(process.env.SESSION_TTL_MS ?? 1000 * 60 * 60 * 12),
@@ -162,7 +179,7 @@ export function getRuntimeConfig(overrides: RuntimeConfigOverrides = {}): Runtim
     integrationEndpoints: overrides.integrationEndpoints ?? parseIntegrationEndpoints(process.env.INTEGRATION_ENDPOINTS),
     integrationRequestTimeoutMs: overrides.integrationRequestTimeoutMs ?? Number(process.env.INTEGRATION_REQUEST_TIMEOUT_MS ?? 5000),
     integrationMaxAttempts: overrides.integrationMaxAttempts ?? Number(process.env.INTEGRATION_MAX_ATTEMPTS ?? 3),
-    requiredIntegrationProviders: overrides.requiredIntegrationProviders ?? parseCsv(process.env.REQUIRED_INTEGRATION_PROVIDERS),
+    requiredIntegrationProviders: overrides.requiredIntegrationProviders?.map(normalizeIntegrationProviderKey) ?? parseIntegrationProviders(process.env.REQUIRED_INTEGRATION_PROVIDERS),
     fileStorageMode: overrides.fileStorageMode ?? ((process.env.FILE_STORAGE_MODE?.trim().toLowerCase() as FileStorageMode | undefined) ?? "local"),
     objectStorageEndpoint: overrides.objectStorageEndpoint ?? process.env.OBJECT_STORAGE_ENDPOINT?.trim() ?? null,
     objectStorageBucket: overrides.objectStorageBucket ?? process.env.OBJECT_STORAGE_BUCKET?.trim() ?? null,
@@ -175,6 +192,9 @@ export function getRuntimeConfig(overrides: RuntimeConfigOverrides = {}): Runtim
     csrfStrategy:
       overrides.csrfStrategy ??
       ((process.env.CSRF_STRATEGY?.trim().toLowerCase() as "same-site-cookie" | "double-submit" | "reverse-proxy" | undefined) ?? "same-site-cookie"),
+    workflowExecutionSource: overrides.workflowExecutionSource ?? ((process.env.WORKFLOW_EXECUTION_SOURCE?.trim().toLowerCase() as WorkflowExecutionSource | undefined) ?? "r8_workflow"),
+    processLayerMode: overrides.processLayerMode ?? ((process.env.PROCESS_LAYER_MODE?.trim().toLowerCase() as ProcessLayerMode | undefined) ?? "shadow"),
+    bpmnPilotMode: overrides.bpmnPilotMode ?? ((process.env.BPMN_PILOT_MODE?.trim().toLowerCase() as BpmnPilotMode | undefined) ?? "shadow"),
     buildVersion: overrides.buildVersion ?? process.env.BUILD_VERSION?.trim() ?? "local-build"
   };
 }
@@ -191,18 +211,39 @@ function parseIntegrationEndpoints(value: string | undefined) {
 
 export interface RuntimeReadinessCheck {
   key: string;
-  level: "pass" | "warning" | "failure";
+  level: "pass" | "info" | "warning" | "failure";
+  severity: "pass" | "info" | "warning" | "error";
   message: string;
 }
 
 export function validateRuntimeConfig(config: RuntimeConfig): RuntimeReadinessCheck[] {
   const checks: RuntimeReadinessCheck[] = [];
-  const add = (key: string, level: RuntimeReadinessCheck["level"], message: string) => checks.push({ key, level, message });
+  const add = (key: string, level: RuntimeReadinessCheck["level"], message: string) => checks.push({ key, level, severity: level === "failure" ? "error" : level, message });
 
   if (config.appEnv !== "production") {
     add("app_env", "warning", "Current environment is not production; this is suitable only for local, test or UAT use.");
   } else {
     add("app_env", "pass", "APP_ENV=production.");
+  }
+
+  if (config.workflowExecutionSource === "r8_workflow") {
+    add("workflow_execution_source", "pass", "R8 Workflow remains the primary execution source.");
+  } else {
+    add("workflow_execution_source", "failure", "R8 Workflow must remain the primary execution source until a separate production cutover is explicitly approved.");
+  }
+
+  if (config.processLayerMode === "shadow") {
+    add("process_layer_mode", "info", "Process Layer is configured as shadow/mirror for display, event trace and gradual process modeling.");
+  } else {
+    add("process_layer_mode", config.appEnv === "production" ? "failure" : "warning", "Process Layer is not in shadow mode; M6-A does not approve it as a production execution source.");
+  }
+
+  if (config.bpmnPilotMode === "shadow") {
+    add("bpmn_pilot_mode", "info", "BPMN is configured as a controlled shadow pilot, not the default production execution engine.");
+  } else if (config.bpmnPilotMode === "disabled") {
+    add("bpmn_pilot_mode", "warning", "BPMN pilot is disabled; configurable process trial data will not be collected.");
+  } else {
+    add("bpmn_pilot_mode", "failure", "BPMN pilot must not be configured as a production execution engine in M6-A.");
   }
 
   if (config.appEnv === "production" && config.mockAuthEnabled) {
@@ -215,6 +256,12 @@ export function validateRuntimeConfig(config: RuntimeConfig): RuntimeReadinessCh
     add("local_password_login", "failure", "Local weak password accounts must be disabled in production.");
   } else {
     add("local_password_login", "pass", "Local password login is disabled for production or only enabled outside production.");
+  }
+
+  if (config.appEnv === "production" && config.seedOnBoot) {
+    add("seed_data", "failure", "APP_SEED_ON_BOOT must be disabled in production so demo data and test accounts are not treated as a normal production baseline.");
+  } else {
+    add("seed_data", "pass", "Demo seed data is disabled for production or only enabled outside production.");
   }
 
   if (config.appEnv === "production" && config.identityProviderMode === "local") {
@@ -269,6 +316,20 @@ export function validateRuntimeConfig(config: RuntimeConfig): RuntimeReadinessCh
     add("database", "pass", `${config.databaseDriver} database URL is configured.`);
   }
 
+  if (!Number.isFinite(config.fileUploadMaxBytes) || config.fileUploadMaxBytes <= 0) {
+    add("upload_limit", "failure", "FILE_UPLOAD_MAX_BYTES must be a positive number.");
+  } else if (config.appEnv === "production" && config.fileUploadMaxBytes > 50 * 1024 * 1024) {
+    add("upload_limit", "warning", "FILE_UPLOAD_MAX_BYTES is unusually high; confirm customer security and bandwidth limits before production.");
+  } else {
+    add("upload_limit", "pass", "Upload size limit is configured.");
+  }
+
+  if (config.allowedUploadContentTypes.length === 0) {
+    add("upload_content_types", "failure", "At least one allowed upload content type must be configured.");
+  } else {
+    add("upload_content_types", "pass", "Allowed upload content types are configured.");
+  }
+
   if (config.appEnv === "production" && config.fileStorageMode === "local") {
     add("file_storage", "warning", "Local file storage is configured; production should use object storage or an approved shared file service.");
   } else if (config.fileStorageMode === "object" && (!config.objectStorageEndpoint || !config.objectStorageBucket)) {
@@ -279,9 +340,14 @@ export function validateRuntimeConfig(config: RuntimeConfig): RuntimeReadinessCh
     add("file_storage", "pass", `File storage mode is ${config.fileStorageMode}.`);
   }
 
+  const configuredKeys = configuredEndpointKeys(config);
   for (const provider of config.requiredIntegrationProviders) {
-    if (!configuredEndpointKeys(config).includes(provider)) {
+    if (!configuredKeys.includes(provider)) {
       add(`integration_${provider}`, config.appEnv === "production" ? "failure" : "warning", `Required integration provider ${provider} is not configured.`);
+    } else if (config.appEnv === "production") {
+      add(`integration_${provider}`, "warning", `Required integration provider ${provider} has an endpoint configured, but M6-B treats it as an unverified contract boundary until real customer-system evidence is attached.`);
+    } else {
+      add(`integration_${provider}`, "pass", `Required integration provider ${provider} has an endpoint configured for this environment.`);
     }
   }
 
@@ -296,24 +362,9 @@ export function validateRuntimeConfig(config: RuntimeConfig): RuntimeReadinessCh
 
 export function configuredEndpointKeys(config: RuntimeConfig) {
   const keys = new Set(Object.keys(config.integrationEndpoints));
-  const envKeyMap: Record<string, string> = {
-    sso: "SSO",
-    oa: "OA",
-    organizationUserSync: "ORG_USER",
-    masterData: "MASTER_DATA",
-    erp: "ERP",
-    wms: "WMS",
-    contractSystem: "CONTRACT",
-    finance: "FINANCE",
-    fileService: "FILE_SERVICE",
-    messageNotification: "MESSAGE",
-    auditExport: "AUDIT_EXPORT",
-    eSignature: "E_SIGNATURE",
-    ca: "CA",
-    eInvoice: "E_INVOICE"
-  };
+  const envKeyMap = integrationEndpointEnvMap();
   for (const [key, envKey] of Object.entries(envKeyMap)) {
     if (process.env[`INTEGRATION_${envKey}_ENDPOINT`]?.trim()) keys.add(key);
   }
-  return Array.from(keys);
+  return Array.from(keys).map(normalizeIntegrationProviderKey);
 }

@@ -2,6 +2,25 @@ import { Router } from "express";
 import type { AppContext } from "../app-context.js";
 import { buildAuthContext, clearSessionCookie, createSessionCookie } from "../auth.js";
 
+const roleLabels: Record<string, string> = {
+  group_manager: "集团采购管理人员",
+  buyer: "采购经办人",
+  hotel_buyer: "酒店采购",
+  hotel_finance: "酒店财务",
+  platform_operator: "平台运营",
+  supplier: "供应商",
+  supplier_admin: "供应商管理员",
+  supplier_quotation: "供应商报价人员",
+  expert: "专家",
+  finance_reviewer: "财务审核",
+  auditor: "纪检 / 审计",
+  admin: "系统管理员"
+};
+
+function currentAccount(ctx: AppContext, userId: string) {
+  return ctx.authStore.getAccountsByUserIds([userId])[0] ?? null;
+}
+
 export function authRoutes(ctx: AppContext) {
   const router = Router();
   const cookieOptions = {
@@ -32,6 +51,7 @@ export function authRoutes(ctx: AppContext) {
       user: req.auth.user,
       roleId: req.auth.roleId,
       orgScope: req.auth.orgScope,
+      passwordChangeRequired: Boolean(currentAccount(ctx, req.auth.user.id)?.passwordChangeRequired),
       mockAuthEnabled: ctx.config.mockAuthEnabled,
       mode: ctx.config.appEnv
     });
@@ -105,7 +125,15 @@ export function authRoutes(ctx: AppContext) {
     res.setHeader("set-cookie", createSessionCookie(session.sessionId, ctx.config.sessionCookieName, ctx.config.sessionTtlMs, cookieOptions));
     const auth = buildAuthContext(ctx, account.user_id);
     const log = ctx.policies.auditRequiredAction.recordSensitiveAction(auth, "auth.login", "user", auth.user.id);
-    return res.json({ user: auth.user, roleId: auth.roleId, orgScope: auth.orgScope, mockAuthEnabled: ctx.config.mockAuthEnabled, mode: ctx.config.appEnv, auditLogId: log.id });
+    return res.json({
+      user: auth.user,
+      roleId: auth.roleId,
+      orgScope: auth.orgScope,
+      passwordChangeRequired: Boolean(account.password_change_required),
+      mockAuthEnabled: ctx.config.mockAuthEnabled,
+      mode: ctx.config.appEnv,
+      auditLogId: log.id
+    });
   });
 
   router.post("/auth/logout", (req, res) => {
@@ -113,6 +141,45 @@ export function authRoutes(ctx: AppContext) {
     res.setHeader("set-cookie", clearSessionCookie(ctx.config.sessionCookieName, cookieOptions));
     const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "auth.logout", "user", req.auth.user.id);
     return res.json({ ok: true, auditLogId: log.id });
+  });
+
+  router.post("/me/change-password", (req, res) => {
+    if (!ctx.config.allowLocalPasswordLogin) {
+      return res.status(403).json({
+        error: {
+          code: "LOCAL_PASSWORD_LOGIN_DISABLED",
+          message: "Local password login is disabled. Change password through the configured enterprise identity provider."
+        }
+      });
+    }
+
+    const currentPassword = String(req.body?.currentPassword ?? "");
+    const newPassword = String(req.body?.newPassword ?? "");
+    const confirmPassword = String(req.body?.confirmPassword ?? "");
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ error: { code: "PASSWORD_CHANGE_INVALID", message: "Current password, new password and confirmation are required." } });
+    }
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ error: { code: "PASSWORD_CONFIRM_MISMATCH", message: "New password and confirmation do not match." } });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: { code: "PASSWORD_TOO_WEAK", message: "New password must be at least 8 characters." } });
+    }
+    if (newPassword === currentPassword) {
+      return res.status(400).json({ error: { code: "PASSWORD_UNCHANGED", message: "New password must be different from current password." } });
+    }
+
+    const result = ctx.authStore.changePassword(req.auth.user.id, currentPassword, newPassword);
+    if (result.status === "not_found") {
+      return res.status(404).json({ error: { code: "AUTH_ACCOUNT_NOT_FOUND", message: "Current login account was not found." } });
+    }
+    if (result.status === "current_password_invalid") {
+      const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "auth.password.change.denied", "auth_account", req.auth.user.id, undefined, "current password invalid");
+      return res.status(401).json({ error: { code: "CURRENT_PASSWORD_INVALID", message: "Current password is incorrect.", auditLogId: log.id } });
+    }
+
+    const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "auth.password.change", "auth_account", req.auth.user.id, undefined, "self-service");
+    return res.json({ account: result.account, passwordChangeRequired: false, auditLogId: log.id });
   });
 
   router.post("/auth/mock-login", (req, res) => {
@@ -128,11 +195,48 @@ export function authRoutes(ctx: AppContext) {
     const session = ctx.authStore.createSession(auth.user.id, ctx.config.sessionTtlMs);
     res.setHeader("set-cookie", createSessionCookie(session.sessionId, ctx.config.sessionCookieName, ctx.config.sessionTtlMs, cookieOptions));
     const log = ctx.policies.auditRequiredAction.recordSensitiveAction(auth, "auth.mock_login", "user", auth.user.id, undefined, "local/test mock only");
-    return res.json({ token: `mock-token-${auth.user.id}`, user: auth.user, roleId: auth.roleId, orgScope: auth.orgScope, mockAuthEnabled: ctx.config.mockAuthEnabled, mode: ctx.config.appEnv, auditLogId: log.id });
+    return res.json({
+      token: `mock-token-${auth.user.id}`,
+      user: auth.user,
+      roleId: auth.roleId,
+      orgScope: auth.orgScope,
+      passwordChangeRequired: Boolean(currentAccount(ctx, auth.user.id)?.passwordChangeRequired),
+      mockAuthEnabled: ctx.config.mockAuthEnabled,
+      mode: ctx.config.appEnv,
+      auditLogId: log.id
+    });
+  });
+
+  router.get("/auth/mock-users", (_req, res) => {
+    if (!ctx.config.mockAuthEnabled) {
+      return res.status(403).json({ error: { code: "MOCK_USERS_DISABLED", message: "Mock account directory is only allowed in local/test environments." } });
+    }
+    const users = ctx.state.users
+      .filter((user) => user.roleId !== "system" && (user.status ?? "active") === "active")
+      .map((user) => {
+        const supplier = user.supplierId ? ctx.state.suppliers.find((item) => item.id === user.supplierId) : undefined;
+        return {
+          id: user.id,
+          name: user.name,
+          roleId: user.roleId,
+          roleLabel: roleLabels[user.roleId] ?? user.roleId,
+          supplierId: user.supplierId,
+          supplierName: supplier?.name,
+          orgId: user.orgId
+        };
+      });
+    return res.json({ users });
   });
 
   router.get("/me", (req, res) => {
-    return res.json({ user: req.auth.user, roleId: req.auth.roleId, orgScope: req.auth.orgScope, mockAuthEnabled: ctx.config.mockAuthEnabled, mode: ctx.config.appEnv });
+    return res.json({
+      user: req.auth.user,
+      roleId: req.auth.roleId,
+      orgScope: req.auth.orgScope,
+      passwordChangeRequired: Boolean(currentAccount(ctx, req.auth.user.id)?.passwordChangeRequired),
+      mockAuthEnabled: ctx.config.mockAuthEnabled,
+      mode: ctx.config.appEnv
+    });
   });
 
   router.post("/me/mock-role-switch", (req, res) => {
@@ -150,7 +254,15 @@ export function authRoutes(ctx: AppContext) {
     const session = ctx.authStore.createSession(auth.user.id, ctx.config.sessionTtlMs);
     res.setHeader("set-cookie", createSessionCookie(session.sessionId, ctx.config.sessionCookieName, ctx.config.sessionTtlMs, cookieOptions));
     const log = ctx.policies.auditRequiredAction.recordSensitiveAction(auth, "auth.mock_role_switch", "user", auth.user.id, undefined, "local/test mock only");
-    return res.json({ user: auth.user, roleId: auth.roleId, orgScope: auth.orgScope, mockAuthEnabled: ctx.config.mockAuthEnabled, mode: ctx.config.appEnv, auditLogId: log.id });
+    return res.json({
+      user: auth.user,
+      roleId: auth.roleId,
+      orgScope: auth.orgScope,
+      passwordChangeRequired: Boolean(currentAccount(ctx, auth.user.id)?.passwordChangeRequired),
+      mockAuthEnabled: ctx.config.mockAuthEnabled,
+      mode: ctx.config.appEnv,
+      auditLogId: log.id
+    });
   });
 
   router.get("/me/org-scope", (req, res) => {

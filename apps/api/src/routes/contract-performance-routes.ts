@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import type { AppContext } from "../app-context.js";
 import type {
   AcceptancePaymentRecord,
+  AwardApproval,
   ContractLedger,
   PerformanceNode,
   ProcurementDocumentAttachment,
@@ -9,9 +10,10 @@ import type {
   SupplierEvaluation,
   SupplierEvaluationDimensions
 } from "../types.js";
+import { isSupplierRole, supplierIdMatches } from "../role-groups.js";
 
-const maintainerRoles = new Set(["buyer", "group_manager"]);
-const readerRoles = new Set(["buyer", "group_manager", "auditor"]);
+const maintainerRoles = new Set(["buyer", "platform_operator"]);
+const readerRoles = new Set(["buyer", "platform_operator", "group_manager", "auditor"]);
 
 function denyResponse(
   ctx: AppContext,
@@ -38,10 +40,25 @@ function denyResponse(
   return res.status(status).json({ error: { code, message, auditLogId: auditLog.id } });
 }
 
-function canReadProject(req: Request, project: ProcurementProject) {
-  if (req.auth.roleId === "buyer") return req.auth.user.managedProjectIds?.includes(project.id) ?? false;
+function supplierCanReadProjectContract(ctx: AppContext, project: ProcurementProject, supplierId: string) {
+  if (!supplierId) return false;
+  return (
+    project.participantSupplierIds.includes(supplierId) ||
+    ctx.state.contractLedgers.some((item) => item.projectId === project.id && item.supplierId === supplierId) ||
+    ctx.state.awardApprovals.some((item) => item.projectId === project.id && item.selectedSupplierId === supplierId && item.approvalStatus === "approved") ||
+    ctx.state.resultNotifications.some((item) => item.projectId === project.id && item.supplierId === supplierId && item.status === "sent") ||
+    ctx.state.bids.some((item) => item.projectId === project.id && item.supplierId === supplierId) ||
+    ctx.state.supplierRegistrations.some((item) => item.projectId === project.id && item.supplierId === supplierId && item.status !== "rejected") ||
+    ctx.state.purchaseOrders.some((item) => item.projectId === project.id && item.supplierId === supplierId)
+  );
+}
+
+function canReadProject(ctx: AppContext, req: Request, project: ProcurementProject) {
+  if (req.auth.roleId === "buyer" || req.auth.roleId === "platform_operator") {
+    return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || req.auth.orgScope.includes(project.orgId);
+  }
   if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") return req.auth.orgScope.includes(project.orgId);
-  if (req.auth.roleId === "supplier") return project.participantSupplierIds.includes(req.auth.user.supplierId ?? "");
+  if (isSupplierRole(req.auth.roleId)) return supplierCanReadProjectContract(ctx, project, req.auth.user.supplierId ?? "");
   return false;
 }
 
@@ -67,19 +84,19 @@ function assertMaintainer(ctx: AppContext, req: Request, res: Response, project:
   if (!maintainerRoles.has(req.auth.roleId)) {
     return denyResponse(ctx, req, res, 403, "CONTRACT_BUSINESS_ROLE_REQUIRED", "Only procurement business roles can maintain contract and performance data.", action, "project", project.id, project.id);
   }
-  if (canReadProject(req, project)) return true;
+  if (canReadProject(ctx, req, project)) return true;
   return denyResponse(ctx, req, res, 403, "PROJECT_SCOPE_DENIED", "Current user cannot maintain this project.", action, "project", project.id, project.id);
 }
 
 function assertReader(ctx: AppContext, req: Request, res: Response, project: ProcurementProject, action: string) {
-  if (req.auth.roleId === "supplier") {
-    if (project.participantSupplierIds.includes(req.auth.user.supplierId ?? "")) return true;
+  if (isSupplierRole(req.auth.roleId)) {
+    if (supplierCanReadProjectContract(ctx, project, req.auth.user.supplierId ?? "")) return true;
     return denyResponse(ctx, req, res, 403, "SUPPLIER_CONTRACT_SCOPE_DENIED", "Supplier can only read own contract and performance data.", action, "project", project.id, project.id);
   }
   if (!readerRoles.has(req.auth.roleId)) {
     return denyResponse(ctx, req, res, 403, "CONTRACT_READ_DENIED", "Current role cannot read contract and performance data.", action, "project", project.id, project.id);
   }
-  if (canReadProject(req, project)) return true;
+  if (canReadProject(ctx, req, project)) return true;
   return denyResponse(ctx, req, res, 403, "PROJECT_SCOPE_DENIED", "Current user cannot read this project.", action, "project", project.id, project.id);
 }
 
@@ -87,10 +104,61 @@ function visibleContracts(ctx: AppContext, req: Request, projectId?: string) {
   let contracts = ctx.state.contractLedgers;
   if (projectId) contracts = contracts.filter((item) => item.projectId === projectId);
   return contracts.filter((contract) => {
-    if (req.auth.roleId === "supplier") return contract.supplierId === req.auth.user.supplierId;
+    if (isSupplierRole(req.auth.roleId)) return contract.supplierId === req.auth.user.supplierId;
     const project = ctx.state.projects.find((item) => item.id === contract.projectId);
-    return project ? readerRoles.has(req.auth.roleId) && canReadProject(req, project) : false;
+    return project ? readerRoles.has(req.auth.roleId) && canReadProject(ctx, req, project) : false;
   });
+}
+
+function latestApprovedAwardApproval(ctx: AppContext, projectId: string) {
+  return [...ctx.state.awardApprovals].reverse().find((item) => item.projectId === projectId && item.approvalStatus === "approved");
+}
+
+function latestPricingReport(ctx: AppContext, project: ProcurementProject, approval?: AwardApproval) {
+  return [...ctx.state.pricingReports]
+    .reverse()
+    .find((item) => item.projectId === project.id && item.status !== "voided" && (!approval || item.awardApprovalId === approval.id));
+}
+
+function contractAmountFromAward(ctx: AppContext, project: ProcurementProject, approval?: AwardApproval) {
+  const report = latestPricingReport(ctx, project, approval);
+  if (report?.items.length) {
+    return Number(report.items.reduce((sum, item) => sum + item.salePrice * item.quantity, 0).toFixed(2));
+  }
+  const selectedBid = approval
+    ? ctx.state.bids.find((item) => item.projectId === project.id && item.supplierId === approval.selectedSupplierId && ["submitted", "locked"].includes(item.status))
+    : undefined;
+  return selectedBid?.amount ?? project.budgetAmount ?? 0;
+}
+
+function nextContractId(ctx: AppContext) {
+  let index = ctx.state.contractLedgers.length + 1;
+  let id = `cl-${index}`;
+  while (ctx.state.contractLedgers.some((item) => item.id === id)) {
+    index += 1;
+    id = `cl-${index}`;
+  }
+  return id;
+}
+
+function buildContract(ctx: AppContext, req: Request, project: ProcurementProject, supplierId: string, status: ContractLedger["status"], amount: number): ContractLedger {
+  const now = new Date().toISOString();
+  const id = nextContractId(ctx);
+  return {
+    id,
+    projectId: project.id,
+    supplierId,
+    contractNo: String(req.body?.contractNo ?? `HT-${project.code}-${String(ctx.state.contractLedgers.length + 1).padStart(3, "0")}`),
+    amount,
+    status,
+    contractSystemLink: req.body?.contractSystemLink ? String(req.body.contractSystemLink) : undefined,
+    attachmentMetadata: Array.isArray(req.body?.attachmentMetadata)
+      ? req.body.attachmentMetadata.map((item: unknown, index: number) => toAttachment(item, `contract-att-${id}-${index + 1}`))
+      : [],
+    createdBy: req.auth.user.id,
+    createdAt: now,
+    updatedAt: now
+  };
 }
 
 function toAttachment(input: unknown, fallbackId: string): ProcurementDocumentAttachment {
@@ -124,7 +192,7 @@ export function contractPerformanceRoutes(ctx: AppContext) {
   const router = Router();
 
   router.get("/contracts", (req, res) => {
-    if (req.auth.roleId === "supplier") return res.json({ contracts: visibleContracts(ctx, req) });
+    if (isSupplierRole(req.auth.roleId)) return res.json({ contracts: visibleContracts(ctx, req) });
     if (!readerRoles.has(req.auth.roleId)) {
       return denyResponse(ctx, req, res, 403, "CONTRACT_READ_DENIED", "Current role cannot read contract ledger data.", "contract.read.denied", "contract_ledger", "list");
     }
@@ -136,6 +204,45 @@ export function contractPerformanceRoutes(ctx: AppContext) {
     if (!project) return;
     if (!assertReader(ctx, req, res, project, "contract.read.denied")) return;
     return res.json({ contracts: visibleContracts(ctx, req, project.id) });
+  });
+
+  router.post("/projects/:projectId/contracts/signing", (req, res) => {
+    const project = ensureProject(ctx, req.params.projectId, res);
+    if (!project) return;
+    if (!assertMaintainer(ctx, req, res, project, "contract_signing.create.denied")) return;
+    const approvedAward = latestApprovedAwardApproval(ctx, project.id);
+    if (!approvedAward) {
+      return denyResponse(ctx, req, res, 400, "CONTRACT_AWARD_APPROVAL_REQUIRED", "Approved award approval is required before contract signing.", "contract_signing.award.denied", "project", project.id, project.id);
+    }
+    const supplierId = String(req.body?.supplierId ?? approvedAward.selectedSupplierId);
+    if (supplierId !== approvedAward.selectedSupplierId) {
+      return denyResponse(ctx, req, res, 400, "CONTRACT_SUPPLIER_MUST_BE_AWARD_WINNER", "Contract supplier must be the awarded supplier.", "contract_signing.supplier.denied", "project", project.id, project.id);
+    }
+    const existing = ctx.state.contractLedgers.find((item) => item.projectId === project.id && item.supplierId === supplierId && item.status !== "cancelled");
+    if (existing) return res.json({ contract: existing });
+    const amount = Number(req.body?.amount ?? contractAmountFromAward(ctx, project, approvedAward));
+    const contract = buildContract(ctx, req, project, supplierId, "pending_supplier_confirmation", amount);
+    ctx.state.contractLedgers.push(contract);
+    const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "contract_signing.create", "contract_ledger", contract.id, project.id, `supplier=${supplierId}`);
+    ctx.eventBus.emit({
+      eventCode: "ContractLedgerCreated",
+      businessType: "contract_preparation",
+      businessId: contract.id,
+      businessTitle: project.name,
+      actor: req.auth.user,
+      orgId: project.orgId,
+      supplierId,
+      projectId: project.id,
+      idempotencyKey: `contract_preparation:${project.id}:contract_signing:${contract.id}`,
+      payloadJson: {
+        projectId: project.id,
+        projectName: project.name,
+        contractId: contract.id,
+        supplierId,
+        status: contract.status
+      }
+    });
+    return res.status(201).json({ contract, auditLogId: auditLog.id });
   });
 
   router.post("/projects/:projectId/contracts", (req, res) => {
@@ -166,7 +273,51 @@ export function contractPerformanceRoutes(ctx: AppContext) {
     project.status = project.externalTradeFlag ? "external_contract_registered" : "contract_registered";
     project.displayStatus = "contract registered";
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "contract_ledger.register", "contract_ledger", contract.id, project.id);
+    ctx.eventBus.emit({
+      eventCode: "ContractLedgerCreated",
+      businessType: "contract_preparation",
+      businessId: contract.id,
+      businessTitle: project.name,
+      actor: req.auth.user,
+      orgId: project.orgId,
+      supplierId,
+      projectId: project.id,
+      idempotencyKey: `contract_preparation:${project.id}:contract_ledger:${contract.id}`,
+      payloadJson: {
+        projectId: project.id,
+        projectName: project.name,
+        contractId: contract.id,
+        supplierId
+      }
+    });
     return res.status(201).json({ contract, auditLogId: auditLog.id });
+  });
+
+  router.post("/contracts/:contractId/confirm", (req, res) => {
+    const contract = ensureContract(ctx, req.params.contractId, res);
+    if (!contract) return;
+    const project = ensureProject(ctx, contract.projectId, res);
+    if (!project) return;
+    if (!isSupplierRole(req.auth.roleId) || !supplierIdMatches(req.auth.user, contract.supplierId)) {
+      return denyResponse(ctx, req, res, 403, "SUPPLIER_CONTRACT_CONFIRM_DENIED", "Supplier can only confirm own contract.", "contract_signing.confirm.denied", "contract_ledger", contract.id, project.id);
+    }
+    if (contract.status === "cancelled") {
+      return denyResponse(ctx, req, res, 400, "CONTRACT_CANCELLED", "Cancelled contract cannot be confirmed.", "contract_signing.confirm.denied", "contract_ledger", contract.id, project.id);
+    }
+    if (Array.isArray(req.body?.attachmentMetadata) && req.body.attachmentMetadata.length > 0) {
+      const existingCount = contract.attachmentMetadata.length;
+      contract.attachmentMetadata = [
+        ...contract.attachmentMetadata,
+        ...req.body.attachmentMetadata.map((item: unknown, index: number) => toAttachment(item, `contract-confirm-${contract.id}-${existingCount + index + 1}`))
+      ];
+    }
+    const now = new Date().toISOString();
+    contract.status = "registered";
+    contract.updatedAt = now;
+    project.status = project.externalTradeFlag ? "external_contract_registered" : "contract_registered";
+    project.displayStatus = "contract registered";
+    const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "contract_signing.confirm", "contract_ledger", contract.id, project.id, `supplier=${contract.supplierId}`);
+    return res.json({ contract, auditLogId: auditLog.id });
   });
 
   router.post("/contracts/:contractId/performance-nodes", (req, res) => {
@@ -311,16 +462,16 @@ export function contractPerformanceRoutes(ctx: AppContext) {
   });
 
   router.get("/suppliers/:supplierId/evaluations", (req, res) => {
-    if (req.auth.roleId === "supplier") {
+    if (isSupplierRole(req.auth.roleId)) {
       ctx.policies.supplierDataIsolation.assertSupplierAccess(req.auth, req.params.supplierId, "supplier_evaluation", req.params.supplierId);
     } else if (!readerRoles.has(req.auth.roleId)) {
       return denyResponse(ctx, req, res, 403, "SUPPLIER_EVALUATION_READ_DENIED", "Current role cannot read supplier evaluation content.", "supplier_evaluation.read.denied", "supplier", req.params.supplierId);
     }
     const supplierEvaluations = ctx.state.supplierEvaluations.filter((item) => {
       if (item.supplierId !== req.params.supplierId) return false;
-      if (req.auth.roleId === "supplier") return true;
+      if (isSupplierRole(req.auth.roleId)) return true;
       const project = ctx.state.projects.find((projectItem) => projectItem.id === item.projectId);
-      return project ? canReadProject(req, project) : false;
+      return project ? canReadProject(ctx, req, project) : false;
     });
     return res.json({ supplierEvaluations });
   });

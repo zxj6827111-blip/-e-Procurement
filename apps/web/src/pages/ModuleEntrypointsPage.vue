@@ -1,12 +1,12 @@
 <template>
   <section class="panel">
     <h2>模块总览</h2>
-    <p>下列模块已接入业务导航，可按当前角色权限进入对应工作台。</p>
+    <p>下列模块已接入业务导航，可按当前角色权限进入对应业务页面。</p>
     <div class="module-grid">
       <span>供应商管理</span>
       <span>采购需求</span>
-      <span>项目立项</span>
-      <span>项目工作台</span>
+      <span>需求转项目</span>
+      <span>项目执行</span>
       <span>采购文件</span>
       <span>公告与邀请</span>
       <span>报名资料</span>

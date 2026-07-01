@@ -100,3 +100,36 @@ UAT 证据位置：
 5. 完成修复或恢复。
 6. 运行 health、readiness、关键 API 和浏览器冒烟。
 7. 由业务确认恢复后开放流量。
+
+## 8. M6-C 最终运维验收补充
+
+日期：2026-06-28
+
+发布或客户 UAT 前建议执行：
+
+```powershell
+npm.cmd --workspace @eprocurement/api run test -- m6c-final-security-ops.test.ts
+npm.cmd run test:api
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run r9:readiness
+npm.cmd run m6b:backup-restore
+npm.cmd run m6c:browser-smoke
+```
+
+M6-C 证据位置：
+
+| 证据 | 路径 |
+|---|---|
+| 最终安全/运维报告 | `docs/m6c-final-security-ops-go-no-go-report.md` |
+| 九角色浏览器 JSON | `output/m6c-browser-evidence/m6c-browser-role-smoke.json` |
+| 九角色浏览器截图 | `output/m6c-browser-evidence/m6c-u*.png` |
+| 本地备份恢复 | `output/r10-backup-restore/r10-backup-restore-drill-latest.json` |
+| Readiness 备份 | `output/r9-backups/` |
+
+运维边界：
+
+1. `r9:readiness` 和 `m6b:backup-restore` 只能证明本地/UAT恢复能力，不等同生产 RPO/RTO。
+2. `/health` 会隐藏本机路径和 SQLite 文件名，但生产仍需接入客户监控、日志平台和告警。
+3. 集成 endpoint 配置只代表契约边界可达，不代表真实 OA/ERP/财务/发票/支付联调完成。
+4. 回滚前必须确认数据库、文件、对象存储和外部回调的一致性窗口。

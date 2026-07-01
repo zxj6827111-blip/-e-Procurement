@@ -1,3 +1,5 @@
+import type { IntegrationAdapterContract } from "./integration-contracts.js";
+
 export type IntegrationJobStatus = "pending" | "running" | "succeeded" | "failed" | "retrying" | "cancelled";
 export type IntegrationAdapterMode = "mock" | "test" | "http";
 
@@ -32,6 +34,7 @@ export interface IntegrationAdapter {
   retry(jobId: string): AdapterCallLog | null;
   cancel(jobId: string): AdapterCallLog | null;
   logs(): AdapterCallLog[];
+  contract(): IntegrationAdapterContract;
 }
 
 export interface IntegrationCallOptions {

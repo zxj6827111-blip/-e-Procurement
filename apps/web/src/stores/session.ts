@@ -12,6 +12,7 @@ interface CurrentUserResponse {
   };
   roleId: string;
   orgScope: string[];
+  passwordChangeRequired?: boolean;
   mockAuthEnabled?: boolean;
   mode?: string;
 }
@@ -27,6 +28,7 @@ export const useSessionStore = defineStore("session", {
     user: null as CurrentUserResponse["user"] | null,
     roleId: "",
     orgScope: [] as string[],
+    passwordChangeRequired: false,
     mockAuthEnabled: false,
     mode: ""
   }),
@@ -44,6 +46,7 @@ export const useSessionStore = defineStore("session", {
       this.user = data.user;
       this.roleId = data.roleId;
       this.orgScope = data.orgScope;
+      this.passwordChangeRequired = Boolean(data.passwordChangeRequired);
       this.mockAuthEnabled = Boolean(data.mockAuthEnabled);
       this.mode = data.mode ?? "";
       return data;
@@ -69,6 +72,7 @@ export const useSessionStore = defineStore("session", {
         this.user = null;
         this.roleId = "";
         this.orgScope = [];
+        this.passwordChangeRequired = false;
         sessionStorage.removeItem("demoAuthActive");
         return null;
       }
@@ -87,6 +91,7 @@ export const useSessionStore = defineStore("session", {
       this.user = null;
       this.roleId = "";
       this.orgScope = [];
+      this.passwordChangeRequired = false;
       this.mode = "";
       sessionStorage.removeItem("demoAuthActive");
       sessionStorage.removeItem("demoUserId");

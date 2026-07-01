@@ -55,6 +55,11 @@ export async function loadWorkflowNotifications(businessType: "all" | R8Approval
   return filterR8BusinessType(data.notifications, businessType).map(toR8WorkflowNotificationView);
 }
 
+export async function loadApprovalInstances(businessType: "all" | R8ApprovalBusinessType = "all") {
+  const data = await apiGet<{ approvalInstances: R8ApprovalInstanceDto[] }>("/api/workflow/approval-instances");
+  return filterR8BusinessType(data.approvalInstances, businessType);
+}
+
 export async function loadApprovalRules() {
   const data = await apiGet<{ approvalRules: R8ApprovalRuleDto[] }>("/api/workflow/approval-rules");
   return data.approvalRules.map(toR8ApprovalRuleView);

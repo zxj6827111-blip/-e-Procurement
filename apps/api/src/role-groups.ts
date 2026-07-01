@@ -1,7 +1,9 @@
 import type { RoleId, User } from "./types.js";
 
-const procurementBuyerRoles = new Set<RoleId>(["group_manager", "buyer", "hotel_buyer", "platform_operator"]);
-const procurementMaintainerRoles = new Set<RoleId>(["group_manager", "buyer", "hotel_buyer", "platform_operator"]);
+const procurementBuyerRoles = new Set<RoleId>(["buyer", "hotel_buyer", "platform_operator"]);
+const mallListingOperatorRoles = new Set<RoleId>(["group_manager", "buyer", "platform_operator"]);
+const procurementMaintainerRoles = new Set<RoleId>(["buyer", "platform_operator"]);
+const supplierGovernanceRoles = new Set<RoleId>(["group_manager"]);
 const supplierRoles = new Set<RoleId>(["supplier", "supplier_admin", "supplier_quotation"]);
 const supplierAdminRoles = new Set<RoleId>(["supplier", "supplier_admin"]);
 const supplierQuotationRoles = new Set<RoleId>(["supplier", "supplier_admin", "supplier_quotation"]);
@@ -14,8 +16,16 @@ export function isProcurementBuyerRole(roleId: RoleId | string) {
   return procurementBuyerRoles.has(roleId as RoleId);
 }
 
+export function isMallListingOperatorRole(roleId: RoleId | string) {
+  return mallListingOperatorRoles.has(roleId as RoleId);
+}
+
 export function isProcurementMaintainerRole(roleId: RoleId | string) {
   return procurementMaintainerRoles.has(roleId as RoleId);
+}
+
+export function isSupplierGovernanceRole(roleId: RoleId | string) {
+  return supplierGovernanceRoles.has(roleId as RoleId);
 }
 
 export function isSupplierRole(roleId: RoleId | string) {

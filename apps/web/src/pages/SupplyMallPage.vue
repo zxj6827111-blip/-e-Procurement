@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { apiGet, apiPatch, apiPost, uploadFile, type UploadedFileMetadata } from "../api/http";
 import AttachmentList from "../components/AttachmentList.vue";
+import ProcessTimeline from "../components/ProcessTimeline.vue";
 import { useSessionStore } from "../stores/session";
 import { labelStatus } from "../utils/status-labels";
 
@@ -42,6 +43,30 @@ interface MallProduct {
     sourceId: string;
     trace?: { reportNo?: string; quotationId?: string };
   } | null;
+  sourceType?: "award_project" | "agreement";
+  sourceProjectId?: string;
+  sourceAgreementNo?: string;
+  sourcePricingReportId?: string;
+  sourcePricingReportItemId?: string;
+  listedAt?: string | null;
+  sourceCompleted?: boolean;
+  sourceTrace?: {
+    type?: string;
+    projectId?: string;
+    projectCode?: string;
+    projectName?: string;
+    agreementNo?: string;
+    pricingReportId?: string;
+    pricingReportNo?: string;
+    pricingReportItemId?: string;
+  };
+  availablePricingReports?: Array<{
+    id: string;
+    reportNo?: string;
+    projectId?: string;
+    status: string;
+    items: Array<{ id: string; salePrice: number; purchasePrice: number; effectiveFrom?: string; effectiveTo?: string }>;
+  }>;
   imageFileIds?: string[];
   imageFileMetadata?: UploadedFileMetadata[];
   attachmentFileIds?: string[];
@@ -108,6 +133,13 @@ interface Organization {
   name: string;
 }
 
+interface ProjectRow {
+  id: string;
+  code: string;
+  name: string;
+  externalTradeFlag?: boolean;
+}
+
 const session = useSessionStore();
 const products = ref<MallProduct[]>([]);
 const orders = ref<MallOrder[]>([]);
@@ -116,10 +148,12 @@ const questionnaires = ref<MallQuestionnaire[]>([]);
 const fundAccounts = ref<FundAccount[]>([]);
 const supplierRows = ref<SupplierRow[]>([]);
 const organizations = ref<Organization[]>([]);
+const projects = ref<ProjectRow[]>([]);
 const productImage = ref<File | null>(null);
 const productImageName = ref("");
 const message = ref("");
 const error = ref("");
+const processRefreshKey = ref(0);
 
 const keyword = ref("");
 const categoryFilter = ref("全部");
@@ -151,6 +185,11 @@ const productForm = ref({
 const editingProductId = ref("");
 const priceForm = ref({
   productId: "",
+  sourceType: "agreement" as "" | "award_project" | "agreement",
+  sourceProjectId: "",
+  sourceAgreementNo: "",
+  pricingReportId: "",
+  pricingReportItemId: "",
   purchasePrice: 0,
   salePrice: 0,
   taxRate: 0.13,
@@ -193,11 +232,12 @@ const templateOrderForm = ref({
   departmentId: ""
 });
 
-const buyerRoles = ["group_manager", "buyer", "hotel_buyer", "platform_operator"];
+const buyerRoles = ["buyer", "hotel_buyer", "platform_operator"];
 const supplierRoles = ["supplier", "supplier_admin", "supplier_quotation"];
 const supplierAdminRoles = ["supplier", "supplier_admin"];
 const financeRoles = ["group_manager", "buyer", "hotel_finance", "finance_reviewer"];
-const operatorRoles = ["group_manager", "buyer", "platform_operator"];
+const operatorRoles = ["buyer", "platform_operator"];
+const listingOperatorRoles = ["group_manager", "buyer", "platform_operator"];
 
 const listedProducts = computed(() => products.value.filter((product) => product.status === "listed").length);
 const pendingOrders = computed(() => orders.value.filter((order) => !["received", "closed"].includes(order.status)).length);
@@ -205,16 +245,28 @@ const totalFundBalance = computed(() => fundAccounts.value.reduce((sum, account)
 const categories = computed(() => ["全部", ...Array.from(new Set(products.value.map((product) => product.category).filter(Boolean)))]);
 const suppliers = computed(() => ["全部", ...Array.from(new Set(products.value.map((product) => productSupplierLabel(product)).filter(Boolean)))]);
 const recentOrders = computed(() => orders.value.slice(0, 4));
+const selectedOrderProcessId = computed(() => [...orders.value].sort((a, b) => String(b.id).localeCompare(String(a.id)))[0]?.id ?? "");
 const canUsePurchasePackages = computed(() => hasRole([...buyerRoles, ...operatorRoles]));
 const canMaintainProductCatalog = computed(() => hasRole(supplierAdminRoles));
 const visibleTemplates = computed(() => (canUsePurchasePackages.value ? templates.value.slice(0, 3) : []));
 const supplierNameMap = computed(() => new Map(supplierRows.value.map((item) => [item.id, item.name])));
 const orgNameMap = computed(() => new Map(organizations.value.map((item) => [item.id, item.name])));
+const sourceProjects = computed(() => projects.value.filter((project) => !project.externalTradeFlag));
+const selectedPriceProduct = computed(() => products.value.find((product) => product.id === priceForm.value.productId));
+const selectedPricingReports = computed(() => selectedPriceProduct.value?.availablePricingReports ?? []);
+const selectedReportItems = computed(() => selectedPricingReports.value.find((report) => report.id === priceForm.value.pricingReportId)?.items ?? []);
+const productListingSteps = ["供应商维护商品", "平台关联来源", "生成/选择定价报告", "平台上架", "酒店采购下单"];
+const mallRoleHint = computed(() => {
+  if (canMaintainProductCatalog.value) return "当前是供应商商品维护视角：这里只能维护商品基础资料；关联中标项目/协议来源、生成或选择定价报告、平台上架由集团采购或平台账号处理。";
+  if (hasRole(listingOperatorRoles)) return "这里是商品定价和上架区。请按“关联来源 -> 定价报告 -> 平台上架”的顺序处理，完成后酒店采购账号才能下单。";
+  if (hasRole(["hotel_buyer"])) return "这里是酒店可采购商品目录。只有已上架并有有效价格的商品会显示，供应商草稿商品不会直接进入采购目录。";
+  return "";
+});
 
 const filteredProducts = computed(() =>
   products.value.filter((product) => {
     const price = Number(product.activePrice?.salePrice ?? product.activePrice?.price ?? 0);
-    const keywordMatched = [product.name, product.specification, product.brand, product.category, productSupplierLabel(product)]
+    const keywordMatched = [product.name, product.specification, product.brand, product.category, productSupplierLabel(product), productSourceLabel(product)]
       .join(" ")
       .toLowerCase()
       .includes(keyword.value.trim().toLowerCase());
@@ -242,20 +294,25 @@ function money(value: number | undefined) {
   return `¥${Number(value).toLocaleString("zh-CN")}`;
 }
 
+function dateValue(value?: string) {
+  return value ? value.slice(0, 10) : "";
+}
+
 function chooseImage(event: Event) {
   productImage.value = (event.target as HTMLInputElement).files?.[0] ?? null;
   productImageName.value = productImage.value?.name ?? "";
 }
 
 async function loadMall() {
-  const [productData, orderData, templateData, questionnaireData, fundData, supplierData, orgData] = await Promise.all([
+  const [productData, orderData, templateData, questionnaireData, fundData, supplierData, orgData, projectData] = await Promise.all([
     apiGet<{ products: MallProduct[] }>("/api/mall/products"),
     apiGet<{ orders: MallOrder[] }>("/api/mall/orders"),
     apiGet<{ templates: ScenarioTemplate[] }>("/api/mall/scenario-templates"),
     apiGet<{ questionnaires: MallQuestionnaire[] }>("/api/mall/questionnaires"),
     apiGet<{ accounts: FundAccount[] }>("/api/mall/fund-accounts"),
     canReadSuppliers(session.roleId) ? apiGet<{ suppliers: SupplierRow[] }>("/api/suppliers").catch(() => ({ suppliers: [] })) : Promise.resolve({ suppliers: [] }),
-    apiGet<{ organizations: Organization[] }>("/api/organizations").catch(() => ({ organizations: [] }))
+    apiGet<{ organizations: Organization[] }>("/api/organizations").catch(() => ({ organizations: [] })),
+    hasRole(listingOperatorRoles) ? apiGet<{ projects: ProjectRow[] }>("/api/projects").catch(() => ({ projects: [] })) : Promise.resolve({ projects: [] })
   ]);
   products.value = productData.products;
   orders.value = orderData.orders;
@@ -264,6 +321,7 @@ async function loadMall() {
   fundAccounts.value = fundData.accounts;
   supplierRows.value = supplierData.suppliers;
   organizations.value = orgData.organizations;
+  projects.value = projectData.projects;
   if (!priceForm.value.productId && products.value[0]) preparePrice(products.value[0]);
 }
 
@@ -271,6 +329,7 @@ async function runMallAction(action: () => Promise<void>) {
   error.value = "";
   try {
     await action();
+    processRefreshKey.value += 1;
   } catch (err) {
     error.value = err instanceof Error ? err.message : "操作失败";
   }
@@ -281,6 +340,36 @@ function priceTrace(product: MallProduct) {
   if (!source) return "协议价待确认";
   if (source.type === "pricing_report") return `定价报告 ${source.trace?.reportNo ?? "已归档"}`;
   return `供应商报价 ${source.trace?.quotationId ? "已归档" : "已采纳"}`;
+}
+
+function sourceTypeLabel(value?: MallProduct["sourceType"]) {
+  if (value === "award_project") return "中标项目";
+  if (value === "agreement") return "协议来源";
+  return "未关联来源";
+}
+
+function productSourceLabel(product: MallProduct) {
+  if (product.sourceType === "award_project") {
+    const code = product.sourceTrace?.projectCode || product.sourceProjectId || "";
+    const name = product.sourceTrace?.projectName || "未选择中标项目";
+    return code ? `${code} / ${name}` : name;
+  }
+  if (product.sourceType === "agreement") return product.sourceAgreementNo || product.sourceTrace?.agreementNo || "未填写协议";
+  return "未关联来源";
+}
+
+function pricingReportLabel(product: MallProduct) {
+  return product.sourceTrace?.pricingReportNo || product.priceSource?.trace?.reportNo || "未生成定价报告";
+}
+
+function productFlowSteps(product: MallProduct) {
+  return [
+    { label: "供应商维护商品", state: "done" },
+    { label: product.sourceType ? `已关联${sourceTypeLabel(product.sourceType)}` : "待关联来源", state: product.sourceType ? "done" : "blocked" },
+    { label: product.sourceCompleted ? "定价报告已就绪" : "待定价报告", state: product.sourceCompleted ? "done" : "pending" },
+    { label: product.status === "listed" ? "平台已上架" : "待平台上架", state: product.status === "listed" ? "done" : "pending" },
+    { label: product.status === "listed" ? "酒店可下单" : "酒店暂不可下单", state: product.status === "listed" ? "ready" : "pending" }
+  ];
 }
 
 function productAttachments(product: MallProduct): UploadedFileMetadata[] {
@@ -313,6 +402,12 @@ function deliveryLabel(product: MallProduct) {
 
 function stockLabel(product: MallProduct) {
   return product.status === "listed" ? "可采购" : labelStatus(product.status);
+}
+
+function productBlockedReason(product: MallProduct) {
+  const reasons = product.blockReasons ?? [];
+  if (!reasons.length || product.status === "listed") return "";
+  return reasons.join("；");
 }
 
 function templateAttachments(template: ScenarioTemplate): UploadedFileMetadata[] {
@@ -428,15 +523,37 @@ function editProduct(product: MallProduct) {
 }
 
 function preparePrice(product: MallProduct) {
+  const report = product.availablePricingReports?.find((item) => item.id === product.sourcePricingReportId) ?? product.availablePricingReports?.[0];
+  const reportItem = report?.items.find((item) => item.id === product.sourcePricingReportItemId) ?? report?.items[0];
   priceForm.value = {
     productId: product.id,
-    purchasePrice: Number(product.activePrice?.purchasePrice ?? product.activePrice?.price ?? 0),
-    salePrice: Number(product.activePrice?.salePrice ?? product.activePrice?.price ?? 0),
+    sourceType: product.sourceType ?? "agreement",
+    sourceProjectId: product.sourceProjectId ?? "",
+    sourceAgreementNo: product.sourceAgreementNo ?? "",
+    pricingReportId: report?.id ?? "",
+    pricingReportItemId: reportItem?.id ?? "",
+    purchasePrice: Number(reportItem?.purchasePrice ?? product.activePrice?.purchasePrice ?? product.activePrice?.price ?? 0),
+    salePrice: Number(reportItem?.salePrice ?? product.activePrice?.salePrice ?? product.activePrice?.price ?? 0),
     taxRate: Number(product.activePrice?.taxRate ?? product.taxRate ?? 0.13),
     deliveryDays: Number(product.activePrice?.deliveryDays ?? 3),
-    effectiveFrom: product.activePrice?.effectiveFrom ?? new Date().toISOString().slice(0, 10),
-    effectiveTo: product.activePrice?.effectiveTo ?? ""
+    effectiveFrom: dateValue(reportItem?.effectiveFrom ?? product.activePrice?.effectiveFrom) || new Date().toISOString().slice(0, 10),
+    effectiveTo: dateValue(reportItem?.effectiveTo ?? product.activePrice?.effectiveTo)
   };
+}
+
+function prepareSelectedPriceProduct() {
+  const product = products.value.find((item) => item.id === priceForm.value.productId);
+  if (product) preparePrice(product);
+}
+
+function applySelectedPricingReport() {
+  const item = selectedReportItems.value.find((entry) => entry.id === priceForm.value.pricingReportItemId) ?? selectedReportItems.value[0];
+  if (!item) return;
+  priceForm.value.pricingReportItemId = item.id;
+  priceForm.value.purchasePrice = Number(item.purchasePrice ?? priceForm.value.purchasePrice);
+  priceForm.value.salePrice = Number(item.salePrice ?? priceForm.value.salePrice);
+  priceForm.value.effectiveFrom = dateValue(item.effectiveFrom) || priceForm.value.effectiveFrom;
+  priceForm.value.effectiveTo = dateValue(item.effectiveTo);
 }
 
 async function uploadProductImage() {
@@ -486,8 +603,25 @@ async function submitPriceAndList(productId = priceForm.value.productId) {
       error.value = "请先选择定价商品。";
       return;
     }
-    const price = await apiPost<{ price: { id: string } }>(`/api/mall/products/${targetProductId}/prices`, {
-      price: numberValue(priceForm.value.salePrice),
+    if (!priceForm.value.sourceType) {
+      error.value = "请先选择商品来源类型。";
+      return;
+    }
+    if (priceForm.value.sourceType === "award_project" && !priceForm.value.sourceProjectId) {
+      error.value = "请选择该商品关联的中标项目。";
+      return;
+    }
+    if (priceForm.value.sourceType === "agreement" && !priceForm.value.sourceAgreementNo.trim()) {
+      error.value = "请填写协议编号或协议名称。";
+      return;
+    }
+    await apiPost(`/api/mall/products/${targetProductId}/status`, {
+      status: "listed",
+      sourceType: priceForm.value.sourceType,
+      sourceProjectId: priceForm.value.sourceType === "award_project" ? priceForm.value.sourceProjectId : undefined,
+      sourceAgreementNo: priceForm.value.sourceType === "agreement" ? priceForm.value.sourceAgreementNo.trim() : undefined,
+      pricingReportId: priceForm.value.pricingReportId || undefined,
+      pricingReportItemId: priceForm.value.pricingReportItemId || undefined,
       purchasePrice: numberValue(priceForm.value.purchasePrice),
       salePrice: numberValue(priceForm.value.salePrice),
       taxRate: numberValue(priceForm.value.taxRate, 0.13),
@@ -495,9 +629,7 @@ async function submitPriceAndList(productId = priceForm.value.productId) {
       effectiveFrom: priceForm.value.effectiveFrom,
       effectiveTo: priceForm.value.effectiveTo || undefined
     });
-    await apiPost(`/api/mall/prices/${price.price.id}/approve`, { approved: true });
-    await apiPost(`/api/mall/products/${targetProductId}/status`, { status: "listed" });
-    message.value = "商品已审批定价并上架";
+    message.value = "商品已关联来源、生成或选择定价报告并上架";
     await loadMall();
   });
 }
@@ -528,6 +660,7 @@ async function addToCartAndOrder(productId: string) {
     });
     message.value = `订单已提交：${order.order.orderNo}`;
     await loadMall();
+    processRefreshKey.value += 1;
   });
 }
 
@@ -540,6 +673,7 @@ async function copyOrder(orderId: string) {
     });
     message.value = `已复制订单：${copied.order.orderNo}`;
     await loadMall();
+    processRefreshKey.value += 1;
   });
 }
 
@@ -642,6 +776,7 @@ async function templateToOrder(templateId: string) {
     });
     message.value = `模板转订单已完成：${result.order.orderNo}`;
     await loadMall();
+    processRefreshKey.value += 1;
   });
 }
 
@@ -661,6 +796,19 @@ onMounted(loadMall);
         <span><strong>{{ pendingOrders }}</strong> 进行中订单</span>
         <span><strong>{{ money(totalFundBalance) }}</strong> 资金余额</span>
       </div>
+    </div>
+    <p v-if="mallRoleHint" class="notice">{{ mallRoleHint }}</p>
+    <div v-if="canMaintainProductCatalog && !hasRole(listingOperatorRoles)" class="listing-rule-panel">
+      <div class="panel-head">
+        <h3>商品上架规则</h3>
+        <span class="tag">供应商只读</span>
+      </div>
+      <div class="step-strip compact-flow">
+        <span v-for="(step, index) in productListingSteps" :key="step" class="step-chip" :class="index === 0 ? 'ready' : 'pending'">
+          {{ index + 1 }} {{ step }}
+        </span>
+      </div>
+      <p class="notice">当前账号负责第 1 步；第 2-4 步需要切换到集团采购或平台账号，在“商品定价上架”区域完成后，酒店采购才能看到并下单。</p>
     </div>
 
     <div class="filter-bar">
@@ -716,7 +864,8 @@ onMounted(loadMall);
           <div class="info-grid compact-info">
             <div><span>规格</span><strong>{{ product.specification }}</strong></div>
             <div><span>供应商</span><strong>{{ productSupplierLabel(product) }}</strong></div>
-            <div><span>库存/状态</span><strong>{{ stockLabel(product) }}</strong></div>
+            <div><span>来源</span><strong>{{ productSourceLabel(product) }}</strong></div>
+            <div><span>定价报告</span><strong>{{ pricingReportLabel(product) }}</strong></div>
             <div><span>交期</span><strong>{{ deliveryLabel(product) }}</strong></div>
           </div>
           <div class="catalog-meta">
@@ -724,7 +873,12 @@ onMounted(loadMall);
             <span>{{ product.brand || "-" }}</span>
             <span>{{ product.unit }}</span>
             <span>{{ priceTrace(product) }}</span>
+            <span>{{ stockLabel(product) }}</span>
           </div>
+          <div class="step-strip compact-flow">
+            <span v-for="step in productFlowSteps(product)" :key="step.label" class="step-chip" :class="step.state">{{ step.label }}</span>
+          </div>
+          <p v-if="productBlockedReason(product)" class="muted">暂不可采购：{{ productBlockedReason(product) }}</p>
           <div class="actions">
             <input
               v-if="hasRole(buyerRoles)"
@@ -737,8 +891,8 @@ onMounted(loadMall);
             <button v-if="hasRole(buyerRoles)" type="button" class="secondary-button" :disabled="product.status !== 'listed'" @click="addToCart(product.id)">加入采购清单</button>
             <button v-if="hasRole(buyerRoles)" type="button" :disabled="product.status !== 'listed'" @click="addToCartAndOrder(product.id)">提交订单</button>
             <button v-if="canMaintainProductCatalog || hasRole(operatorRoles)" type="button" class="secondary-button" @click="editProduct(product)">编辑商品</button>
-            <button v-if="hasRole(operatorRoles) && product.status !== 'listed'" type="button" class="secondary-button" @click="preparePrice(product)">填定价</button>
-            <button v-if="hasRole(operatorRoles) && product.status === 'listed'" type="button" class="secondary-button" @click="delistProduct(product.id)">下架</button>
+            <button v-if="hasRole(listingOperatorRoles) && product.status !== 'listed'" type="button" class="secondary-button" @click="preparePrice(product)">填定价</button>
+            <button v-if="hasRole(listingOperatorRoles) && product.status === 'listed'" type="button" class="secondary-button" @click="delistProduct(product.id)">下架</button>
           </div>
         </div>
       </article>
@@ -791,6 +945,13 @@ onMounted(loadMall);
           </article>
         </div>
         <div v-else class="empty compact-empty">暂无订单。</div>
+        <ProcessTimeline
+          v-if="selectedOrderProcessId"
+          business-type="order_fulfillment"
+          :business-id="selectedOrderProcessId"
+          title="最近订单履约流程"
+          :refresh-key="processRefreshKey"
+        />
       </section>
 
       <section v-if="canUsePurchasePackages" class="business-panel">
@@ -896,6 +1057,7 @@ onMounted(loadMall);
   <section v-if="canMaintainProductCatalog" class="business-panel">
     <button type="button" class="section-toggle" @click="showMaintenance = !showMaintenance">{{ showMaintenance ? "收起供应商商品维护" : "展开供应商商品维护" }}</button>
     <div v-if="showMaintenance">
+      <p class="notice">维护的是供应商商品基础资料，不是直接上架销售。商品需有图片、规格、有效定价，并由平台完成上架后，酒店采购才能看到并下单。</p>
       <div class="form-grid">
         <label>
           商品名称
@@ -985,16 +1147,48 @@ onMounted(loadMall);
     </div>
   </section>
 
-  <section v-if="hasRole(operatorRoles)" class="business-panel">
+  <section v-if="hasRole(listingOperatorRoles)" class="business-panel">
     <div class="panel-head">
       <h3>商品定价上架</h3>
     </div>
+    <p class="notice">上架顺序：供应商维护商品 -> 关联中标项目或协议来源 -> 生成/选择定价报告 -> 平台上架 -> 酒店采购下单。</p>
     <div class="form-grid">
       <label>
         商品
-        <select v-model="priceForm.productId">
+        <select v-model="priceForm.productId" @change="prepareSelectedPriceProduct">
           <option value="">请选择商品</option>
           <option v-for="product in products" :key="product.id" :value="product.id">{{ product.name }} / {{ product.skuCode }}</option>
+        </select>
+      </label>
+      <label>
+        来源类型
+        <select v-model="priceForm.sourceType">
+          <option value="agreement">协议来源</option>
+          <option value="award_project">中标项目</option>
+        </select>
+      </label>
+      <label v-if="priceForm.sourceType === 'award_project'">
+        中标项目
+        <select v-model="priceForm.sourceProjectId">
+          <option value="">请选择中标项目</option>
+          <option v-for="project in sourceProjects" :key="project.id" :value="project.id">{{ project.code }} / {{ project.name }}</option>
+        </select>
+      </label>
+      <label v-if="priceForm.sourceType === 'agreement'">
+        协议编号 / 来源
+        <input v-model="priceForm.sourceAgreementNo" placeholder="例如 AG-2026-001" />
+      </label>
+      <label>
+        定价报告
+        <select v-model="priceForm.pricingReportId" @change="applySelectedPricingReport">
+          <option value="">自动生成新的定价报告</option>
+          <option v-for="report in selectedPricingReports" :key="report.id" :value="report.id">{{ report.reportNo || report.id }} / {{ labelStatus(report.status) }}</option>
+        </select>
+      </label>
+      <label v-if="selectedReportItems.length">
+        报告明细
+        <select v-model="priceForm.pricingReportItemId" @change="applySelectedPricingReport">
+          <option v-for="item in selectedReportItems" :key="item.id" :value="item.id">{{ item.id }} / {{ money(item.salePrice) }}</option>
         </select>
       </label>
       <label>

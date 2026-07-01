@@ -37,6 +37,15 @@ function seedFrozenReport(runtime: ReturnType<typeof boot>) {
   });
 }
 
+async function approveAwardThroughWorkflow(runtime: ReturnType<typeof boot>, approvalId: string, opinion = "workflow approved") {
+  const submitted = await request(runtime.app).post(`/api/award-approvals/${approvalId}/submit`).set("x-mock-user-id", "u2");
+  expect(submitted.status).toBe(200);
+  const instanceId = submitted.body.workflow.approvalInstance.id as string;
+  const approved = await request(runtime.app).post(`/api/workflow/approval-instances/${instanceId}/actions`).set("x-mock-user-id", "u1").send({ action: "approve", opinion });
+  expect(approved.status).toBe(200);
+  return { submitted, approved };
+}
+
 describe("Phase 5 award approval and result notification", () => {
   let runtime: ReturnType<typeof boot>;
 
@@ -71,7 +80,7 @@ describe("Phase 5 award approval and result notification", () => {
     expectDenied(notCandidate, "AWARD_SUPPLIER_NOT_RECOMMENDED", ["not in report"]);
   });
 
-  it("submits and mock-approves award approval through adapter logs, not real OA", async () => {
+  it("submits and approves award approval through formal workflow", async () => {
     const created = await request(runtime.app)
       .post("/api/projects/p-award/award-approvals")
       .set("x-mock-user-id", "u2")
@@ -85,14 +94,20 @@ describe("Phase 5 award approval and result notification", () => {
     const duplicateSubmit = await request(runtime.app).post(`/api/award-approvals/${created.body.approval.id}/submit`).set("x-mock-user-id", "u2");
     expectDenied(duplicateSubmit, "AWARD_APPROVAL_STATUS_DENIED");
 
+    const buyerApprove = await request(runtime.app)
+      .post(`/api/workflow/approval-instances/${submitted.body.workflow.approvalInstance.id}/actions`)
+      .set("x-mock-user-id", "u2")
+      .send({ action: "approve", opinion: "buyer should not approve own award" });
+    expect(buyerApprove.status).toBe(403);
+    expect(buyerApprove.body.error.code).toBe("WORKFLOW_ASSIGNEE_DENIED");
+
     const approved = await request(runtime.app)
-      .post(`/api/award-approvals/${created.body.approval.id}/mock-approve`)
+      .post(`/api/workflow/approval-instances/${submitted.body.workflow.approvalInstance.id}/actions`)
       .set("x-mock-user-id", "u1")
-      .send({ approved: true, approvalOpinion: "mock approved" });
+      .send({ action: "approve", opinion: "workflow approved" });
     expect(approved.status).toBe(200);
-    expect(approved.body.approval.approvalStatus).toBe("approved");
-    expect(approved.body.adapterLog.mode).toBe("test");
-    expect(approved.body.project?.status ?? runtime.ctx.state.projects.find((item) => item.id === "p-award")?.status).toBe("awarded_pending_order");
+    expect(runtime.ctx.state.awardApprovals.find((item) => item.id === created.body.approval.id)?.approvalStatus).toBe("approved");
+    expect(runtime.ctx.state.projects.find((item) => item.id === "p-award")?.status).toBe("awarded_pending_order");
   });
 
   it("sends result notifications with supplier self-only isolation and audit logs", async () => {
@@ -100,8 +115,7 @@ describe("Phase 5 award approval and result notification", () => {
       .post("/api/projects/p-award/award-approvals")
       .set("x-mock-user-id", "u2")
       .send({ selectedSupplierId: "sup-1", nonLowestPriceReason: "service score leads" });
-    await request(runtime.app).post(`/api/award-approvals/${created.body.approval.id}/submit`).set("x-mock-user-id", "u2");
-    await request(runtime.app).post(`/api/award-approvals/${created.body.approval.id}/mock-approve`).set("x-mock-user-id", "u1").send({ approved: true });
+    await approveAwardThroughWorkflow(runtime, created.body.approval.id);
 
     const sent = await request(runtime.app)
       .post("/api/projects/p-award/result-notifications")
@@ -133,6 +147,116 @@ describe("Phase 5 award approval and result notification", () => {
     const publicity = await request(runtime.app).post("/api/projects/p-award/internal-publicity").set("x-mock-user-id", "u2").send({ contentSummary: "phase5 publicity" });
     expect(publicity.status).toBe(201);
     expect(publicity.body.publicityRecord.status).toBe("published");
+
+    const duplicateSent = await request(runtime.app)
+      .post("/api/projects/p-award/result-notifications")
+      .set("x-mock-user-id", "u2")
+      .send({ visibilityConfig: "supplier_self_only" });
+    expect(duplicateSent.status).toBe(200);
+    expect(duplicateSent.body.notifications).toHaveLength(2);
+    expect(runtime.ctx.state.resultNotifications.filter((item) => item.projectId === "p-award" && item.awardApprovalId === created.body.approval.id && item.scope === "supplier_self")).toHaveLength(2);
+
+    const duplicatePublicity = await request(runtime.app).post("/api/projects/p-award/internal-publicity").set("x-mock-user-id", "u2").send({ contentSummary: "duplicate publicity" });
+    expect(duplicatePublicity.status).toBe(200);
+    expect(duplicatePublicity.body.publicityRecord.id).toBe(publicity.body.publicityRecord.id);
+    expect(runtime.ctx.state.internalPublicityRecords.filter((item) => item.projectId === "p-award" && item.awardApprovalId === created.body.approval.id)).toHaveLength(1);
+  });
+
+  it("allows supplier admin and quotation accounts to read own award result and pricing report only", async () => {
+    const created = await request(runtime.app)
+      .post("/api/projects/p-award/award-approvals")
+      .set("x-mock-user-id", "u2")
+      .send({ selectedSupplierId: "sup-1", nonLowestPriceReason: "service score leads" });
+    await approveAwardThroughWorkflow(runtime, created.body.approval.id);
+    runtime.ctx.state.contractLedgers = runtime.ctx.state.contractLedgers.filter((item) => item.projectId !== "p-award");
+
+    const pricing = await request(runtime.app).post("/api/projects/p-award/pricing-reports").set("x-mock-user-id", "u2").send({ awardApprovalId: created.body.approval.id });
+    expect(pricing.status).toBe(201);
+
+    const sent = await request(runtime.app)
+      .post("/api/projects/p-award/result-notifications")
+      .set("x-mock-user-id", "u2")
+      .send({ visibilityConfig: "supplier_self_only" });
+    expect(sent.status).toBe(201);
+
+    const quotationResult = await request(runtime.app).get("/api/projects/p-award/result-notifications").set("x-mock-user-id", "u12");
+    expect(quotationResult.status).toBe(200);
+    expect(quotationResult.body.notifications).toHaveLength(1);
+    expect(quotationResult.body.notifications[0].supplierId).toBe("sup-1");
+    expect(quotationResult.text).not.toContain("sup-2");
+
+    const adminResult = await request(runtime.app).get("/api/projects/p-award/result-notifications").set("x-mock-user-id", "u11");
+    expect(adminResult.status).toBe(200);
+    expect(adminResult.body.notifications).toHaveLength(1);
+
+    const quotationPricing = await request(runtime.app).get("/api/projects/p-award/pricing-reports").set("x-mock-user-id", "u12");
+    expect(quotationPricing.status).toBe(200);
+    expect(quotationPricing.body.pricingReports.length).toBeGreaterThan(0);
+    expect(quotationPricing.body.pricingReports.every((report: { selectedSupplierId: string }) => report.selectedSupplierId === "sup-1")).toBe(true);
+
+    const otherSupplierPricing = await request(runtime.app).get("/api/projects/p-award/pricing-reports").set("x-mock-user-id", "u15");
+    expect(otherSupplierPricing.status).toBe(200);
+    expect(otherSupplierPricing.body.pricingReports).toHaveLength(0);
+  });
+
+  it("runs award follow-up through contract confirmation and auto-listed awarded products", async () => {
+    const created = await request(runtime.app)
+      .post("/api/projects/p-award/award-approvals")
+      .set("x-mock-user-id", "u2")
+      .send({ selectedSupplierId: "sup-1", nonLowestPriceReason: "service score leads" });
+    await approveAwardThroughWorkflow(runtime, created.body.approval.id);
+
+    const pricing = await request(runtime.app).post("/api/projects/p-award/pricing-reports").set("x-mock-user-id", "u2").send({ awardApprovalId: created.body.approval.id });
+    expect(pricing.status).toBe(201);
+
+    const signing = await request(runtime.app).post("/api/projects/p-award/contracts/signing").set("x-mock-user-id", "u2").send();
+    expect([200, 201]).toContain(signing.status);
+    expect(signing.body.contract.supplierId).toBe("sup-1");
+
+    const supplierContracts = await request(runtime.app).get("/api/projects/p-award/contracts").set("x-mock-user-id", "u11");
+    expect(supplierContracts.status).toBe(200);
+    expect(supplierContracts.body.contracts.map((item: { id: string }) => item.id)).toContain(signing.body.contract.id);
+
+    const otherSupplierConfirm = await request(runtime.app).post(`/api/contracts/${signing.body.contract.id}/confirm`).set("x-mock-user-id", "u15");
+    expectDenied(otherSupplierConfirm, "SUPPLIER_CONTRACT_CONFIRM_DENIED");
+
+    const confirmed = await request(runtime.app).post(`/api/contracts/${signing.body.contract.id}/confirm`).set("x-mock-user-id", "u11");
+    expect(confirmed.status).toBe(200);
+    expect(confirmed.body.contract.status).toBe("registered");
+
+    const listed = await request(runtime.app).post("/api/projects/p-award/award-products/auto-list").set("x-mock-user-id", "u2");
+    expect(listed.status).toBe(201);
+    expect(listed.body.products.length).toBeGreaterThan(0);
+    expect(listed.body.products.every((item: { status: string; supplierId: string; sourceType: string; sourceProjectId: string }) => item.status === "listed" && item.supplierId === "sup-1" && item.sourceType === "award_project" && item.sourceProjectId === "p-award")).toBe(true);
+
+    const supplierMall = await request(runtime.app).get("/api/mall/products").set("x-mock-user-id", "u11");
+    expect(supplierMall.status).toBe(200);
+    expect(supplierMall.body.products.some((item: { sourceProjectId?: string; supplierId: string; status: string; activePrice?: unknown }) => item.sourceProjectId === "p-award" && item.supplierId === "sup-1" && item.status === "listed" && item.activePrice)).toBe(true);
+  });
+
+  it("keeps award result visible when participant list misses the selected supplier", async () => {
+    const created = await request(runtime.app)
+      .post("/api/projects/p-award/award-approvals")
+      .set("x-mock-user-id", "u2")
+      .send({ selectedSupplierId: "sup-1", nonLowestPriceReason: "service score leads" });
+    await approveAwardThroughWorkflow(runtime, created.body.approval.id);
+
+    const project = runtime.ctx.state.projects.find((item) => item.id === "p-award");
+    expect(project).toBeTruthy();
+    project!.participantSupplierIds = ["sup-2"];
+
+    const sent = await request(runtime.app)
+      .post("/api/projects/p-award/result-notifications")
+      .set("x-mock-user-id", "u2")
+      .send({ visibilityConfig: "supplier_self_only" });
+    expect(sent.status).toBe(201);
+    expect(sent.body.notifications.map((item: { supplierId?: string }) => item.supplierId)).toEqual(expect.arrayContaining(["sup-1", "sup-2"]));
+
+    const quotationResult = await request(runtime.app).get("/api/projects/p-award/result-notifications").set("x-mock-user-id", "u12");
+    expect(quotationResult.status).toBe(200);
+    expect(quotationResult.body.notifications).toHaveLength(1);
+    expect(quotationResult.body.notifications[0].supplierId).toBe("sup-1");
+    expect(quotationResult.body.notifications[0].selected).toBe(true);
   });
 
   it("validates result notification scope and winner-name visibility config", async () => {
@@ -140,8 +264,7 @@ describe("Phase 5 award approval and result notification", () => {
       .post("/api/projects/p-award/award-approvals")
       .set("x-mock-user-id", "u2")
       .send({ selectedSupplierId: "sup-1", nonLowestPriceReason: "service score leads" });
-    await request(runtime.app).post(`/api/award-approvals/${created.body.approval.id}/submit`).set("x-mock-user-id", "u2");
-    await request(runtime.app).post(`/api/award-approvals/${created.body.approval.id}/mock-approve`).set("x-mock-user-id", "u1").send({ approved: true });
+    await approveAwardThroughWorkflow(runtime, created.body.approval.id);
 
     const badScope = await request(runtime.app)
       .post("/api/projects/p-award/result-notifications")
@@ -171,8 +294,7 @@ describe("Phase 5 award approval and result notification", () => {
       .post("/api/projects/p-award/award-approvals")
       .set("x-mock-user-id", "u2")
       .send({ selectedSupplierId: "sup-1", nonLowestPriceReason: "service score leads" });
-    await request(runtime.app).post(`/api/award-approvals/${created.body.approval.id}/submit`).set("x-mock-user-id", "u2");
-    await request(runtime.app).post(`/api/award-approvals/${created.body.approval.id}/mock-approve`).set("x-mock-user-id", "u1").send({ approved: true });
+    await approveAwardThroughWorkflow(runtime, created.body.approval.id);
 
     const sent = await request(runtime.app)
       .post("/api/projects/p-award/result-notifications")
@@ -199,6 +321,37 @@ describe("Phase 5 award approval and result notification", () => {
       .set("x-mock-user-id", "u6")
       .send({ selectedSupplierId: "sup-1", nonLowestPriceReason: "admin denied" });
     expectDenied(admin, "AWARD_MAINTAINER_REQUIRED", ["admin denied"]);
+  });
+
+  it("allows group management to confirm pending award approval from the award detail context", async () => {
+    const created = await request(runtime.app)
+      .post("/api/projects/p-award/award-approvals")
+      .set("x-mock-user-id", "u2")
+      .send({ selectedSupplierId: "sup-1", nonLowestPriceReason: "service score leads" });
+    const submitted = await request(runtime.app).post(`/api/award-approvals/${created.body.approval.id}/submit`).set("x-mock-user-id", "u2");
+    const instanceId = submitted.body.workflow.approvalInstance.id as string;
+
+    const tasks = await request(runtime.app).get("/api/workflow/tasks").set("x-mock-user-id", "u1");
+    expect(tasks.status).toBe(200);
+    expect(tasks.body.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          approvalInstanceId: instanceId,
+          assigneeRoleId: "group_manager",
+          businessType: "award_approval",
+          status: "pending"
+        })
+      ])
+    );
+
+    const approved = await request(runtime.app)
+      .post(`/api/workflow/approval-instances/${instanceId}/actions`)
+      .set("x-mock-user-id", "u1")
+      .send({ action: "approve", opinion: "集团确认定标" });
+    expect(approved.status).toBe(200);
+    expect(approved.body.approvalInstance.approvalStatus).toBe("approved");
+    expect(runtime.ctx.state.awardApprovals.find((item) => item.id === created.body.approval.id)?.approvalStatus).toBe("approved");
+    expect(runtime.ctx.state.projects.find((item) => item.id === "p-award")?.status).toBe("awarded_pending_order");
   });
 
   it("supports comparison-report-only award source for comparison projects", async () => {

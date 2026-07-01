@@ -22,6 +22,12 @@ const props = defineProps<{
   imageOnly?: boolean;
   showMeta?: boolean;
   showDownload?: boolean;
+  deletable?: boolean;
+  deleteLabel?: string;
+}>();
+
+const emit = defineEmits<{
+  delete: [attachment: Attachment];
 }>();
 
 const previewUrls = ref<Record<string, string>>({});
@@ -144,6 +150,9 @@ onBeforeUnmount(() => {
         <small v-if="errors[attachmentId(attachment)]" class="inline-error">{{ errors[attachmentId(attachment)] }}</small>
       </div>
       <button v-if="downloadVisible" type="button" class="secondary-button" :disabled="!attachmentId(attachment)" @click="downloadAttachment(attachment)">下载</button>
+      <button v-if="deletable" type="button" class="secondary-button danger-button" :disabled="!attachmentId(attachment)" @click="emit('delete', attachment)">
+        {{ deleteLabel ?? "删除" }}
+      </button>
     </div>
   </div>
   <span v-else class="notice">{{ emptyText ?? "-" }}</span>

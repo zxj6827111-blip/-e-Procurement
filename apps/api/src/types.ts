@@ -58,6 +58,7 @@ export interface Supplier {
   regularizedAt?: string;
   periodicAssessment?: SupplierPeriodicAssessment;
   registrationTrace?: SupplierRegistrationTrace;
+  onboardingProfile?: SupplierOnboardingProfile;
   supplierType?: string;
   supplierSource?: string;
   socialCreditCode?: string;
@@ -79,6 +80,86 @@ export interface Supplier {
   restrictionReason?: string;
   restrictedAt?: string;
   evaluationScore: number | null;
+}
+
+export interface SupplierOnboardingProfile {
+  account: {
+    mobile: string;
+    agreementAccepted: boolean;
+    agreementVersion?: string;
+    submittedFrom?: string;
+  };
+  basic: {
+    companyName: string;
+    socialCreditCode: string;
+    businessLicenseNo?: string;
+    legalRepresentative: string;
+    registeredAddress?: string;
+    detailAddress?: string;
+    website?: string;
+    businessScope?: string;
+    supplierType?: string;
+    supplierSource?: string;
+  };
+  contacts: SupplierOnboardingContact[];
+  products: SupplierOnboardingProduct[];
+  sites: SupplierOnboardingSite[];
+  companyMaterials: SupplierOnboardingCompanyMaterials;
+  questionnaire: SupplierOnboardingQuestionnaire;
+  submittedAt: string;
+}
+
+export interface SupplierOnboardingContact {
+  id: string;
+  name: string;
+  position?: string;
+  email?: string;
+  mobile: string;
+  phone?: string;
+  fax?: string;
+  primary?: boolean;
+}
+
+export interface SupplierOnboardingProduct {
+  id: string;
+  category: string;
+  name: string;
+  specification?: string;
+  monthlyCapacity?: string;
+  description?: string;
+  attachments?: ProcurementDocumentAttachment[];
+}
+
+export interface SupplierOnboardingSite {
+  id: string;
+  siteType: "office" | "factory" | "showroom" | "warehouse" | "other";
+  name: string;
+  address?: string;
+  description?: string;
+  attachments?: ProcurementDocumentAttachment[];
+}
+
+export interface SupplierOnboardingCompanyMaterials {
+  enterpriseNature?: string;
+  taxpayerType?: string;
+  registeredCapital?: string;
+  employeeScale?: string;
+  annualRevenue?: string;
+  qualitySystem?: string;
+  qualityDescription?: string;
+  cooperationCases?: string;
+  developmentPlan?: string;
+  sunshineCommitmentAccepted?: boolean;
+  attachments?: ProcurementDocumentAttachment[];
+}
+
+export interface SupplierOnboardingQuestionnaire {
+  cooperationScope?: string;
+  serviceCapability?: string;
+  deliveryCoverage?: string;
+  afterSalesCommitment?: string;
+  complianceCommitment?: string;
+  remark?: string;
 }
 
 export interface SupplierAdmissionReview {
@@ -432,6 +513,8 @@ export interface ProcurementMethodRule {
 
 export type ApprovalBusinessType =
   | "procurement_request"
+  | "procurement_document"
+  | "review_award"
   | "award_approval"
   | "archive_supplement"
   | "price_approval"
@@ -538,7 +621,7 @@ export interface ProcurementProjectPackage {
 }
 
 export type ProcurementDocumentStatus = "draft" | "reviewing" | "locked" | "voided";
-export type ProcurementDocumentReviewStatus = "draft" | "submitted" | "approved" | "voided";
+export type ProcurementDocumentReviewStatus = "draft" | "submitted" | "approved" | "rejected" | "voided";
 
 export interface ProcurementDocumentAttachment {
   id: string;
@@ -743,6 +826,12 @@ export interface Expert {
   status: string;
   accountUserIds?: string[];
   avoidanceTags?: string[];
+  ownerOrgId?: string;
+  branchOrgId?: string;
+  reviewScopes?: string[];
+  supplierAssessmentScopes?: string[];
+  sharedAccount?: boolean;
+  active?: boolean;
   maintainedAt?: string;
   maintenanceLog?: string;
 }
@@ -773,6 +862,19 @@ export interface ScoringTemplate {
   configJson: Record<string, unknown>;
 }
 
+export type ScoringCategory = "technical" | "service" | "price";
+
+export interface ScoringDetailValue {
+  score: number;
+  comment?: string;
+  label?: string;
+  category?: ScoringCategory;
+  categoryLabel?: string;
+  maxScore?: number;
+  reference?: string;
+  evidence?: string;
+}
+
 export interface ScoringSheet {
   id: string;
   projectId: string;
@@ -788,7 +890,7 @@ export interface ScoringSheet {
   versionNo: number;
   submittedAt: string | null;
   lockedAt: string | null;
-  details?: Record<string, number>;
+  details?: Record<string, number | ScoringDetailValue>;
 }
 
 export interface ScoringVersion {
@@ -870,6 +972,8 @@ export interface PricingReportItem {
   salePrice: number;
   serviceFeeRate: number;
   grossMarginRate: number;
+  taxRate?: number;
+  deliveryDays?: number;
   effectiveFrom: string;
   effectiveTo?: string;
 }
@@ -939,7 +1043,7 @@ export interface ContractLedger {
   supplierId: string;
   contractNo: string;
   amount: number;
-  status: "registered" | "performing" | "completed" | "cancelled";
+  status: "pending_supplier_confirmation" | "registered" | "performing" | "completed" | "cancelled";
   contractSystemLink?: string;
   attachmentMetadata: ProcurementDocumentAttachment[];
   createdBy: string;
@@ -1192,6 +1296,12 @@ export interface MallProduct {
   supplierId: string;
   serviceRegions: string[];
   procurementCategory?: string;
+  sourceType?: "award_project" | "agreement";
+  sourceProjectId?: string;
+  sourceAgreementNo?: string;
+  sourcePricingReportId?: string;
+  sourcePricingReportItemId?: string;
+  listedAt?: string | null;
   imageFileIds: string[];
   attachmentFileIds: string[];
   createdBy: string;

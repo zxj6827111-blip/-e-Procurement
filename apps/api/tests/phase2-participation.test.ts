@@ -133,6 +133,205 @@ describe("Phase 2 procurement documents, announcements and supplier registration
     expect(runtime.ctx.state.auditLogs.some((item) => item.action === "announcement.publish")).toBe(true);
   });
 
+  it("blocks invitations and registrations for suppliers that have not passed admission", async () => {
+    const admission = await request(runtime.app)
+      .post("/api/suppliers/admissions")
+      .set("x-mock-user-id", "u1")
+      .send({ name: "待准入供应商", category: "客房一次性用品", contactName: "待准入联系人", contactPhone: "13900001234" });
+    expect(admission.status).toBe(201);
+    expect(admission.body.supplier.admissionStatus).toBe("pending");
+    const supplierId = admission.body.supplier.id as string;
+    const quotationUserId = `u-pending-quotation-${supplierId}`;
+    runtime.ctx.state.users.push({
+      id: quotationUserId,
+      name: "待准入报价员",
+      roleId: "supplier_quotation",
+      orgId: "org-supplier",
+      supplierId,
+      status: "active"
+    });
+
+    const document = await createLockedDocument(runtime);
+    const created = await request(runtime.app)
+      .post("/api/projects/p-pre/announcements")
+      .set("x-mock-user-id", "u2")
+      .send({ documentId: document.id, title: "待准入不可邀请公告", scope: "invited_suppliers" });
+    expect(created.status).toBe(201);
+
+    const blockedPublish = await request(runtime.app)
+      .post(`/api/announcements/${created.body.announcement.id}/publish`)
+      .set("x-mock-user-id", "u2")
+      .send({ supplierIds: [supplierId] });
+    expectDenied(blockedPublish, "SUPPLIER_INVITATION_NOT_ELIGIBLE");
+    expect(runtime.ctx.state.procurementAnnouncements.find((item) => item.id === created.body.announcement.id)?.status).toBe("draft");
+    expect(runtime.ctx.state.supplierInvitations.some((item) => item.supplierId === supplierId && item.announcementId === created.body.announcement.id)).toBe(false);
+
+    const publicAnnouncement = await createPublishedAnnouncement(runtime, "p-pre", []);
+    const supplierAnnouncements = await request(runtime.app).get("/api/announcements").set("x-mock-user-id", quotationUserId);
+    expect(supplierAnnouncements.status).toBe(200);
+    expect(supplierAnnouncements.body.announcements.map((item: { id: string }) => item.id)).not.toContain(publicAnnouncement.id);
+
+    const registration = await request(runtime.app)
+      .post(`/api/announcements/${publicAnnouncement.id}/registrations`)
+      .set("x-mock-user-id", quotationUserId)
+      .send({ materialMetadata: [{ fileName: "pending-supplier.pdf" }] });
+    expectDenied(registration, "SUPPLIER_NOT_ADMITTED", ["pending-supplier.pdf"]);
+  });
+
+  it("deletes draft announcements before supplier participation starts", async () => {
+    const document = await createLockedDocument(runtime);
+    const created = await request(runtime.app)
+      .post("/api/projects/p-pre/announcements")
+      .set("x-mock-user-id", "u2")
+      .send({ documentId: document.id, title: "误创建公告", scope: "public_internal" });
+    expect(created.status).toBe(201);
+
+    const deleted = await request(runtime.app).delete(`/api/announcements/${created.body.announcement.id}`).set("x-mock-user-id", "u2");
+
+    expect(deleted.status).toBe(200);
+    expect(deleted.body.deleted).toBe(true);
+    expect(runtime.ctx.state.procurementAnnouncements.some((item) => item.id === created.body.announcement.id)).toBe(false);
+
+    const list = await request(runtime.app).get("/api/projects/p-pre/announcements").set("x-mock-user-id", "u2");
+    expect(list.body.announcements.map((item: { id: string }) => item.id)).not.toContain(created.body.announcement.id);
+  });
+
+  it("does not reuse announcement ids that are still referenced by invitations", async () => {
+    const document = await createLockedDocument(runtime, "p-pre");
+    runtime.ctx.state.supplierInvitations.push({
+      id: "inv-stale-ann-1",
+      projectId: "p-pre",
+      announcementId: "ann-1",
+      supplierId: "sup-1",
+      status: "sent",
+      notificationStatus: "sent",
+      notifiedAt: "2026-06-30T00:00:00.000Z",
+      createdAt: "2026-06-30T00:00:00.000Z"
+    });
+
+    const created = await request(runtime.app)
+      .post("/api/projects/p-pre/announcements")
+      .set("x-mock-user-id", "u2")
+      .send({ documentId: document.id, title: "不复用编号公告", scope: "public_internal" });
+
+    expect(created.status).toBe(201);
+    expect(created.body.announcement.id).not.toBe("ann-1");
+  });
+
+  it("closes published announcements before registration and hides them from suppliers", async () => {
+    const document = await createLockedDocument(runtime);
+    const created = await request(runtime.app)
+      .post("/api/projects/p-pre/announcements")
+      .set("x-mock-user-id", "u2")
+      .send({ documentId: document.id, title: "待撤销公告", scope: "public_internal" });
+    expect(created.status).toBe(201);
+
+    const published = await request(runtime.app).post(`/api/announcements/${created.body.announcement.id}/publish`).set("x-mock-user-id", "u2").send({ supplierIds: ["sup-1"] });
+    expect(published.status).toBe(200);
+
+    const deletePublished = await request(runtime.app).delete(`/api/announcements/${created.body.announcement.id}`).set("x-mock-user-id", "u2");
+    expect(deletePublished.status).toBe(400);
+    expect(deletePublished.body.error.code).toBe("ANNOUNCEMENT_DELETE_DENIED");
+
+    const closed = await request(runtime.app).post(`/api/announcements/${created.body.announcement.id}/close`).set("x-mock-user-id", "u2").send({ reason: "内容有误" });
+    expect(closed.status).toBe(200);
+    expect(closed.body.announcement.status).toBe("closed");
+
+    const supplierAnnouncements = await request(runtime.app).get("/api/announcements").set("x-mock-user-id", "u3");
+    expect(supplierAnnouncements.body.announcements.map((item: { id: string }) => item.id)).not.toContain(created.body.announcement.id);
+
+    const registration = await request(runtime.app).post(`/api/announcements/${created.body.announcement.id}/registrations`).set("x-mock-user-id", "u3").send({ materialMetadata: [] });
+    expect(registration.status).toBe(400);
+    expect(registration.body.error.code).toBe("ANNOUNCEMENT_NOT_PUBLISHED");
+    expect(runtime.ctx.state.auditLogs.some((item) => item.action === "announcement.close")).toBe(true);
+  });
+
+  it("lets the named buyer maintain announcement chain for own projects", async () => {
+    const project = runtime.ctx.state.projects.find((item) => item.id === "p-pre");
+    expect(project).toBeTruthy();
+    project!.buyer = "刘明";
+    const originalManagedProjectIds = runtime.ctx.state.users.find((item) => item.id === "u2")?.managedProjectIds ?? [];
+    runtime.ctx.state.users.find((item) => item.id === "u2")!.managedProjectIds = originalManagedProjectIds.filter((id) => id !== "p-pre");
+
+    const document = await createLockedDocument(runtime, "p-pre");
+    const created = await request(runtime.app)
+      .post("/api/projects/p-pre/announcements")
+      .set("x-mock-user-id", "u2")
+      .send({ documentId: document.id, title: "本人项目公告", scope: "public_internal" });
+    expect(created.status).toBe(201);
+
+    const list = await request(runtime.app).get("/api/projects/p-pre/announcements").set("x-mock-user-id", "u2");
+    expect(list.status).toBe(200);
+    expect(list.body.announcements.map((item: { id: string }) => item.id)).toContain(created.body.announcement.id);
+  });
+
+  it("lets suppliers read projects behind public published announcements for registration display", async () => {
+    const document = await createLockedDocument(runtime, "p-pre");
+    const created = await request(runtime.app)
+      .post("/api/projects/p-pre/announcements")
+      .set("x-mock-user-id", "u2")
+      .send({
+        documentId: document.id,
+        title: "004 采购公告",
+        scope: "public_internal",
+        registrationDeadlineAt: "2099-12-20T17:00:00.000Z",
+        quoteDeadlineAt: "2099-12-31T17:00:00.000Z"
+      });
+    expect(created.status).toBe(201);
+
+    const published = await request(runtime.app)
+      .post(`/api/announcements/${created.body.announcement.id}/publish`)
+      .set("x-mock-user-id", "u2")
+      .send({ supplierIds: [] });
+    expect(published.status).toBe(200);
+
+    const announcements = await request(runtime.app).get("/api/announcements").set("x-mock-user-id", "u15");
+    expect(announcements.status).toBe(200);
+    expect(announcements.body.announcements.map((item: { id: string }) => item.id)).toContain(created.body.announcement.id);
+
+    const projects = await request(runtime.app).get("/api/projects").set("x-mock-user-id", "u15");
+    expect(projects.status).toBe(200);
+    expect(projects.body.projects.map((item: { id: string }) => item.id)).toContain("p-pre");
+  });
+
+  it("allows suppliers to upload registration files before participation is created", async () => {
+    const document = await createLockedDocument(runtime, "p-pre");
+    const created = await request(runtime.app)
+      .post("/api/projects/p-pre/announcements")
+      .set("x-mock-user-id", "u2")
+      .send({
+        documentId: document.id,
+        title: "首次报名材料上传公告",
+        scope: "public_internal",
+        registrationDeadlineAt: "2099-12-20T17:00:00.000Z",
+        quoteDeadlineAt: "2099-12-31T17:00:00.000Z"
+      });
+    expect(created.status).toBe(201);
+
+    const published = await request(runtime.app)
+      .post(`/api/announcements/${created.body.announcement.id}/publish`)
+      .set("x-mock-user-id", "u2")
+      .send({ supplierIds: [] });
+    expect(published.status).toBe(200);
+    runtime.ctx.state.projects.find((item) => item.id === "p-pre")!.participantSupplierIds = [];
+
+    const uploaded = await request(runtime.app)
+      .post("/api/files/upload")
+      .set("x-mock-user-id", "u3")
+      .send({
+        originalName: "registration-material.png",
+        contentType: "image/png",
+        contentBase64: Buffer.from("registration file", "utf8").toString("base64"),
+        attachmentKind: "registration_material",
+        objectType: "supplier_registration",
+        objectId: created.body.announcement.id,
+        projectId: "p-pre",
+        supplierId: "sup-1"
+      });
+    expect(uploaded.status).toBe(201);
+    expect(uploaded.body.file.fileName).toBe("registration-material.png");
+  });
+
   it("covers PDF inquiry sheet, structured announcement rules, clarification attachments and project samples", async () => {
     const document = await createLockedDocument(runtime);
     const inquiry = await request(runtime.app)
@@ -257,6 +456,7 @@ describe("Phase 2 procurement documents, announcements and supplier registration
       .set("x-mock-user-id", "u3")
       .send({ materialMetadata: [{ fileName: "wrong-category.pdf" }] });
     expectDenied(unauthorized, "SUPPLIER_CATEGORY_NOT_AUTHORIZED", ["wrong-category.pdf"]);
+    expect(unauthorized.body.error.message).toContain("当前供应商未授权参与该采购品类");
 
     supplier!.categoryAuthorizations = [{ category: "客房一次性用品", status: "active", authorizedAt: "2026-06-01T00:00:00.000Z", expiresAt: "2020-01-01T00:00:00.000Z" }];
     runtime.ctx.r3SupplierProductRepository.upsertSupplier(supplier!);
@@ -265,6 +465,7 @@ describe("Phase 2 procurement documents, announcements and supplier registration
       .set("x-mock-user-id", "u3")
       .send({ materialMetadata: [{ fileName: "expired-category.pdf" }] });
     expectDenied(expired, "SUPPLIER_CATEGORY_NOT_AUTHORIZED", ["expired-category.pdf"]);
+    expect(expired.body.error.message).toContain("当前供应商未授权参与该采购品类");
   });
 
   it("keeps supplier registration list scoped to the current supplier only", async () => {

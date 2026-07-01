@@ -10,6 +10,8 @@ const allowedExtensions = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp", ".d
 const preProjectUploadObjectTypes = new Set(["procurement_request"]);
 const supplierPreParticipationObjectTypes = new Set(["supplier_registration"]);
 const supplierOwnedObjectTypes = new Set(["mall_order"]);
+const requestAttachmentUploaderRoles = new Set(["hotel_buyer"]);
+const requestAttachmentReaderRoles = new Set(["buyer", "hotel_buyer", "platform_operator", "group_manager"]);
 
 function decodeBody(body: unknown) {
   const encoded = typeof body === "string" ? body : String((body as { contentBase64?: string } | null)?.contentBase64 ?? "");
@@ -27,6 +29,30 @@ interface UploadScope {
 
 function validateUploadScope(ctx: AppContext, req: Request, res: Response, scope: UploadScope) {
   const { objectType, objectId, projectId, supplierId } = scope;
+  if (supplierPreParticipationObjectTypes.has(objectType)) {
+    if (!isSupplierRole(req.auth.roleId) || !supplierIdMatches(req.auth.user, supplierId)) {
+      denyResponse(ctx, req, res, 403, "SUPPLIER_FILE_SCOPE_DENIED", "Only supplier accounts can upload own registration files.", "file.upload.denied", objectType, objectId, projectId);
+      return false;
+    }
+    const announcement = ctx.state.procurementAnnouncements.find((item) => item.id === objectId);
+    if (!announcement || announcement.status !== "published" || (projectId && announcement.projectId !== projectId)) {
+      denyResponse(ctx, req, res, 403, "SUPPLIER_FILE_SCOPE_DENIED", "Supplier can only upload registration files for published visible announcements.", "file.upload.denied", objectType, objectId, projectId);
+      return false;
+    }
+    const project = ctx.state.projects.find((item) => item.id === announcement.projectId);
+    if (!project || project.externalTradeFlag) {
+      denyResponse(ctx, req, res, 403, "SUPPLIER_FILE_SCOPE_DENIED", "Supplier can only upload registration files for internal procurement announcements.", "file.upload.denied", objectType, objectId, projectId);
+      return false;
+    }
+    if (
+      announcement.scope !== "public_internal" &&
+      !ctx.state.supplierInvitations.some((item) => item.announcementId === announcement.id && item.supplierId === supplierId)
+    ) {
+      denyResponse(ctx, req, res, 403, "SUPPLIER_FILE_SCOPE_DENIED", "Supplier can only upload registration files for visible announcements.", "file.upload.denied", objectType, objectId, projectId);
+      return false;
+    }
+    return true;
+  }
   if (projectId) {
     const project = ctx.state.projects.find((item) => item.id === projectId);
     if (!project) {
@@ -56,13 +82,8 @@ function validateUploadScope(ctx: AppContext, req: Request, res: Response, scope
     return true;
   }
   if (preProjectUploadObjectTypes.has(objectType)) {
-    if (isProcurementMaintainerRole(req.auth.roleId)) return true;
-    denyResponse(ctx, req, res, 403, "FILE_UPLOAD_SCOPE_DENIED", "Only procurement business roles can upload pre-project request files.", "file.upload.denied", objectType, objectId);
-    return false;
-  }
-  if (supplierPreParticipationObjectTypes.has(objectType)) {
-    if (isSupplierRole(req.auth.roleId) && supplierIdMatches(req.auth.user, supplierId)) return true;
-    denyResponse(ctx, req, res, 403, "SUPPLIER_FILE_SCOPE_DENIED", "Only supplier accounts can upload own registration files.", "file.upload.denied", objectType, objectId, projectId);
+    if (requestAttachmentUploaderRoles.has(req.auth.roleId)) return true;
+    denyResponse(ctx, req, res, 403, "FILE_UPLOAD_SCOPE_DENIED", "Only hotel procurement request initiators can upload pre-project request files.", "file.upload.denied", objectType, objectId);
     return false;
   }
   if (supplierOwnedObjectTypes.has(objectType)) {
@@ -144,6 +165,31 @@ function fileSummary(file: StoredFileRecord) {
   };
 }
 
+function procurementRequestForFile(ctx: AppContext, file: StoredFileRecord) {
+  return (
+    ctx.state.procurementRequests.find((item) => item.id === file.objectId) ??
+    ctx.state.procurementRequests.find((item) => (item.attachments ?? []).some((attachment) => attachment.id === file.fileId || (attachment as { fileId?: string }).fileId === file.fileId))
+  );
+}
+
+function canReadProcurementRequestAttachment(
+  ctx: AppContext,
+  req: Request,
+  procurementRequest: { orgId: string; createdBy?: string; status?: string; approvalStatus?: string; projectId: string | null }
+) {
+  if (!requestAttachmentReaderRoles.has(req.auth.roleId)) return false;
+  if (!userOrgScope(req.auth.user).includes(procurementRequest.orgId)) return false;
+  if (req.auth.roleId === "hotel_buyer") return procurementRequest.createdBy === req.auth.user.id;
+  if (req.auth.roleId === "buyer" || req.auth.roleId === "platform_operator") {
+    if (procurementRequest.projectId) {
+      const project = ctx.state.projects.find((item) => item.id === procurementRequest.projectId);
+      return project ? canReadProject(req, project) : false;
+    }
+    return procurementRequest.approvalStatus === "approved";
+  }
+  return req.auth.roleId === "group_manager" && procurementRequest.status !== "draft";
+}
+
 function assertFileAccess(ctx: AppContext, req: Request, res: Response, file: StoredFileRecord, action: "read" | "write") {
   const deniedAction = action === "read" ? "file.read.denied" : "file.write.denied";
   if (isMallCatalogAsset(ctx, req, file)) {
@@ -198,6 +244,23 @@ function assertFileAccess(ctx: AppContext, req: Request, res: Response, file: St
     }
     return true;
   }
+  if (file.objectType === "procurement_request") {
+    const procurementRequest = procurementRequestForFile(ctx, file);
+    if (!procurementRequest) {
+      res.status(404).json({ error: { code: "PROCUREMENT_REQUEST_NOT_FOUND", message: "Procurement request does not exist." } });
+      return false;
+    }
+    if (req.auth.roleId === "admin") {
+      return denyResponse(ctx, req, res, 403, "FILE_DOWNLOAD_DENIED", "系统管理员不能读取业务附件内容。", deniedAction, file.objectType, file.objectId);
+    }
+    if (!canReadProcurementRequestAttachment(ctx, req, procurementRequest)) {
+      return denyResponse(ctx, req, res, 403, action === "read" ? "FILE_DOWNLOAD_DENIED" : "FILE_WRITE_DENIED", "当前角色无权访问该附件。", deniedAction, file.objectType, file.objectId);
+    }
+    if (action === "write" && (req.auth.roleId !== "hotel_buyer" || file.uploadedBy !== req.auth.user.id)) {
+      return denyResponse(ctx, req, res, 403, "FILE_WRITE_DENIED", "只有酒店采购发起人可以维护采购申请附件。", deniedAction, file.objectType, file.objectId);
+    }
+    return true;
+  }
   if (file.objectType === "supplier") {
     if (isSupplierRole(req.auth.roleId)) {
       if (!supplierIdMatches(req.auth.user, file.objectId)) {
@@ -249,6 +312,10 @@ function canListFile(ctx: AppContext, req: Request, file: StoredFileRecord) {
     if (!project) return false;
     if (isSupplierRole(req.auth.roleId)) return supplierIdMatches(req.auth.user, file.supplierId);
     return isOrgReaderRole(req.auth.roleId) && canReadProject(req, project);
+  }
+  if (file.objectType === "procurement_request") {
+    const procurementRequest = procurementRequestForFile(ctx, file);
+    return Boolean(procurementRequest && canReadProcurementRequestAttachment(ctx, req, procurementRequest));
   }
   if (file.objectType === "supplier") {
     if (isSupplierRole(req.auth.roleId)) return supplierIdMatches(req.auth.user, file.objectId);

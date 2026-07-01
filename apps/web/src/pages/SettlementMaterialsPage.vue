@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { apiGet, apiPost } from "../api/http";
 import ErrorAlert from "../components/ErrorAlert.vue";
+import ProcessTimeline from "../components/ProcessTimeline.vue";
 import { useSessionStore } from "../stores/session";
 import { formalFileName } from "../utils/business-display";
 import { formatDateTime, labelStatus } from "../utils/status-labels";
@@ -92,6 +93,7 @@ const overview = ref<Overview>({
 const loading = ref(false);
 const error = ref("");
 const message = ref("");
+const processRefreshKey = ref(0);
 const settlementOperationForm = ref({
   billApproveOpinion: "财务审核通过",
   billRejectOpinion: "金额或资料需更正",
@@ -113,6 +115,8 @@ const summary = computed(() => ({
   pendingInvoices: overview.value.invoices.filter((item) => item.status === "pending_verification").length,
   amount: overview.value.settlementBills.reduce((sum, item) => sum + Number(item.settlementAmount ?? 0), 0)
 }));
+const selectedSettlementBillId = computed(() => overview.value.settlementBills[0]?.id ?? "");
+const selectedInvoiceId = computed(() => overview.value.invoices[0]?.id ?? "");
 
 function money(value: number | undefined) {
   if (value === undefined || Number.isNaN(Number(value))) return "-";
@@ -182,6 +186,7 @@ async function run(action: () => Promise<void>, successText: string) {
     await action();
     message.value = successText;
     await load();
+    processRefreshKey.value += 1;
   } catch (err) {
     error.value = err instanceof Error ? err.message : "操作失败";
   }
@@ -256,6 +261,22 @@ onMounted(load);
     <p v-if="message" class="notice">{{ message }}</p>
     <p v-if="loading" class="notice">正在加载结算数据...</p>
   </section>
+
+  <ProcessTimeline
+    v-if="selectedSettlementBillId"
+    business-type="settlement"
+    :business-id="selectedSettlementBillId"
+    title="结算流程"
+    :refresh-key="processRefreshKey"
+  />
+
+  <ProcessTimeline
+    v-if="selectedInvoiceId"
+    business-type="invoice"
+    :business-id="selectedInvoiceId"
+    title="发票流程"
+    :refresh-key="processRefreshKey"
+  />
 
   <section class="business-panel">
     <div class="panel-head">

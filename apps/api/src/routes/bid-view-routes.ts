@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import type { AppContext } from "../app-context.js";
 import type { BidViewApproval, BidViewContent } from "../types.js";
+import { isProcurementBuyerRole, userOrgScope } from "../role-groups.js";
 
 const requesterRoles = new Set(["buyer", "group_manager", "auditor"]);
 const approverRoles = new Set(["group_manager", "auditor"]);
@@ -42,9 +43,18 @@ function ensureApproval(ctx: AppContext, approvalId: string, res: Response) {
 function canReadProject(req: Request, ctx: AppContext, projectId: string) {
   const project = ctx.state.projects.find((item) => item.id === projectId);
   if (!project) return false;
-  if (req.auth.roleId === "buyer") return req.auth.user.managedProjectIds?.includes(project.id) ?? false;
-  if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") return req.auth.orgScope.includes(project.orgId);
+  if (isProcurementBuyerRole(req.auth.roleId)) return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || userOrgScope(req.auth.user).includes(project.orgId);
+  if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") return userOrgScope(req.auth.user).includes(project.orgId);
   return false;
+}
+
+function supplierBelongsToProject(ctx: AppContext, projectId: string, supplierId: string) {
+  const project = ctx.state.projects.find((item) => item.id === projectId);
+  return Boolean(
+    project?.participantSupplierIds.includes(supplierId) ||
+      ctx.state.supplierRegistrations.some((item) => item.projectId === projectId && item.supplierId === supplierId && item.status === "qualified") ||
+      ctx.state.bids.some((item) => item.projectId === projectId && item.supplierId === supplierId)
+  );
 }
 
 function assertRequesterRole(ctx: AppContext, req: Request, res: Response, objectId: string, projectId?: string) {
@@ -89,8 +99,7 @@ export function bidViewRoutes(ctx: AppContext) {
       return denyResponse(ctx, req, res, 403, "PROJECT_SCOPE_DENIED", "Current user cannot request approval for this project.", "bid_view_approval.project.denied", "project", projectId, projectId);
     }
     const targetSupplierId = String(req.body?.targetSupplierId ?? "");
-    const project = ctx.state.projects.find((item) => item.id === projectId);
-    if (!project?.participantSupplierIds.includes(targetSupplierId)) {
+    if (!supplierBelongsToProject(ctx, projectId, targetSupplierId)) {
       return denyResponse(ctx, req, res, 400, "BID_VIEW_TARGET_INVALID", "Target supplier must belong to the project.", "bid_view_approval.target.denied", "supplier", targetSupplierId, projectId);
     }
     const approval: BidViewApproval = {

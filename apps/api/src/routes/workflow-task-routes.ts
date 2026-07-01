@@ -22,6 +22,8 @@ const roleIds: RoleId[] = [
 ];
 const validBusinessTypes: ApprovalBusinessType[] = [
   "procurement_request",
+  "procurement_document",
+  "review_award",
   "award_approval",
   "archive_supplement",
   "price_approval",
@@ -87,6 +89,27 @@ function syncBusinessAfterWorkflowAction(ctx: AppContext, instanceId: string) {
     approval.approvalStatus = businessApprovalStatus as typeof approval.approvalStatus;
     approval.approvedAt = instance.completedAt ?? null;
     ctx.r5ReviewAwardRepository.upsertAwardApproval(approval);
+    if (businessApprovalStatus === "approved") {
+      const project = ctx.state.projects.find((item) => item.id === approval.projectId);
+      if (project && !project.externalTradeFlag) {
+        project.status = "awarded_pending_order";
+        project.displayStatus = "awarded pending order";
+        ctx.r4SourcingRepository.upsertProject(project);
+      }
+    }
+  }
+  if (instance.businessType === "procurement_document" && ["approved", "rejected", "cancelled"].includes(businessApprovalStatus)) {
+    const document = ctx.state.procurementDocuments.find((item) => item.id === instance.businessId);
+    if (!document) return;
+    if (businessApprovalStatus === "approved") {
+      document.reviewStatus = "approved";
+      document.status = "reviewing";
+    } else {
+      document.reviewStatus = "rejected";
+      document.status = "draft";
+    }
+    document.updatedAt = instance.updatedAt;
+    ctx.r4SourcingRepository.upsertProcurementDocument(document);
   }
 }
 
@@ -115,6 +138,18 @@ function resolveManualWorkflowBusiness(ctx: AppContext, businessType: ApprovalBu
           projectId: project.id,
           orgId: project.orgId,
           supplierId: item.selectedSupplierId
+        }
+      : null;
+  }
+  if (businessType === "procurement_document") {
+    const item = ctx.state.procurementDocuments.find((document) => document.id === businessId);
+    const project = item ? ctx.state.projects.find((projectItem) => projectItem.id === item.projectId) : undefined;
+    return item && project
+      ? {
+          title: item.title,
+          methodType: "procurement_document",
+          projectId: project.id,
+          orgId: project.orgId
         }
       : null;
   }

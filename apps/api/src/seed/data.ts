@@ -313,7 +313,6 @@ export const rolePermissions: Array<{ roleId: string; menus: string[]; actions: 
     "menus": [
       "dashboard",
       "myTasks",
-      "needs",
       "projects",
       "suppliers",
       "procurementDocuments",
@@ -355,7 +354,8 @@ export const rolePermissions: Array<{ roleId: string; menus: string[]; actions: 
     ],
     "actions": [
       "project:maintain",
-      "request:maintain",
+      "request:accept",
+      "request:method-decision",
       "document:maintain",
       "announcement:publish",
       "registration:qualify",
@@ -431,6 +431,7 @@ export const rolePermissions: Array<{ roleId: string; menus: string[]; actions: 
       "audit"
     ],
     "actions": [
+      "bpmn:manage",
       "mall:operate",
       "questionnaire:maintain",
       "scenario-template:maintain",
@@ -533,6 +534,7 @@ export const rolePermissions: Array<{ roleId: string; menus: string[]; actions: 
       "admin"
     ],
     "actions": [
+      "bpmn:manage",
       "config:manage"
     ]
   }
@@ -916,7 +918,7 @@ export const procurementRequests: ProcurementRequest[] = [
     "externalTradeFlag": false,
     "status": "project_created",
     "approvalStatus": "approved",
-    "createdBy": "u2",
+    "createdBy": "u8",
     "createdAt": "2026-06-21T09:30:00.000Z",
     "updatedAt": "2026-06-21T10:20:00.000Z"
   },
@@ -974,7 +976,7 @@ export const procurementRequests: ProcurementRequest[] = [
     "externalTradeFlag": false,
     "status": "project_created",
     "approvalStatus": "approved",
-    "createdBy": "u2",
+    "createdBy": "u8",
     "createdAt": "2026-06-10T09:30:00.000Z",
     "updatedAt": "2026-06-10T10:20:00.000Z"
   },
@@ -1024,7 +1026,7 @@ export const procurementRequests: ProcurementRequest[] = [
     "externalTradeFlag": false,
     "status": "project_created",
     "approvalStatus": "approved",
-    "createdBy": "u2",
+    "createdBy": "u8",
     "createdAt": "2026-06-19T09:30:00.000Z",
     "updatedAt": "2026-06-19T10:20:00.000Z"
   },
@@ -1066,7 +1068,7 @@ export const procurementRequests: ProcurementRequest[] = [
     "externalTradeFlag": true,
     "status": "project_created",
     "approvalStatus": "approved",
-    "createdBy": "u2",
+    "createdBy": "u8",
     "createdAt": "2026-06-20T09:30:00.000Z",
     "updatedAt": "2026-06-20T10:20:00.000Z"
   }
@@ -1134,6 +1136,51 @@ export const approvalRules: ApprovalRule[] = [
     "status": "enabled",
     "versionNo": 1,
     "updatedAt": "2026-06-24T00:00:00.000Z"
+  },
+  {
+    "id": "apr-procurement-request-high-value",
+    "ruleCode": "approval-procurement-request-high-value",
+    "ruleName": "大额采购需求审批规则",
+    "businessType": "procurement_request",
+    "amountMin": 500000.01,
+    "methodTypes": [
+      "all"
+    ],
+    "nodeRoleIds": [
+      "group_manager"
+    ],
+    "actions": [
+      "submit",
+      "approve",
+      "reject",
+      "return"
+    ],
+    "status": "enabled",
+    "versionNo": 1,
+    "updatedAt": "2026-07-01T00:00:00.000Z"
+  },
+  {
+    "id": "apr-procurement-document-1",
+    "ruleCode": "approval-procurement-document-standard",
+    "ruleName": "采购文件标准审核规则",
+    "businessType": "procurement_document",
+    "amountMin": 0,
+    "methodTypes": [
+      "procurement_document",
+      "all"
+    ],
+    "nodeRoleIds": [
+      "group_manager"
+    ],
+    "actions": [
+      "submit",
+      "approve",
+      "reject",
+      "return"
+    ],
+    "status": "disabled",
+    "versionNo": 1,
+    "updatedAt": "2026-06-29T00:00:00.000Z"
   },
   {
     "id": "apr-award-1",
@@ -2022,19 +2069,66 @@ export const experts: Expert[] = [
     "id": "exp-1",
     "name": "赵教授",
     "category": "酒店运营",
-    "status": "可抽取"
+    "status": "可抽取",
+    "accountUserIds": [
+      "u4"
+    ],
+    "ownerOrgId": "org-group",
+    "branchOrgId": "org-group",
+    "reviewScopes": [
+      "技术评审",
+      "商务评审"
+    ],
+    "supplierAssessmentScopes": [
+      "技术评审",
+      "商务评审",
+      "供应链评审",
+      "业务部门评审"
+    ],
+    "sharedAccount": false,
+    "active": true
   },
   {
     "id": "exp-3",
     "name": "孙会计",
     "category": "财务成本",
-    "status": "可抽取"
+    "status": "可抽取",
+    "ownerOrgId": "org-group",
+    "branchOrgId": "org-group",
+    "reviewScopes": [
+      "商务评审",
+      "财务评审"
+    ],
+    "supplierAssessmentScopes": [
+      "商务评审",
+      "财务评审",
+      "供应链评审"
+    ],
+    "sharedAccount": false,
+    "active": true
   },
   {
     "id": "exp-4",
     "name": "李顾问",
     "category": "信息化服务",
-    "status": "回避"
+    "status": "回避",
+    "accountUserIds": [
+      "u7"
+    ],
+    "ownerOrgId": "org-group",
+    "branchOrgId": "org-group",
+    "reviewScopes": [
+      "技术评审"
+    ],
+    "supplierAssessmentScopes": [
+      "技术评审",
+      "供应链评审"
+    ],
+    "sharedAccount": false,
+    "active": true,
+    "avoidanceTags": [
+      "需回避布草项目"
+    ]
   }
 ];
 
@@ -2276,7 +2370,116 @@ export const awardApprovals: AwardApproval[] = [
   }
 ];
 
-export const pricingReports: PricingReport[] = [];
+export const pricingReports: PricingReport[] = [
+  {
+    "id": "pr-seed-amenity-kit",
+    "projectId": "agreement:AG-MALL-AMENITY-2026",
+    "awardApprovalId": "agreement:AG-MALL-AMENITY-2026",
+    "sourceReportId": "AG-MALL-AMENITY-2026",
+    "selectedSupplierId": "sup-2",
+    "reportNo": "PR-MALL-AMENITY-2026",
+    "status": "approved",
+    "items": [
+      {
+        "id": "pr-seed-amenity-kit-item-1",
+        "productId": "mp-amenity-kit",
+        "itemName": "客房环保洗漱套装",
+        "specification": "竹柄牙刷+牙膏+梳子+护理包",
+        "quantity": 1,
+        "unit": "套",
+        "purchasePrice": 7.9,
+        "salePrice": 8.6,
+        "serviceFeeRate": 0.0886,
+        "grossMarginRate": 0.0814,
+        "taxRate": 0.13,
+        "deliveryDays": 5,
+        "effectiveFrom": "2026-06-20T00:00:00.000Z",
+        "effectiveTo": "2099-12-31T23:59:59.000Z"
+      }
+    ],
+    "basisJson": {
+      "source": "agreement",
+      "sourceAgreementNo": "AG-MALL-AMENITY-2026",
+      "productId": "mp-amenity-kit"
+    },
+    "createdBy": "u10",
+    "createdAt": "2026-06-20T10:00:00.000Z",
+    "updatedAt": "2026-06-20T10:00:00.000Z",
+    "approvedAt": "2026-06-20T10:00:00.000Z"
+  },
+  {
+    "id": "pr-seed-linen-sheet",
+    "projectId": "p-award",
+    "awardApprovalId": "aa-award-1",
+    "sourceReportId": "p-award",
+    "selectedSupplierId": "sup-1",
+    "reportNo": "PR-MALL-LINEN-2026",
+    "status": "approved",
+    "items": [
+      {
+        "id": "pr-seed-linen-sheet-item-1",
+        "productId": "mp-linen-sheet",
+        "itemName": "高支纱酒店床单",
+        "specification": "80s 纯棉 280x280cm",
+        "quantity": 1,
+        "unit": "条",
+        "purchasePrice": 118,
+        "salePrice": 128,
+        "serviceFeeRate": 0.0847,
+        "grossMarginRate": 0.0781,
+        "taxRate": 0.13,
+        "deliveryDays": 12,
+        "effectiveFrom": "2026-06-18T00:00:00.000Z",
+        "effectiveTo": "2099-12-31T23:59:59.000Z"
+      }
+    ],
+    "basisJson": {
+      "source": "award_project",
+      "sourceProjectId": "p-award",
+      "productId": "mp-linen-sheet"
+    },
+    "createdBy": "u10",
+    "createdAt": "2026-06-18T10:00:00.000Z",
+    "updatedAt": "2026-06-18T10:00:00.000Z",
+    "approvedAt": "2026-06-18T10:00:00.000Z"
+  },
+  {
+    "id": "pr-seed-breakfast-fruit",
+    "projectId": "p-food",
+    "awardApprovalId": "aa-food-1",
+    "sourceReportId": "p-food",
+    "selectedSupplierId": "sup-3",
+    "reportNo": "PR-MALL-FOOD-2026",
+    "status": "approved",
+    "items": [
+      {
+        "id": "pr-seed-breakfast-fruit-item-1",
+        "productId": "mp-breakfast-fruit",
+        "itemName": "早餐鲜切水果盒",
+        "specification": "A级混合果盘 250g 冷链配送",
+        "quantity": 1,
+        "unit": "盒",
+        "purchasePrice": 11.6,
+        "salePrice": 12.8,
+        "serviceFeeRate": 0.1034,
+        "grossMarginRate": 0.0938,
+        "taxRate": 0.09,
+        "deliveryDays": 1,
+        "effectiveFrom": "2026-06-19T00:00:00.000Z",
+        "effectiveTo": "2099-12-31T23:59:59.000Z"
+      }
+    ],
+    "basisJson": {
+      "source": "award_project",
+      "sourceProjectId": "p-food",
+      "productId": "mp-breakfast-fruit"
+    },
+    "createdBy": "u10",
+    "createdAt": "2026-06-19T10:00:00.000Z",
+    "updatedAt": "2026-06-19T10:00:00.000Z",
+    "approvedAt": "2026-06-19T10:00:00.000Z"
+  }
+];
 
 export const resultNotifications: ResultNotification[] = [
   {
@@ -2855,6 +3058,11 @@ export const mallProducts: MallProduct[] = [
     "supplierId": "sup-2",
     "serviceRegions": ["华东", "上海"],
     "procurementCategory": "客房一次性用品",
+    "sourceType": "agreement",
+    "sourceAgreementNo": "AG-MALL-AMENITY-2026",
+    "sourcePricingReportId": "pr-seed-amenity-kit",
+    "sourcePricingReportItemId": "pr-seed-amenity-kit-item-1",
+    "listedAt": "2026-06-20T10:00:00.000Z",
     "imageFileIds": ["file-mall-amenity-main"],
     "attachmentFileIds": ["file-mall-amenity-spec"],
     "createdBy": "u10",
@@ -2881,6 +3089,11 @@ export const mallProducts: MallProduct[] = [
     "supplierId": "sup-1",
     "serviceRegions": ["华东", "上海"],
     "procurementCategory": "客房布草",
+    "sourceType": "award_project",
+    "sourceProjectId": "p-award",
+    "sourcePricingReportId": "pr-seed-linen-sheet",
+    "sourcePricingReportItemId": "pr-seed-linen-sheet-item-1",
+    "listedAt": "2026-06-18T10:00:00.000Z",
     "imageFileIds": ["file-mall-linen-main"],
     "attachmentFileIds": ["file-mall-linen-spec"],
     "createdBy": "u10",
@@ -2907,6 +3120,11 @@ export const mallProducts: MallProduct[] = [
     "supplierId": "sup-3",
     "serviceRegions": ["长三角", "上海"],
     "procurementCategory": "食材供应",
+    "sourceType": "award_project",
+    "sourceProjectId": "p-food",
+    "sourcePricingReportId": "pr-seed-breakfast-fruit",
+    "sourcePricingReportItemId": "pr-seed-breakfast-fruit-item-1",
+    "listedAt": "2026-06-19T10:00:00.000Z",
     "imageFileIds": ["file-mall-fruit-main"],
     "attachmentFileIds": ["file-mall-fruit-spec"],
     "createdBy": "u10",
@@ -3340,7 +3558,60 @@ export function createSeedState() {
 
 export type SeedState = ReturnType<typeof createSeedState>;
 
-export function enrichSeedState(state: SeedState) {
+export function createCleanBusinessSeedState(): SeedState {
+  const state = createSeedState();
+  clearScenarioBusinessData(state);
+  return state;
+}
+
+export function clearScenarioBusinessData(state: SeedState) {
+  state.suppliers = [];
+  state.procurementRequests = [];
+  state.projects = [];
+  state.projectPackages = [];
+  state.procurementDocuments = [];
+  state.procurementAnnouncements = [];
+  state.inquirySheets = [];
+  state.projectSampleReceipts = [];
+  state.supplierInvitations = [];
+  state.supplierRegistrations = [];
+  state.bids = [];
+  state.bidVersions = [];
+  state.bidViewApprovals = [];
+  state.bidViewLogs = [];
+  state.expertAssignments = [];
+  state.scoringSheets = [];
+  state.scoringVersions = [];
+  state.reviewReports = [];
+  state.comparisonReports = [];
+  state.awardApprovals = [];
+  state.pricingReports = [];
+  state.resultNotifications = [];
+  state.internalPublicityRecords = [];
+  state.externalTradeRecords = [];
+  state.contractLedgers = [];
+  state.performanceNodes = [];
+  state.purchaseOrders = [];
+  state.receiptRecords = [];
+  state.acceptancePaymentRecords = [];
+  state.settlementMaterials = [];
+  state.supplierEvaluations = [];
+  state.archiveItems = [];
+  state.archiveSupplementRequests = [];
+  state.mallProducts = [];
+  state.mallPrices = [];
+  state.mallCartItems = [];
+  state.mallOrders = [];
+  state.mallShipments = [];
+  state.mallReturnRequests = [];
+  state.mallSettlementInvoices = [];
+  state.mallQuestionnaires = [];
+  state.mallScenarioTemplates = [];
+  state.mallFundAccounts = [];
+  state.auditLogs = [];
+}
+
+export function enrichSeedState(state: SeedState, options: { cleanBusinessData?: boolean } = {}) {
   upsertById(state.users, users);
   upsertById(state.organizations, organizations);
   upsertRolePermissions(state.rolePermissions, rolePermissions);
@@ -3393,6 +3664,15 @@ export function enrichSeedState(state: SeedState) {
   state.mallScenarioTemplates ??= [];
   state.mallFundAccounts ??= [];
   state.auditLogs ??= [];
+  if (options.cleanBusinessData) {
+    clearScenarioBusinessData(state);
+    upsertById(state.procurementMethodRules, procurementMethodRules);
+    upsertById(state.approvalRules, approvalRules);
+    upsertById(state.experts, experts);
+    backfillById(state.scoringTemplates, scoringTemplates);
+    upsertById(state.archiveTemplates, archiveTemplates);
+    return;
+  }
   backfillById(state.procurementRequests, procurementRequests);
   upsertById(state.procurementMethodRules, procurementMethodRules);
   upsertById(state.approvalRules, approvalRules);

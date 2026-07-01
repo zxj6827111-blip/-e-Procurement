@@ -21,16 +21,18 @@ import type {
 import { canReadAuditLog, canReadProject, denyResponse } from "./permission-helpers.js";
 import { isFinanceReviewRole, isProcurementBuyerRole, isSupplierAdminRole, isSupplierRole, supplierIdMatches } from "../role-groups.js";
 
+const procurementExecutionRoles = new Set(["buyer", "platform_operator"]);
+
 function isWorkbenchBusinessReader(roleId: string) {
-  return isProcurementBuyerRole(roleId) || roleId === "auditor" || isFinanceReviewRole(roleId);
+  return isProcurementBuyerRole(roleId) || roleId === "group_manager" || roleId === "auditor" || isFinanceReviewRole(roleId);
 }
 
 function isWorkbenchBusinessMaintainer(roleId: string) {
-  return isProcurementBuyerRole(roleId);
+  return procurementExecutionRoles.has(roleId);
 }
 
 function isSettlementVerifier(roleId: string) {
-  return isProcurementBuyerRole(roleId) || isFinanceReviewRole(roleId);
+  return procurementExecutionRoles.has(roleId) || isFinanceReviewRole(roleId);
 }
 
 const archiveItemCatalog = [
@@ -225,7 +227,7 @@ function visibleBid(ctx: AppContext, req: Request, project: ProcurementProject, 
   if (isSupplier && !supplierIdMatches(req.auth.user, bid.supplierId)) return null;
   const canSeeBidBody =
     (isSupplier && supplierIdMatches(req.auth.user, bid.supplierId)) ||
-    ((isProcurementBuyerRole(req.auth.roleId) || req.auth.roleId === "auditor") && !isBeforeDeadline(project));
+    ((procurementExecutionRoles.has(req.auth.roleId) || req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") && !isBeforeDeadline(project));
   if (!canSeeBidBody) return base;
   return {
     ...base,
@@ -497,6 +499,8 @@ export function projectWorkbenchRoutes(ctx: AppContext) {
         status: supplier.status,
         admissionStatus: supplier.admissionStatus,
         contactName: supplier.contactName,
+        contactPhone: supplier.contactPhone,
+        contactEmail: supplier.contactEmail,
         serviceRegions: supplier.serviceRegions ?? [],
         categoryAuthorizations: supplier.categoryAuthorizations ?? [],
         qualification: supplier.qualification,
@@ -522,6 +526,16 @@ export function projectWorkbenchRoutes(ctx: AppContext) {
       suppliers,
       bids,
       comparisonReport: visibleComparison(ctx, req, project),
+      scoringSheets: isSupplier
+        ? []
+        : ctx.state.scoringSheets
+            .filter((item) => item.projectId === project.id)
+            .map((sheet) => ({
+              ...sheet,
+              expertName: ctx.state.experts.find((item) => item.id === sheet.expertId)?.name,
+              supplierName: ctx.state.suppliers.find((item) => item.id === sheet.supplierId)?.name
+            })),
+      reviewReports: isSupplier ? [] : ctx.state.reviewReports.filter((item) => item.projectId === project.id),
       awardApprovals: isSupplier ? [] : ctx.state.awardApprovals.filter((item) => item.projectId === project.id),
       pricingReports: isSupplier ? [] : ctx.state.pricingReports.filter((item) => item.projectId === project.id),
       resultNotifications: ctx.state.resultNotifications.filter((item) => item.projectId === project.id && (!isSupplier || item.supplierId === req.auth.user.supplierId)),

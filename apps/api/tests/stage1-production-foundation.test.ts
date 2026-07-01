@@ -43,7 +43,7 @@ describe("Stage 1 production foundation", () => {
     const runtime1 = boot(dataRoot);
     const created = await request(runtime1.app)
       .post("/api/procurement-requests")
-      .set("x-mock-user-id", "u2")
+      .set("x-mock-user-id", "u8")
       .send({
         title: "阶段1重启留存测试",
         orgId: "org-hotel",
@@ -57,7 +57,7 @@ describe("Stage 1 production foundation", () => {
     expect(created.status).toBe(201);
 
     const runtime2 = boot(dataRoot);
-    const list = await request(runtime2.app).get("/api/procurement-requests").set("x-mock-user-id", "u2");
+    const list = await request(runtime2.app).get("/api/procurement-requests").set("x-mock-user-id", "u8");
     expect(list.status).toBe(200);
     expect(list.body.procurementRequests.some((item: { title: string }) => item.title === "阶段1重启留存测试")).toBe(true);
   });

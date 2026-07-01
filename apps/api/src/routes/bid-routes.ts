@@ -9,10 +9,12 @@ import type {
   ComparisonReportRow,
   InternalProjectStatus,
   ProcurementDocumentAttachment,
-  ProcurementProject
+  ProcurementProject,
+  SupplierCategoryAuthorization
 } from "../types.js";
 import {
   isOrgReaderRole,
+  isProcurementBuyerRole,
   isProcurementMaintainerRole,
   isSupplierQuotationRole,
   isSupplierRole,
@@ -64,26 +66,103 @@ function ensureBid(ctx: AppContext, bidId: string, res: Response) {
   return bid;
 }
 
-function canReadProject(req: Request, project: ProcurementProject) {
-  if (req.auth.roleId === "buyer") return req.auth.user.managedProjectIds?.includes(project.id) ?? false;
+function supplierCanAccessBidProject(ctx: AppContext, supplierId: string, project: ProcurementProject) {
+  if (!supplierId) return false;
+  if (project.participantSupplierIds.includes(supplierId)) return true;
+  return ctx.state.supplierRegistrations.some((item) => item.projectId === project.id && item.supplierId === supplierId && item.status !== "rejected");
+}
+
+function supplierHasQualifiedRegistration(ctx: AppContext, supplierId: string, project: ProcurementProject) {
+  if (!supplierId) return false;
+  return ctx.state.supplierRegistrations.some((item) => item.projectId === project.id && item.supplierId === supplierId && item.status === "qualified");
+}
+
+function supplierHasActiveCategoryAuthorization(ctx: AppContext, supplierId: string, category: string) {
+  ctx.r3SupplierProductRepository.syncSupplierState(ctx.state.suppliers);
+  const supplier = ctx.state.suppliers.find((item) => item.id === supplierId);
+  if (!supplier) return false;
+  const admissionStatus = supplier.admissionStatus ?? (supplier.id === "sup-4" ? "restricted" : "admitted");
+  if (admissionStatus !== "admitted") return false;
+  const authorizations: SupplierCategoryAuthorization[] =
+    supplier.categoryAuthorizations ??
+    supplier.categoryAuth.map((item) => ({
+      category: item,
+      status: "active" as const,
+      authorizedAt: "2026-06-01T00:00:00.000Z"
+    }));
+  const now = Date.now();
+  return authorizations.some((item) => item.category === category && item.status === "active" && (item.expiresAt === undefined || new Date(item.expiresAt).getTime() >= now));
+}
+
+function ensureSupplierProjectParticipant(ctx: AppContext, project: ProcurementProject, supplierId: string) {
+  if (!project.participantSupplierIds.includes(supplierId)) {
+    project.participantSupplierIds.push(supplierId);
+    ctx.r4SourcingRepository.upsertProject(project);
+  }
+}
+
+function canReadProject(ctx: AppContext, req: Request, project: ProcurementProject) {
+  if (isProcurementBuyerRole(req.auth.roleId)) {
+    return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || userOrgScope(req.auth.user).includes(project.orgId);
+  }
   if (isOrgReaderRole(req.auth.roleId)) return userOrgScope(req.auth.user).includes(project.orgId);
-  if (isSupplierRole(req.auth.roleId)) return project.participantSupplierIds.some((supplierId) => supplierIdMatches(req.auth.user, supplierId));
+  if (isSupplierRole(req.auth.roleId)) return supplierCanAccessBidProject(ctx, req.auth.user.supplierId ?? "", project);
   if (req.auth.roleId === "expert") return project.assignedExpertIds.includes(req.auth.user.expertId ?? "");
   return req.auth.roleId === "admin";
+}
+
+function bidProgressShape(ctx: AppContext, bid: Bid) {
+  const supplier = ctx.state.suppliers.find((item) => item.id === bid.supplierId);
+  return {
+    id: bid.id,
+    projectId: bid.projectId,
+    supplierId: bid.supplierId,
+    supplierName: supplier?.name,
+    status: bid.status,
+    submittedAt: bid.submittedAt,
+    lockedAt: bid.lockedAt,
+    withdrawnAt: bid.withdrawnAt,
+    versionNo: bid.versionNo ?? latestVersionNoFromBid(bid)
+  };
+}
+
+function bidStatusCounts(projectBids: Bid[]) {
+  const draftCount = projectBids.filter((item) => item.status === "draft").length;
+  const submittedCount = projectBids.filter((item) => item.status === "submitted" || item.status === "resubmitted").length;
+  const lockedCount = projectBids.filter((item) => item.status === "locked").length;
+  const withdrawnCount = projectBids.filter((item) => item.status === "withdrawn").length;
+  const effectiveSubmittedCount = submittedCount + lockedCount;
+  return {
+    draftCount,
+    submittedCount,
+    lockedCount,
+    withdrawnCount,
+    effectiveSubmittedCount,
+    totalBidCount: projectBids.length
+  };
+}
+
+function projectSupplierIds(ctx: AppContext, project: ProcurementProject) {
+  const supplierIds = new Set(project.participantSupplierIds);
+  for (const invitation of ctx.state.supplierInvitations.filter((item) => item.projectId === project.id)) supplierIds.add(invitation.supplierId);
+  for (const registration of ctx.state.supplierRegistrations.filter((item) => item.projectId === project.id)) supplierIds.add(registration.supplierId);
+  for (const bid of ctx.state.bids.filter((item) => item.projectId === project.id)) supplierIds.add(bid.supplierId);
+  return [...supplierIds];
 }
 
 function assertProjectReadable(ctx: AppContext, req: Request, res: Response, project: ProcurementProject) {
   if (req.auth.roleId === "admin") {
     ctx.policies.adminBusinessIsolation.assertBusinessAccessAllowed(req.auth, "project", project.id, project.id);
   }
-  if (canReadProject(req, project)) return true;
+  if (canReadProject(ctx, req, project)) return true;
   denyResponse(ctx, req, res, 403, "PROJECT_SCOPE_DENIED", "Current user cannot access this project.", "bid.project.scope.denied", "project", project.id, project.id);
   return false;
 }
 
 function assertSupplierBidOwner(ctx: AppContext, req: Request, res: Response, bid: Bid) {
   if (!isSupplierQuotationRole(req.auth.roleId)) {
-    return denyResponse(ctx, req, res, 403, "SUPPLIER_ROLE_REQUIRED", "Only supplier quotation accounts can maintain bids.", "bid.supplier-role.denied", "bid", bid.id, bid.projectId);
+    denyResponse(ctx, req, res, 403, "SUPPLIER_ROLE_REQUIRED", "Only supplier quotation accounts can maintain bids.", "bid.supplier-role.denied", "bid", bid.id, bid.projectId);
+    return false;
   }
   if (supplierIdMatches(req.auth.user, bid.supplierId)) return true;
   denyResponse(ctx, req, res, 403, "SUPPLIER_BID_SCOPE_DENIED", "Suppliers can only maintain their own bids.", "bid.supplier.scope.denied", "bid", bid.id, bid.projectId);
@@ -92,11 +171,40 @@ function assertSupplierBidOwner(ctx: AppContext, req: Request, res: Response, bi
 
 function assertSupplierCanBid(ctx: AppContext, req: Request, res: Response, project: ProcurementProject) {
   if (!isSupplierQuotationRole(req.auth.roleId) || !req.auth.user.supplierId) {
-    return denyResponse(ctx, req, res, 403, "SUPPLIER_ROLE_REQUIRED", "Only supplier quotation accounts can submit bids.", "bid.supplier-role.denied", "project", project.id, project.id);
+    denyResponse(ctx, req, res, 403, "SUPPLIER_ROLE_REQUIRED", "Only supplier quotation accounts can submit bids.", "bid.supplier-role.denied", "project", project.id, project.id);
+    return false;
   }
-  if (!project.participantSupplierIds.includes(req.auth.user.supplierId)) {
-    return denyResponse(ctx, req, res, 403, "SUPPLIER_NOT_REGISTERED", "Supplier must complete registration before bidding.", "bid.registration.denied", "project", project.id, project.id);
+  if (!supplierHasActiveCategoryAuthorization(ctx, req.auth.user.supplierId, project.category)) {
+    denyResponse(
+      ctx,
+      req,
+      res,
+      403,
+      "SUPPLIER_NOT_ADMITTED",
+      "供应商当前未通过集团准入评审或该项目品类授权已失效，不能报价。",
+      "bid.supplier-admission.denied",
+      "project",
+      project.id,
+      project.id
+    );
+    return false;
   }
+  if (!supplierHasQualifiedRegistration(ctx, req.auth.user.supplierId, project)) {
+    denyResponse(
+      ctx,
+      req,
+      res,
+      403,
+      "SUPPLIER_REGISTRATION_NOT_QUALIFIED",
+      "供应商报名资格审核通过后才能报价。请先提交报名资料并等待采购经办人审核。",
+      "bid.registration.denied",
+      "project",
+      project.id,
+      project.id
+    );
+    return false;
+  }
+  ensureSupplierProjectParticipant(ctx, project, req.auth.user.supplierId);
   return true;
 }
 
@@ -349,6 +457,33 @@ function assertBidProgressMaintainer(ctx: AppContext, req: Request, res: Respons
   return assertProjectReadable(ctx, req, res, project);
 }
 
+function emitBidSourcingEvent(
+  ctx: AppContext,
+  req: Request,
+  project: ProcurementProject,
+  eventCode: "QuoteDraftCreated" | "QuoteSubmitted" | "QuoteWithdrawn" | "QuoteResubmitted" | "BidLocked" | "BidCutoffCompleted" | "ComparisonReportGenerated",
+  args: { businessId: string; businessTitle?: string; supplierId?: string; idempotencyKey: string; payloadJson?: Record<string, unknown> }
+) {
+  if (project.externalTradeFlag) return;
+  ctx.processService.startSourcingProcess({ project, actor: req.auth.user, source: eventCode });
+  ctx.eventBus.emit({
+    eventCode,
+    businessType: eventCode.startsWith("Quote") ? "bid" : eventCode === "ComparisonReportGenerated" ? "comparison_report" : "project",
+    businessId: args.businessId,
+    businessTitle: args.businessTitle ?? project.name,
+    actor: req.auth.user,
+    orgId: project.orgId,
+    supplierId: args.supplierId,
+    projectId: project.id,
+    idempotencyKey: args.idempotencyKey,
+    payloadJson: {
+      projectId: project.id,
+      projectType: project.type,
+      ...args.payloadJson
+    }
+  });
+}
+
 export function bidRoutes(ctx: AppContext) {
   const router = Router();
 
@@ -361,11 +496,16 @@ export function bidRoutes(ctx: AppContext) {
     if (!assertProjectReadable(ctx, req, res, project)) return;
     const projectBids = ctx.state.bids.filter((item) => item.projectId === project.id);
     if (req.auth.roleId === "expert" || (isBeforeDeadline(project) && !isSupplierRole(req.auth.roleId))) {
-      const submittedCount = projectBids.filter((item) => item.status === "submitted").length;
-      return res.json({ projectId: project.id, beforeDeadline: isBeforeDeadline(project), submittedCount, totalInvitedSuppliers: project.participantSupplierIds.length });
+      return res.json({
+        projectId: project.id,
+        beforeDeadline: isBeforeDeadline(project),
+        ...bidStatusCounts(projectBids),
+        totalInvitedSuppliers: projectSupplierIds(ctx, project).length,
+        bidProgress: projectBids.map((bid) => bidProgressShape(ctx, bid))
+      });
     }
     const visibleBids = isSupplierRole(req.auth.roleId) ? projectBids.filter((bid) => supplierIdMatches(req.auth.user, bid.supplierId)) : projectBids;
-    return res.json({ projectId: project.id, beforeDeadline: isBeforeDeadline(project), bids: visibleBids.map((bid) => publicBidShape(req, project, bid)) });
+    return res.json({ projectId: project.id, beforeDeadline: isBeforeDeadline(project), ...bidStatusCounts(projectBids), bids: visibleBids.map((bid) => publicBidShape(req, project, bid)) });
   });
 
   router.post("/projects/:projectId/bids", (req, res) => {
@@ -423,6 +563,17 @@ export function bidRoutes(ctx: AppContext) {
     ctx.r4SourcingRepository.upsertBid(bid);
     ctx.r4SourcingRepository.upsertProject(project);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "bid.draft.create", "bid", bid.id, project.id);
+    emitBidSourcingEvent(ctx, req, project, "QuoteDraftCreated", {
+      businessId: bid.id,
+      businessTitle: `${project.name} 报价草稿`,
+      supplierId,
+      idempotencyKey: `bid:${bid.id}:draft_created`,
+      payloadJson: {
+        bidId: bid.id,
+        supplierId,
+        status: bid.status
+      }
+    });
     return res.status(201).json({ bid: publicBidShape(req, project, bid), auditLogId: auditLog.id });
   });
 
@@ -495,6 +646,7 @@ export function bidRoutes(ctx: AppContext) {
     if (!project) return;
     ctx.policies.externalTradeBlocking.assertInternalActionAllowed(req.auth, project, "internal_bid");
     if (!assertSupplierBidOwner(ctx, req, res, bid)) return;
+    if (!assertSupplierCanBid(ctx, req, res, project)) return;
     if (!ensureBidBeforeDeadline(ctx, req, res, project, bid)) return;
     if (!["draft", "withdrawn"].includes(bid.status)) {
       return denyResponse(ctx, req, res, 400, "BID_STATUS_DENIED", "Only draft or withdrawn bids can be edited.", "bid.update.denied", "bid", bid.id, project.id, `status=${bid.status}`);
@@ -542,6 +694,7 @@ export function bidRoutes(ctx: AppContext) {
     if (!project) return;
     ctx.policies.externalTradeBlocking.assertInternalActionAllowed(req.auth, project, "internal_bid");
     if (!assertSupplierBidOwner(ctx, req, res, bid)) return;
+    if (!assertSupplierCanBid(ctx, req, res, project)) return;
     if (!ensureBidBeforeDeadline(ctx, req, res, project, bid)) return;
     if (!["draft", "withdrawn"].includes(bid.status)) {
       return denyResponse(ctx, req, res, 400, "BID_STATUS_DENIED", "Only draft or withdrawn bids can be submitted.", "bid.submit.denied", "bid", bid.id, project.id, `status=${bid.status}`);
@@ -552,6 +705,18 @@ export function bidRoutes(ctx: AppContext) {
     const version = recordBidVersion(ctx, bid, "submit");
     ctx.r4SourcingRepository.upsertBid(bid);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "bid.submit", "bid", bid.id, project.id, `version=${version.versionNo}`);
+    emitBidSourcingEvent(ctx, req, project, "QuoteSubmitted", {
+      businessId: bid.id,
+      businessTitle: `${project.name} 报价提交`,
+      supplierId: bid.supplierId,
+      idempotencyKey: `bid:${bid.id}:submitted:${version.versionNo}`,
+      payloadJson: {
+        bidId: bid.id,
+        supplierId: bid.supplierId,
+        status: bid.status,
+        versionNo: version.versionNo
+      }
+    });
     return res.json({ bid: publicBidShape(req, project, bid), version, auditLogId: auditLog.id });
   });
 
@@ -572,6 +737,18 @@ export function bidRoutes(ctx: AppContext) {
     const version = recordBidVersion(ctx, bid, `withdraw${bid.withdrawalReason ? `: ${bid.withdrawalReason}` : ""}`);
     ctx.r4SourcingRepository.upsertBid(bid);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "bid.withdraw", "bid", bid.id, project.id, `version=${version.versionNo}`);
+    emitBidSourcingEvent(ctx, req, project, "QuoteWithdrawn", {
+      businessId: bid.id,
+      businessTitle: `${project.name} 报价撤回`,
+      supplierId: bid.supplierId,
+      idempotencyKey: `bid:${bid.id}:withdrawn:${version.versionNo}`,
+      payloadJson: {
+        bidId: bid.id,
+        supplierId: bid.supplierId,
+        status: bid.status,
+        versionNo: version.versionNo
+      }
+    });
     return res.json({ bid: publicBidShape(req, project, bid), version, auditLogId: auditLog.id });
   });
 
@@ -582,6 +759,7 @@ export function bidRoutes(ctx: AppContext) {
     if (!project) return;
     ctx.policies.externalTradeBlocking.assertInternalActionAllowed(req.auth, project, "internal_bid");
     if (!assertSupplierBidOwner(ctx, req, res, bid)) return;
+    if (!assertSupplierCanBid(ctx, req, res, project)) return;
     if (!ensureBidBeforeDeadline(ctx, req, res, project, bid)) return;
     if (bid.status !== "withdrawn") {
       return denyResponse(ctx, req, res, 400, "BID_STATUS_DENIED", "Only withdrawn bids can be resubmitted.", "bid.resubmit.denied", "bid", bid.id, project.id, `status=${bid.status}`);
@@ -623,6 +801,18 @@ export function bidRoutes(ctx: AppContext) {
     const version = recordBidVersion(ctx, bid, "resubmit");
     ctx.r4SourcingRepository.upsertBid(bid);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "bid.resubmit", "bid", bid.id, project.id, `version=${version.versionNo}`);
+    emitBidSourcingEvent(ctx, req, project, "QuoteResubmitted", {
+      businessId: bid.id,
+      businessTitle: `${project.name} 报价重新提交`,
+      supplierId: bid.supplierId,
+      idempotencyKey: `bid:${bid.id}:resubmitted:${version.versionNo}`,
+      payloadJson: {
+        bidId: bid.id,
+        supplierId: bid.supplierId,
+        status: bid.status,
+        versionNo: version.versionNo
+      }
+    });
     return res.json({ bid: publicBidShape(req, project, bid), version, auditLogId: auditLog.id });
   });
 
@@ -646,6 +836,15 @@ export function bidRoutes(ctx: AppContext) {
     advanceProjectToBiddingLocked(project);
     ctx.r4SourcingRepository.upsertProject(project);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "bid.lock", "project", project.id, project.id, `lockedCount=${bids.length}`);
+    emitBidSourcingEvent(ctx, req, project, "BidLocked", {
+      businessId: project.id,
+      businessTitle: project.name,
+      idempotencyKey: `project:${project.id}:bid_locked`,
+      payloadJson: {
+        lockedCount: bids.length,
+        status: project.status
+      }
+    });
     return res.json({ project, lockedCount: bids.length, auditLogId: auditLog.id });
   });
 
@@ -684,6 +883,17 @@ export function bidRoutes(ctx: AppContext) {
       project.id,
       `previousDeadline=${previousDeadline ?? ""};cutoffAt=${project.quoteDeadlineAt};reason=${String(req.body?.reason ?? "")}`
     );
+    emitBidSourcingEvent(ctx, req, project, "BidCutoffCompleted", {
+      businessId: project.id,
+      businessTitle: project.name,
+      idempotencyKey: `project:${project.id}:bid_cutoff`,
+      payloadJson: {
+        cutoffAt: project.quoteDeadlineAt,
+        previousDeadline,
+        action,
+        beforeDeadline: isBeforeDeadline(project)
+      }
+    });
     return res.json({
       project,
       cutoffAt: project.quoteDeadlineAt,
@@ -717,8 +927,7 @@ export function bidRoutes(ctx: AppContext) {
     return res.json({
       projectId: project.id,
       beforeDeadline: isBeforeDeadline(project),
-      submittedCount: projectBids.filter((item) => item.status === "submitted").length,
-      lockedCount: projectBids.filter((item) => item.status === "locked").length,
+      ...bidStatusCounts(projectBids),
       abandonedCount: projectBids.filter((item) => item.abandonedAt).length,
       expertTasks,
       securityBoundary
@@ -748,6 +957,15 @@ export function bidRoutes(ctx: AppContext) {
     ctx.state.comparisonReports.push(report);
     ctx.r5ReviewAwardRepository.upsertComparisonReport(report);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "comparison_report.generate", "comparison_report", report.id, project.id);
+    emitBidSourcingEvent(ctx, req, project, "ComparisonReportGenerated", {
+      businessId: report.id,
+      businessTitle: report.reportNo,
+      idempotencyKey: `comparison_report:${report.id}:generated`,
+      payloadJson: {
+        recommendedSupplierId: report.recommendedSupplierId,
+        rowCount: report.comparisonRows.length
+      }
+    });
     return res.status(201).json({ comparisonReport: report, auditLogId: auditLog.id });
   });
 

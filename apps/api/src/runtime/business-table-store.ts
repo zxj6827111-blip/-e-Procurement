@@ -733,6 +733,7 @@ export class BusinessTableStore {
         "regularized_at",
         "periodic_assessment_json",
         "registration_trace_json",
+        "onboarding_profile_json",
         "category_auth_json",
         "updated_at"
       ],
@@ -764,6 +765,7 @@ export class BusinessTableStore {
         item.regularizedAt ?? null,
         item.periodicAssessment ? JSON.stringify(item.periodicAssessment) : null,
         item.registrationTrace ? JSON.stringify(item.registrationTrace) : null,
+        item.onboardingProfile ? JSON.stringify(item.onboardingProfile) : null,
         JSON.stringify(item.categoryAuth ?? []),
         syncedAt
       ]
@@ -907,6 +909,12 @@ export class BusinessTableStore {
         "supplier_id",
         "service_regions_json",
         "procurement_category",
+        "source_type",
+        "source_project_id",
+        "source_agreement_no",
+        "source_pricing_report_id",
+        "source_pricing_report_item_id",
+        "listed_at",
         "created_by",
         "created_at",
         "updated_at",
@@ -934,6 +942,12 @@ export class BusinessTableStore {
         item.supplierId,
         JSON.stringify(item.serviceRegions ?? []),
         item.procurementCategory ?? null,
+        item.sourceType ?? null,
+        item.sourceProjectId ?? null,
+        item.sourceAgreementNo ?? null,
+        item.sourcePricingReportId ?? null,
+        item.sourcePricingReportItemId ?? null,
+        item.listedAt ?? null,
         item.createdBy,
         item.createdAt,
         item.updatedAt,
@@ -1325,14 +1339,48 @@ export class BusinessTableStore {
   }
 
   private syncR2ReviewAwardDomain(state: SeedState, syncedAt: string) {
-    this.upsertRows("r2_experts", ["id", "expert_name", "category", "expert_status", "account_user_ids_json", "updated_at"], ["id"], state.experts ?? [], (item) => [
-      item.id,
-      item.name,
-      item.category,
-      item.status,
-      JSON.stringify((state.users ?? []).filter((user) => user.expertId === item.id).map((user) => user.id)),
-      syncedAt
-    ]);
+    this.upsertRows(
+      "r2_experts",
+      [
+        "id",
+        "expert_name",
+        "category",
+        "expert_status",
+        "account_user_ids_json",
+        "owner_org_id",
+        "branch_org_id",
+        "review_scopes_json",
+        "supplier_assessment_scopes_json",
+        "shared_account",
+        "active_flag",
+        "avoidance_tags_json",
+        "maintained_at",
+        "maintenance_log",
+        "updated_at"
+      ],
+      ["id"],
+      state.experts ?? [],
+      (item) => {
+        const seededAccountIds = (state.users ?? []).filter((user) => user.expertId === item.id).map((user) => user.id);
+        return [
+          item.id,
+          item.name,
+          item.category,
+          item.status,
+          JSON.stringify(Array.from(new Set([...(item.accountUserIds ?? []), ...seededAccountIds]))),
+          item.ownerOrgId ?? null,
+          item.branchOrgId ?? null,
+          JSON.stringify(item.reviewScopes ?? []),
+          JSON.stringify(item.supplierAssessmentScopes ?? []),
+          item.sharedAccount ? 1 : 0,
+          item.active === false ? 0 : 1,
+          JSON.stringify(item.avoidanceTags ?? []),
+          item.maintainedAt ?? syncedAt,
+          item.maintenanceLog ?? null,
+          syncedAt
+        ];
+      }
+    );
     this.upsertRows(
       "r2_expert_assignments",
       [
@@ -1513,6 +1561,8 @@ export class BusinessTableStore {
         "sale_price",
         "service_fee_rate",
         "gross_margin_rate",
+        "tax_rate",
+        "delivery_days",
         "effective_from",
         "effective_to",
         "updated_at"
@@ -1533,6 +1583,8 @@ export class BusinessTableStore {
         item.salePrice,
         item.serviceFeeRate,
         item.grossMarginRate,
+        item.taxRate ?? null,
+        item.deliveryDays ?? null,
         item.effectiveFrom,
         item.effectiveTo ?? null,
         syncedAt
@@ -2293,6 +2345,7 @@ export class BusinessTableStore {
         regularized_at text null,
         periodic_assessment_json text null,
         registration_trace_json text null,
+        onboarding_profile_json text null,
         category_auth_json text not null,
         updated_at text not null
       );
@@ -2403,6 +2456,12 @@ export class BusinessTableStore {
         supplier_id text not null,
         service_regions_json text not null default '[]',
         procurement_category text null,
+        source_type text null,
+        source_project_id text null,
+        source_agreement_no text null,
+        source_pricing_report_id text null,
+        source_pricing_report_item_id text null,
+        listed_at text null,
         created_by text not null,
         created_at text not null,
         updated_at text not null,
@@ -2649,6 +2708,15 @@ export class BusinessTableStore {
         category text not null,
         expert_status text not null,
         account_user_ids_json text not null default '[]',
+        owner_org_id text null,
+        branch_org_id text null,
+        review_scopes_json text not null default '[]',
+        supplier_assessment_scopes_json text not null default '[]',
+        shared_account integer not null default 0,
+        active_flag integer not null default 1,
+        avoidance_tags_json text not null default '[]',
+        maintained_at text null,
+        maintenance_log text null,
         updated_at text not null
       );
 
@@ -2760,6 +2828,8 @@ export class BusinessTableStore {
         sale_price real not null,
         service_fee_rate real not null,
         gross_margin_rate real not null,
+        tax_rate real null,
+        delivery_days integer null,
         effective_from text not null,
         effective_to text null,
         updated_at text not null
@@ -3190,6 +3260,7 @@ export class BusinessTableStore {
     this.addColumnIfMissing("r2_suppliers", "regularized_at", "text null");
     this.addColumnIfMissing("r2_suppliers", "periodic_assessment_json", "text null");
     this.addColumnIfMissing("r2_suppliers", "registration_trace_json", "text null");
+    this.addColumnIfMissing("r2_suppliers", "onboarding_profile_json", "text null");
     this.addColumnIfMissing("r2_supplier_admission_reviews", "score_template_code", "text null");
     this.addColumnIfMissing("r2_supplier_admission_reviews", "score_items_json", "text null");
     this.addColumnIfMissing("r2_supplier_admission_reviews", "regularization_decision", "text null");
@@ -3259,6 +3330,15 @@ export class BusinessTableStore {
     this.addColumnIfMissing("r2_clarifications", "answer_attachments_json", "text not null default '[]'");
     this.addColumnIfMissing("r2_clarifications", "notification_trace_json", "text null");
     this.addColumnIfMissing("r2_experts", "account_user_ids_json", "text not null default '[]'");
+    this.addColumnIfMissing("r2_experts", "owner_org_id", "text null");
+    this.addColumnIfMissing("r2_experts", "branch_org_id", "text null");
+    this.addColumnIfMissing("r2_experts", "review_scopes_json", "text not null default '[]'");
+    this.addColumnIfMissing("r2_experts", "supplier_assessment_scopes_json", "text not null default '[]'");
+    this.addColumnIfMissing("r2_experts", "shared_account", "integer not null default 0");
+    this.addColumnIfMissing("r2_experts", "active_flag", "integer not null default 1");
+    this.addColumnIfMissing("r2_experts", "avoidance_tags_json", "text not null default '[]'");
+    this.addColumnIfMissing("r2_experts", "maintained_at", "text null");
+    this.addColumnIfMissing("r2_experts", "maintenance_log", "text null");
     this.addColumnIfMissing("r2_expert_scores", "opinion", "text not null default ''");
     this.addColumnIfMissing("r2_expert_scores", "details_json", "text not null default '{}'");
     this.addColumnIfMissing("r2_award_decisions", "approval_opinion", "text null");
@@ -3267,6 +3347,14 @@ export class BusinessTableStore {
     this.addColumnIfMissing("r2_pricing_reports", "report_no", "text null");
     this.addColumnIfMissing("r2_pricing_reports", "created_by", "text null");
     this.addColumnIfMissing("r2_pricing_reports", "approved_at", "text null");
+    this.addColumnIfMissing("r2_pricing_report_items", "tax_rate", "real null");
+    this.addColumnIfMissing("r2_pricing_report_items", "delivery_days", "integer null");
+    this.addColumnIfMissing("r2_products", "source_type", "text null");
+    this.addColumnIfMissing("r2_products", "source_project_id", "text null");
+    this.addColumnIfMissing("r2_products", "source_agreement_no", "text null");
+    this.addColumnIfMissing("r2_products", "source_pricing_report_id", "text null");
+    this.addColumnIfMissing("r2_products", "source_pricing_report_item_id", "text null");
+    this.addColumnIfMissing("r2_products", "listed_at", "text null");
     this.addColumnIfMissing("r2_supplier_evaluations", "description", "text not null default ''");
     this.addColumnIfMissing("r2_supplier_evaluations", "improvement_suggestion", "text null");
     this.addColumnIfMissing("r2_purchase_orders", "payment_status", "text not null default 'payment_reserved'");

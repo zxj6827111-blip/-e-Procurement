@@ -60,6 +60,23 @@ export function settlementFinanceRoutes(ctx: AppContext) {
       );
       syncR7(ctx);
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "settlement_bill.generate", "settlement_bill", bill.id, bill.projectId, `amount=${bill.settlementAmount}`);
+      ctx.eventBus.emit({
+        eventCode: "SettlementBillGenerated",
+        businessType: "settlement_bill",
+        businessId: bill.id,
+        businessTitle: bill.billNo,
+        actor: req.auth.user,
+        orgId: bill.orgId,
+        supplierId: bill.supplierId,
+        projectId: bill.projectId,
+        idempotencyKey: `settlement:${bill.id}:generated`,
+        payloadJson: {
+          projectId: bill.projectId,
+          purchaseOrderId: bill.purchaseOrderId,
+          billNo: bill.billNo,
+          settlementAmount: bill.settlementAmount
+        }
+      });
       return res.status(201).json({ settlementBill: bill, auditLogId: auditLog.id });
     } catch (error) {
       return res.status(400).json({ error: { code: "SETTLEMENT_BILL_GENERATE_BLOCKED", message: error instanceof Error ? error.message : "Settlement bill generation blocked." } });
@@ -87,6 +104,23 @@ export function settlementFinanceRoutes(ctx: AppContext) {
         sourceJson: { route: "settlement_bill.submit", purchaseOrderId: bill.purchaseOrderId }
       });
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "settlement_bill.submit", "settlement_bill", bill.id, bill.projectId);
+      ctx.eventBus.emit({
+        eventCode: "SettlementBillSubmitted",
+        businessType: "settlement_bill",
+        businessId: bill.id,
+        businessTitle: bill.billNo,
+        actor: req.auth.user,
+        orgId: bill.orgId,
+        supplierId: bill.supplierId,
+        projectId: bill.projectId,
+        idempotencyKey: `settlement:${bill.id}:submitted`,
+        payloadJson: {
+          projectId: bill.projectId,
+          purchaseOrderId: bill.purchaseOrderId,
+          billNo: bill.billNo,
+          status: bill.status
+        }
+      });
       return res.json({ settlementBill: bill, workflow, auditLogId: auditLog.id });
     } catch (error) {
       return res.status(400).json({ error: { code: "SETTLEMENT_BILL_SUBMIT_BLOCKED", message: error instanceof Error ? error.message : "Settlement submit blocked." } });
@@ -112,6 +146,23 @@ export function settlementFinanceRoutes(ctx: AppContext) {
         // Keep existing R7 review endpoint compatible if the settlement bill pre-dates R8 workflow.
       }
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, req.body?.approved === false ? "settlement_bill.reject" : "settlement_bill.approve", "settlement_bill", bill.id, bill.projectId, bill.approvalOpinion);
+      ctx.eventBus.emit({
+        eventCode: req.body?.approved === false ? "SettlementBillRejected" : "SettlementBillApproved",
+        businessType: "settlement_bill",
+        businessId: bill.id,
+        businessTitle: bill.billNo,
+        actor: req.auth.user,
+        orgId: bill.orgId,
+        supplierId: bill.supplierId,
+        projectId: bill.projectId,
+        idempotencyKey: `settlement:${bill.id}:${req.body?.approved === false ? "rejected" : "approved"}`,
+        payloadJson: {
+          projectId: bill.projectId,
+          purchaseOrderId: bill.purchaseOrderId,
+          billNo: bill.billNo,
+          status: bill.status
+        }
+      });
       return res.json({ settlementBill: bill, auditLogId: auditLog.id });
     } catch (error) {
       return res.status(400).json({ error: { code: "SETTLEMENT_BILL_REVIEW_BLOCKED", message: error instanceof Error ? error.message : "Settlement review blocked." } });
@@ -139,6 +190,22 @@ export function settlementFinanceRoutes(ctx: AppContext) {
       });
       syncR7(ctx);
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "settlement_material.upload", "settlement_material", material.id, bill.projectId, `type=${material.materialType}`);
+      ctx.eventBus.emit({
+        eventCode: "SettlementMaterialUploaded",
+        businessType: "settlement_bill",
+        businessId: bill.id,
+        businessTitle: bill.billNo,
+        actor: req.auth.user,
+        orgId: bill.orgId,
+        supplierId: bill.supplierId,
+        projectId: bill.projectId,
+        idempotencyKey: `settlement:${bill.id}:material:${material.id}:uploaded`,
+        payloadJson: {
+          projectId: bill.projectId,
+          materialId: material.id,
+          materialType: material.materialType
+        }
+      });
       return res.status(201).json({ settlementMaterial: material, auditLogId: auditLog.id });
     } catch (error) {
       return res.status(400).json({ error: { code: "SETTLEMENT_MATERIAL_UPLOAD_BLOCKED", message: error instanceof Error ? error.message : "Settlement material upload blocked." } });
@@ -156,6 +223,27 @@ export function settlementFinanceRoutes(ctx: AppContext) {
       const reviewed = ctx.r7SettlementFinanceRepository.reviewSettlementMaterial(material.id, req.auth.user, req.body?.approved !== false, req.body?.opinion === undefined ? undefined : String(req.body.opinion));
       syncR7(ctx);
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, req.body?.approved === false ? "settlement_material.reject" : "settlement_material.verify", "settlement_material", reviewed.id, reviewed.projectId, reviewed.verificationOpinion);
+      const bill = ctx.r7SettlementFinanceRepository
+        .listSettlementBills()
+        .find((item) => item.purchaseOrderId === reviewed.purchaseOrderId && item.projectId === reviewed.projectId && item.supplierId === reviewed.supplierId);
+      if (!bill) return res.status(404).json({ error: { code: "SETTLEMENT_BILL_NOT_FOUND", message: "Settlement bill does not exist." } });
+      ctx.eventBus.emit({
+        eventCode: req.body?.approved === false ? "SettlementMaterialRejected" : "SettlementMaterialApproved",
+        businessType: "settlement_bill",
+        businessId: bill.id,
+        businessTitle: bill.billNo,
+        actor: req.auth.user,
+        orgId: bill.orgId,
+        supplierId: bill.supplierId,
+        projectId: reviewed.projectId,
+        idempotencyKey: `settlement:${bill.id}:material:${reviewed.id}:${req.body?.approved === false ? "rejected" : "approved"}`,
+        payloadJson: {
+          projectId: reviewed.projectId,
+          materialId: reviewed.id,
+          materialType: reviewed.materialType,
+          status: reviewed.status
+        }
+      });
       return res.json({ settlementMaterial: reviewed, auditLogId: auditLog.id });
     } catch (error) {
       return res.status(400).json({ error: { code: "SETTLEMENT_MATERIAL_REVIEW_BLOCKED", message: error instanceof Error ? error.message : "Settlement material review blocked." } });
@@ -195,6 +283,23 @@ export function settlementFinanceRoutes(ctx: AppContext) {
         sourceJson: { route: "invoice.upload", settlementBillId: bill.id }
       });
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "invoice.upload", "invoice", invoice.id, bill.projectId, `amount=${invoice.amount}`);
+      ctx.eventBus.emit({
+        eventCode: "InvoiceSubmitted",
+        businessType: "invoice",
+        businessId: invoice.id,
+        businessTitle: invoice.invoiceNo,
+        actor: req.auth.user,
+        orgId: bill.orgId,
+        supplierId: bill.supplierId,
+        projectId: bill.projectId,
+        idempotencyKey: `invoice:${invoice.id}:submitted`,
+        payloadJson: {
+          projectId: bill.projectId,
+          settlementBillId: bill.id,
+          invoiceNo: invoice.invoiceNo,
+          amount: invoice.amount
+        }
+      });
       return res.status(201).json({ invoice, workflow, auditLogId: auditLog.id });
     } catch (error) {
       return res.status(400).json({ error: { code: "INVOICE_UPLOAD_BLOCKED", message: error instanceof Error ? error.message : "Invoice upload blocked." } });
@@ -223,6 +328,23 @@ export function settlementFinanceRoutes(ctx: AppContext) {
         // Keep existing R7 invoice review compatible for pre-R8 invoices.
       }
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, req.body?.approved === false ? "invoice.reject" : "invoice.verify", "invoice", reviewed.id, bill.projectId, reviewed.verificationOpinion);
+      ctx.eventBus.emit({
+        eventCode: req.body?.approved === false ? "InvoiceRejected" : "InvoiceApproved",
+        businessType: "invoice",
+        businessId: reviewed.id,
+        businessTitle: reviewed.invoiceNo,
+        actor: req.auth.user,
+        orgId: bill.orgId,
+        supplierId: bill.supplierId,
+        projectId: bill.projectId,
+        idempotencyKey: `invoice:${reviewed.id}:${req.body?.approved === false ? "rejected" : "approved"}`,
+        payloadJson: {
+          projectId: bill.projectId,
+          settlementBillId: bill.id,
+          invoiceNo: reviewed.invoiceNo,
+          status: reviewed.status
+        }
+      });
       return res.json({ invoice: reviewed, auditLogId: auditLog.id });
     } catch (error) {
       return res.status(400).json({ error: { code: "INVOICE_REVIEW_BLOCKED", message: error instanceof Error ? error.message : "Invoice review blocked." } });
@@ -257,6 +379,25 @@ export function settlementFinanceRoutes(ctx: AppContext) {
         sourceJson: { route: "fund_ledger.create", settlementBillId: bill.id, entryType: entry.entryType }
       });
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "fund_ledger.create", "fund_ledger", entry.id, bill.projectId, `amount=${entry.amount};${entry.note ?? ""}`);
+      ctx.eventBus.emit({
+        eventCode: "PaymentRequested",
+        businessType: "payment",
+        businessId: entry.id,
+        businessTitle: entry.ledgerNo,
+        actor: req.auth.user,
+        orgId: bill.orgId,
+        supplierId: bill.supplierId,
+        projectId: bill.projectId,
+        idempotencyKey: `payment:${entry.id}:requested`,
+        payloadJson: {
+          processBusinessId: entry.id,
+          projectId: bill.projectId,
+          settlementBillId: bill.id,
+          ledgerNo: entry.ledgerNo,
+          amount: entry.amount,
+          status: entry.status
+        }
+      });
       return res.status(201).json({ fundLedgerEntry: entry, workflow, auditLogId: auditLog.id });
     } catch (error) {
       return res.status(400).json({ error: { code: "FUND_LEDGER_CREATE_BLOCKED", message: error instanceof Error ? error.message : "Fund ledger creation blocked." } });
