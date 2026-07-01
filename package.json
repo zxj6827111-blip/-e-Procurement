@@ -16,9 +16,14 @@
     "test:api": "npm --workspace @eprocurement/api run test",
     "typecheck": "npm --workspace @eprocurement/api run typecheck && npm --workspace @eprocurement/web run typecheck",
     "r2:migrate": "node scripts/r2-sqlite-baseline.mjs",
-    "r9:readiness": "node scripts/r9-production-readiness-check.mjs --backup"
+    "r9:readiness": "node scripts/r9-production-readiness-check.mjs --backup",
+    "m6b:backup-restore": "node scripts/r10-backup-restore-drill.mjs",
+    "m6c:browser-smoke": "node scripts/m6c-browser-role-smoke.mjs"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
   }
 }

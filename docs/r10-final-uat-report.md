@@ -60,3 +60,20 @@
 Go for UAT：通过。  
 Go for small internal pilot：有条件通过，必须限定范围、保留回滚、明确 SQLite、本地文件、mock adapter 和未真实联调边界。  
 Go for formal production：No-Go，待客户完成真实集成、生产数据库、文件基础设施、监控备份和安全验收后复评。
+
+## 6. M6-C 最终验收追加
+
+日期：2026-06-28
+
+M6-C 完成安全、运维、文档和九角色浏览器收口：
+
+| 验收项 | 结果 | 证据 |
+|---|---|---|
+| M6-C 安全/运维 API 测试 | 通过 | `apps/api/tests/m6c-final-security-ops.test.ts` |
+| 九角色浏览器验收 | 通过 | `output/m6c-browser-evidence/m6c-browser-role-smoke.json` |
+| 最终 Go/No-Go 报告 | 已完成 | `docs/m6c-final-security-ops-go-no-go-report.md` |
+| 安全清单、运维手册、部署手册、客户输入清单 | 已更新 | R10 文档 M6-C 章节 |
+
+九角色范围：集团采购管理、采购经办、酒店采购、供应商管理员、供应商报价人员、专家、财务审核、审计监督、系统管理员。
+
+M6-C 结论保持：客户 UAT Go；客户二次开发基础 Go；受控试运行 Conditional Go；正式生产 Conditional No-Go。

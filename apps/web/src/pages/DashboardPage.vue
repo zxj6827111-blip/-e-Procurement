@@ -2,8 +2,10 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
 import { apiGet } from "../api/http";
+import { loadProcessTasks, type ProcessTaskView } from "../api/process";
 import { useSessionStore } from "../stores/session";
 import { formatDateTime, labelAuditAction, labelObjectType, labelStatus } from "../utils/status-labels";
+import { loadWorkflowNotifications, loadWorkflowTasks, type R8WorkflowNotificationView, type R8WorkflowTaskView } from "../api/workflow";
 
 interface ProjectRow {
   id: string;
@@ -60,6 +62,20 @@ interface WorkbenchPayload {
   purchaseOrders: OrderRow[];
 }
 
+interface SummaryCard {
+  label: string;
+  value: string | number;
+  tone: "blue" | "green" | "amber" | "red";
+  to?: string;
+}
+
+interface DashboardTodoItem {
+  title: string;
+  meta: string;
+  status: string;
+  to: string;
+}
+
 const session = useSessionStore();
 const health = ref("检查中");
 const projects = ref<ProjectRow[]>([]);
@@ -67,6 +83,9 @@ const suppliers = ref<SupplierRow[]>([]);
 const products = ref<ProductRow[]>([]);
 const orders = ref<OrderRow[]>([]);
 const auditLogs = ref<AuditRow[]>([]);
+const processTasks = ref<ProcessTaskView[]>([]);
+const workflowTasks = ref<R8WorkflowTaskView[]>([]);
+const workflowMessages = ref<R8WorkflowNotificationView[]>([]);
 const loadError = ref("");
 
 const procurementRoles = new Set(["group_manager", "buyer", "hotel_buyer", "platform_operator"]);
@@ -118,15 +137,100 @@ function combineOrders(mallOrders: OrderRow[], procurementOrders: OrderRow[]) {
   });
 }
 
+function isBusinessAuditLog(log: AuditRow) {
+  return !log.action.startsWith("auth.") && log.objectType !== "auth_account" && log.objectType !== "auth_provider";
+}
+
+function canUseCatalogActivities(roleId: string) {
+  return ["buyer", "platform_operator", "hotel_buyer", "supplier", "supplier_admin", "supplier_quotation"].includes(roleId);
+}
+
+function auditActivityTarget() {
+  if (auditRoles.has(session.roleId)) return "/audit";
+  if (financeRoles.has(session.roleId)) return "/settlement-materials";
+  if (session.roleId === "group_manager") return "/archive-audit";
+  return "/archive-audit";
+}
+
+function taskKey(task: Pick<ProcessTaskView | R8WorkflowTaskView, "businessType" | "businessId" | "taskType">) {
+  return `${task.businessType}:${task.businessId}:${task.taskType}`;
+}
+
 const roleTitle = computed(() => {
-  if (supplierRoles.has(session.roleId)) return "供应商工作台";
-  if (financeRoles.has(session.roleId)) return "财务工作台";
-  if (auditRoles.has(session.roleId)) return "监督工作台";
-  if (session.roleId === "admin") return "系统配置工作台";
-  return "采购工作台";
+  if (session.roleId === "group_manager") return "审批监督首页";
+  if (session.roleId === "buyer" || session.roleId === "platform_operator") return "采购经办首页";
+  if (session.roleId === "expert") return "专家首页";
+  if (supplierRoles.has(session.roleId)) return "供应商首页";
+  if (financeRoles.has(session.roleId)) return "财务首页";
+  if (auditRoles.has(session.roleId)) return "监督首页";
+  if (session.roleId === "admin") return "系统配置首页";
+  return "采购首页";
 });
 
-const summaryCards = computed(() => {
+const pendingProcurementRequestCount = computed(() => {
+  const seen = new Set<string>();
+  processTasks.value
+    .filter((task) => task.status === "pending" && task.businessType === "procurement_request")
+    .forEach((task) => {
+      seen.add(taskKey(task));
+    });
+  workflowTasks.value
+    .filter((task) => task.status === "pending" && task.businessType === "procurement_request")
+    .forEach((task) => {
+      seen.add(taskKey(task));
+    });
+  return seen.size;
+});
+
+const groupPendingRequestTasks = computed<DashboardTodoItem[]>(() => {
+  const seen = new Set<string>();
+  const items: DashboardTodoItem[] = [];
+  processTasks.value
+    .filter((task) => task.status === "pending" && task.businessType === "procurement_request")
+    .forEach((task) => {
+      seen.add(taskKey(task));
+      items.push({ title: task.businessTitle || task.title, meta: task.businessTypeLabel, status: task.statusLabel, to: task.targetPath });
+    });
+  workflowTasks.value
+    .filter((task) => task.status === "pending" && task.businessType === "procurement_request" && !seen.has(taskKey(task)))
+    .forEach((task) => {
+      seen.add(taskKey(task));
+      items.push({ title: task.title, meta: task.businessTypeLabel, status: task.statusLabel, to: task.targetPath });
+    });
+  return items;
+});
+
+const expertPendingTasks = computed(() => workflowTasks.value.filter((task) => task.status === "pending"));
+const expertUnreadMessages = computed(() => workflowMessages.value.filter((message) => !message.read));
+const expertScoringPendingCount = computed(() => expertPendingTasks.value.filter((task) => task.businessType === "expert_scoring").length);
+const expertConfirmationPendingCount = computed(
+  () => expertPendingTasks.value.filter((task) => task.businessType === "review_award" || task.taskType === "review_award_expert_confirmation").length
+);
+const expertTodoItems = computed<DashboardTodoItem[]>(() =>
+  expertPendingTasks.value
+    .map((task) => ({
+      title: task.title,
+      meta: `${task.businessTypeLabel} / ${task.businessId}`,
+      status: task.statusLabel,
+      to: task.targetPath
+    }))
+    .slice(0, 5)
+);
+
+const todoEntryLink = computed(() => {
+  if (session.roleId === "group_manager") return { label: "查看需求审批", to: "/procurement-requests" };
+  return { label: "进入待办中心", to: "/my-tasks" };
+});
+
+const summaryCards = computed<SummaryCard[]>(() => {
+  if (session.roleId === "expert") {
+    return [
+      { label: "待处理任务", value: expertPendingTasks.value.length, tone: "blue", to: "/my-tasks" },
+      { label: "待专家评分", value: expertScoringPendingCount.value, tone: "amber", to: "/expert-scoring" },
+      { label: "待专家确认", value: expertConfirmationPendingCount.value, tone: "green", to: "/expert-scoring" },
+      { label: "未读消息", value: expertUnreadMessages.value.length, tone: "red", to: "/messages" }
+    ];
+  }
   if (supplierRoles.has(session.roleId)) {
     return [
       { label: "待报价", value: projects.value.filter((item) => isFormalProject(item) && ["document_published", "bidding_open"].includes(item.status)).length, tone: "blue" },
@@ -160,15 +264,26 @@ const summaryCards = computed(() => {
       { label: "当前角色", value: "管理员", tone: "green" }
     ];
   }
+  if (session.roleId === "group_manager") {
+    return [
+      { label: "待审批需求", value: pendingProcurementRequestCount.value, tone: "blue", to: "/procurement-requests" },
+      { label: "进行中项目", value: projects.value.filter((item) => isFormalProject(item) && !["archived", "closed"].includes(item.status)).length, tone: "amber", to: "/project-workbench" },
+      { label: "定标审批中", value: projects.value.filter((item) => item.status === "award_approving").length, tone: "green", to: "/award-result" },
+      { label: "供应商风险", value: suppliers.value.filter((item) => ["pending", "restricted", "suspended"].includes(item.admissionStatus ?? item.status)).length, tone: "red", to: "/suppliers" }
+    ];
+  }
   return [
-    { label: "待处理采购", value: projects.value.filter((item) => isFormalProject(item) && !["archived", "closed"].includes(item.status)).length, tone: "blue" },
-    { label: "报价截止提醒", value: projects.value.filter((item) => isFormalProject(item) && ["document_published", "bidding_open"].includes(item.status)).length, tone: "amber" },
-    { label: "供应商准入", value: suppliers.value.filter((item) => ["pending", "restricted"].includes(item.admissionStatus ?? item.status)).length, tone: "green" },
-    { label: "异常订单", value: orders.value.filter((item) => ["return_requested", "return_rejected", "partial"].includes(item.status)).length, tone: "red" }
+    { label: "待处理采购", value: projects.value.filter((item) => isFormalProject(item) && !["archived", "closed"].includes(item.status)).length, tone: "blue", to: "/my-tasks" },
+    { label: "报价截止提醒", value: projects.value.filter((item) => isFormalProject(item) && ["document_published", "bidding_open"].includes(item.status)).length, tone: "amber", to: "/announcements-invitations" },
+    { label: "待发公告", value: projects.value.filter((item) => isFormalProject(item) && ["document_locked", "document_published"].includes(item.status)).length, tone: "green", to: "/announcements-invitations" },
+    { label: "异常订单", value: orders.value.filter((item) => ["return_requested", "return_rejected", "partial"].includes(item.status)).length, tone: "red", to: "/order-fulfillment" }
   ];
 });
 
 const todoItems = computed(() => {
+  if (session.roleId === "expert") {
+    return expertTodoItems.value;
+  }
   if (supplierRoles.has(session.roleId)) {
     return [
       ...projects.value.filter(isFormalProject).slice(0, 2).map((item) => ({ title: item.name ?? item.title ?? "采购项目", meta: "报价响应", status: labelStatus(item.status), to: "/bidding" })),
@@ -189,39 +304,78 @@ const todoItems = computed(() => {
   if (session.roleId === "admin") {
     return [{ title: "权限与基础配置", meta: "系统配置", status: "待维护", to: "/permissions" }];
   }
+  if (session.roleId === "group_manager") {
+    return [
+      ...groupPendingRequestTasks.value.slice(0, 3),
+      ...projects.value
+        .filter((item) => isFormalProject(item) && !["archived", "closed"].includes(item.status))
+        .slice(0, 2)
+        .map((item) => ({ title: item.name ?? item.title ?? "采购项目", meta: `预算 ${money(item.budgetAmount)}`, status: labelStatus(item.status), to: "/project-workbench" }))
+    ].slice(0, 5);
+  }
+  if (["buyer", "platform_operator"].includes(session.roleId)) {
+    return [
+      ...projects.value.filter(isFormalProject).slice(0, 3).map((item) => ({ title: item.name ?? item.title ?? "采购项目", meta: `预算 ${money(item.budgetAmount)}`, status: labelStatus(item.status), to: "/project-workbench" })),
+      ...products.value.slice(0, 2).map((item) => ({ title: item.name, meta: `${item.supplierName ?? supplierName(item.supplierId)} / ${productPrice(item)}`, status: labelStatus(item.status), to: "/supply-mall" }))
+    ].slice(0, 5);
+  }
   return [
     ...projects.value.filter(isFormalProject).slice(0, 3).map((item) => ({ title: item.name ?? item.title ?? "采购项目", meta: `预算 ${money(item.budgetAmount)}`, status: labelStatus(item.status), to: "/procurement-requests" })),
-    ...suppliers.value.slice(0, 2).map((item) => ({ title: item.name, meta: item.risk ?? item.qualification ?? "供应商档案", status: labelStatus(item.admissionStatus ?? item.status), to: "/suppliers" }))
+    ...products.value.slice(0, 2).map((item) => ({ title: item.name, meta: `${item.supplierName ?? supplierName(item.supplierId)} / ${productPrice(item)}`, status: labelStatus(item.status), to: "/supply-mall" }))
   ].slice(0, 5);
 });
 
 const recentActivities = computed(() => {
-  const productActivities = products.value.slice(0, 2).map((item) => ({
-    title: item.name,
-    meta: `${item.supplierName ?? supplierName(item.supplierId)} / ${productPrice(item)}`,
-    time: item.activePrice?.deliveryDays ? `${item.activePrice.deliveryDays} 天交付` : "商品目录",
-    to: "/supply-mall"
-  }));
+  if (session.roleId === "expert") {
+    return workflowMessages.value
+      .slice(0, 5)
+      .map((message) => ({
+        title: message.title,
+        meta: message.businessTypeLabel,
+        time: formatDateTime(message.createdAt),
+        to: message.targetPath
+      }));
+  }
+  const productActivities = canUseCatalogActivities(session.roleId)
+    ? products.value.slice(0, 2).map((item) => ({
+        title: item.name,
+        meta: `${item.supplierName ?? supplierName(item.supplierId)} / ${productPrice(item)}`,
+        time: item.activePrice?.deliveryDays ? `${item.activePrice.deliveryDays} 天交付` : "商品目录",
+        to: "/supply-mall"
+      }))
+    : [];
   const auditActivities = auditLogs.value.slice(0, 3).map((item) => ({
     title: labelAuditAction(item.action),
     meta: labelObjectType(item.objectType),
     time: formatDateTime(item.createdAt),
-    to: "/audit"
+    to: auditActivityTarget()
   }));
   return [...productActivities, ...auditActivities].slice(0, 5);
+});
+
+const activityLink = computed(() => {
+  if (session.roleId === "group_manager") return { label: "项目档案", to: "/archive-audit" };
+  if (auditRoles.has(session.roleId)) return { label: "日志与监督", to: "/audit" };
+  if (financeRoles.has(session.roleId)) return { label: "结算与发票", to: "/settlement-materials" };
+  if (supplierRoles.has(session.roleId)) return { label: "报价响应", to: "/bidding" };
+  if (session.roleId === "expert") return { label: "消息中心", to: "/messages" };
+  return { label: "商品目录", to: "/supply-mall" };
 });
 
 async function loadDashboard() {
   if (!session.roleId) return;
   loadError.value = "";
   try {
-    const [healthData, projectData, supplierData, productData, orderData, auditData] = await Promise.all([
+    const [healthData, projectData, supplierData, productData, orderData, auditData, processTaskData, workflowTaskData, workflowMessageData] = await Promise.all([
       apiGet<{ status: string }>("/health").catch(() => ({ status: "unavailable" })),
       canReadProjects(session.roleId) ? apiGet<{ projects: ProjectRow[] }>("/api/projects").catch(() => ({ projects: [] })) : Promise.resolve({ projects: [] }),
       canReadSuppliers(session.roleId) ? apiGet<{ suppliers: SupplierRow[] }>("/api/suppliers").catch(() => ({ suppliers: [] })) : Promise.resolve({ suppliers: [] }),
       session.roleId === "admin" ? Promise.resolve({ products: [] }) : apiGet<{ products: ProductRow[] }>("/api/mall/products").catch(() => ({ products: [] })),
       session.roleId === "admin" ? Promise.resolve({ orders: [] }) : apiGet<{ orders: OrderRow[] }>("/api/mall/orders").catch(() => ({ orders: [] })),
-      canReadAuditLogs(session.roleId) ? apiGet<{ auditLogs: AuditRow[] }>("/api/audit-logs").catch(() => ({ auditLogs: [] })) : Promise.resolve({ auditLogs: [] })
+      canReadAuditLogs(session.roleId) ? apiGet<{ auditLogs: AuditRow[] }>("/api/audit-logs").catch(() => ({ auditLogs: [] })) : Promise.resolve({ auditLogs: [] }),
+      session.roleId !== "admin" ? loadProcessTasks().catch(() => []) : Promise.resolve([]),
+      session.roleId !== "admin" ? loadWorkflowTasks(session).catch(() => []) : Promise.resolve([]),
+      session.roleId !== "admin" ? loadWorkflowNotifications().catch(() => []) : Promise.resolve([])
     ]);
     const formalProjects = projectData.projects.filter(isFormalProject);
     const procurementOrderData = supplierRoles.has(session.roleId)
@@ -236,9 +390,12 @@ async function loadDashboard() {
     suppliers.value = supplierData.suppliers;
     products.value = productData.products;
     orders.value = combineOrders(orderData.orders, procurementOrderData.flatMap((item) => item.purchaseOrders));
-    auditLogs.value = auditData.auditLogs;
+    auditLogs.value = auditData.auditLogs.filter(isBusinessAuditLog);
+    processTasks.value = processTaskData;
+    workflowTasks.value = workflowTaskData;
+    workflowMessages.value = workflowMessageData;
   } catch (error) {
-    loadError.value = error instanceof Error ? error.message : "工作台加载失败";
+    loadError.value = error instanceof Error ? error.message : "首页加载失败";
   }
 }
 
@@ -265,10 +422,16 @@ watch(
     <p v-if="loadError" class="inline-error">{{ loadError }}</p>
 
     <div class="kpi-row">
-      <article v-for="card in summaryCards" :key="card.label" class="kpi-card" :class="`tone-${card.tone}`">
-        <span>{{ card.label }}</span>
-        <strong>{{ card.value }}</strong>
-      </article>
+      <template v-for="card in summaryCards" :key="card.label">
+        <RouterLink v-if="card.to" class="kpi-card clickable" :class="`tone-${card.tone}`" :to="card.to">
+          <span>{{ card.label }}</span>
+          <strong>{{ card.value }}</strong>
+        </RouterLink>
+        <article v-else class="kpi-card" :class="`tone-${card.tone}`">
+          <span>{{ card.label }}</span>
+          <strong>{{ card.value }}</strong>
+        </article>
+      </template>
     </div>
   </section>
 
@@ -276,7 +439,7 @@ watch(
     <div class="business-panel">
       <div class="panel-head">
         <h3>待办事项</h3>
-        <RouterLink v-if="session.roleId !== 'admin'" class="text-link" to="/my-tasks">查看任务</RouterLink>
+        <RouterLink v-if="session.roleId !== 'admin'" class="text-link" :to="todoEntryLink.to">{{ todoEntryLink.label }}</RouterLink>
       </div>
       <div v-if="todoItems.length" class="work-list">
         <RouterLink v-for="item in todoItems" :key="`${item.to}-${item.title}`" :to="item.to" class="work-list-row">
@@ -291,7 +454,7 @@ watch(
     <div class="business-panel">
       <div class="panel-head">
         <h3>近期动态</h3>
-        <RouterLink class="text-link" to="/supply-mall">商品目录</RouterLink>
+        <RouterLink class="text-link" :to="activityLink.to">{{ activityLink.label }}</RouterLink>
       </div>
       <div v-if="recentActivities.length" class="activity-list">
         <RouterLink v-for="item in recentActivities" :key="`${item.title}-${item.time}`" :to="item.to" class="activity-row">

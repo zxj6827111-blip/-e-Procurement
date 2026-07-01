@@ -78,7 +78,17 @@ async function createListedProduct(runtime: ReturnType<typeof boot>) {
   const listed = await request(runtime.app)
     .post(`/api/mall/products/${product.body.product.id}/status`)
     .set("x-mock-user-id", "u2")
-    .send({ status: "listed" });
+    .send({
+      status: "listed",
+      sourceType: "agreement",
+      sourceAgreementNo: "AG-R2-001",
+      purchasePrice: 70,
+      salePrice: 88.5,
+      taxRate: 0.13,
+      deliveryDays: 3,
+      effectiveFrom: "2026-07-01",
+      effectiveTo: "2026-12-31"
+    });
   expect(listed.status).toBe(200);
 
   return { productId: product.body.product.id as string, priceId: price.body.price.id as string, imageFileId: image.body.file.id as string };

@@ -34,7 +34,7 @@ function expectDenied(response: request.Response, code: string, sensitiveTokens:
   }
 }
 
-function seedSupplier(runtime: ReturnType<typeof boot>, supplierId: string, userId: string, category: string) {
+function seedSupplier(runtime: ReturnType<typeof boot>, supplierId: string, userId: string, category: string, registrationStatus: "submitted" | "qualified" = "qualified") {
   runtime.ctx.state.projects.find((item) => item.id === "p-pre")!.participantSupplierIds.push(supplierId);
   runtime.ctx.state.users.push({ id: userId, name: `${supplierId} User`, roleId: "supplier", supplierId, orgId: "org-hotel" });
   runtime.ctx.state.suppliers.push({
@@ -47,6 +47,21 @@ function seedSupplier(runtime: ReturnType<typeof boot>, supplierId: string, user
     qualification: "valid",
     risk: "normal",
     evaluationScore: null
+  });
+  runtime.ctx.state.supplierRegistrations.push({
+    id: `reg-p-pre-${supplierId}`,
+    projectId: "p-pre",
+    announcementId: "ann-pre-1",
+    supplierId,
+    status: registrationStatus,
+    materialMetadata: [],
+    submittedAt: "2026-06-21T15:30:00.000Z",
+    ...(registrationStatus === "qualified"
+      ? {
+          qualifiedAt: "2026-06-21T16:30:00.000Z",
+          qualificationReason: "测试供应商已通过报名资格审核"
+        }
+      : {})
   });
 }
 
@@ -125,6 +140,75 @@ describe("Phase 3 bidding, locking and abnormal view approvals", () => {
     expect(download.text).toBe("phase3-resubmit-content");
   });
 
+  it("rechecks supplier admission before submitting an existing bid draft", async () => {
+    seedSupplier(runtime, "sup-recheck", "u-recheck-supplier", runtime.ctx.state.projects.find((item) => item.id === "p-pre")!.category);
+
+    const draft = await request(runtime.app)
+      .post("/api/projects/p-pre/bids")
+      .set("x-mock-user-id", "u-recheck-supplier")
+      .send({ amount: 188800, responseSummary: "draft before admission revoked" });
+    expect(draft.status).toBe(201);
+
+    const supplier = runtime.ctx.state.suppliers.find((item) => item.id === "sup-recheck");
+    expect(supplier).toBeTruthy();
+    supplier!.admissionStatus = "inactive";
+    supplier!.status = "inactive";
+    supplier!.categoryAuthorizations = supplier!.categoryAuthorizations?.map((item) => ({ ...item, status: "suspended" }));
+    runtime.ctx.r3SupplierProductRepository.upsertSupplier(supplier!);
+
+    const submitted = await request(runtime.app).post(`/api/bids/${draft.body.bid.id}/submit`).set("x-mock-user-id", "u-recheck-supplier");
+    expectDenied(submitted, "SUPPLIER_NOT_ADMITTED");
+  });
+
+  it("requires procurement qualification approval before supplier bidding", async () => {
+    seedSupplier(runtime, "sup-pending", "u-pending-supplier", runtime.ctx.state.projects.find((item) => item.id === "p-pre")!.category, "submitted");
+
+    const denied = await request(runtime.app)
+      .post("/api/projects/p-pre/bids")
+      .set("x-mock-user-id", "u-pending-supplier")
+      .send({ amount: 188800, deliveryDays: 7, responseSummary: "should wait for qualification approval" });
+
+    expectDenied(denied, "SUPPLIER_REGISTRATION_NOT_QUALIFIED", ["should wait for qualification approval"]);
+    expect(runtime.ctx.state.bids.some((item) => item.projectId === "p-pre" && item.supplierId === "sup-pending")).toBe(false);
+  });
+
+  it("blocks bid update, submit and resubmit when registration qualification is revoked", async () => {
+    seedSupplier(runtime, "sup-revoked", "u-revoked-supplier", runtime.ctx.state.projects.find((item) => item.id === "p-pre")!.category);
+
+    const draft = await request(runtime.app)
+      .post("/api/projects/p-pre/bids")
+      .set("x-mock-user-id", "u-revoked-supplier")
+      .send({ amount: 188800, deliveryDays: 7, responseSummary: "qualified draft" });
+    expect(draft.status).toBe(201);
+
+    const registration = runtime.ctx.state.supplierRegistrations.find((item) => item.projectId === "p-pre" && item.supplierId === "sup-revoked");
+    expect(registration).toBeTruthy();
+    registration!.status = "submitted";
+
+    const update = await request(runtime.app)
+      .patch(`/api/bids/${draft.body.bid.id}`)
+      .set("x-mock-user-id", "u-revoked-supplier")
+      .send({ amount: 177700, responseSummary: "should not update after revoke" });
+    expectDenied(update, "SUPPLIER_REGISTRATION_NOT_QUALIFIED", ["should not update after revoke"]);
+
+    const submit = await request(runtime.app).post(`/api/bids/${draft.body.bid.id}/submit`).set("x-mock-user-id", "u-revoked-supplier");
+    expectDenied(submit, "SUPPLIER_REGISTRATION_NOT_QUALIFIED");
+
+    registration!.status = "qualified";
+    const submitted = await request(runtime.app).post(`/api/bids/${draft.body.bid.id}/submit`).set("x-mock-user-id", "u-revoked-supplier");
+    expect(submitted.status).toBe(200);
+
+    const withdrawn = await request(runtime.app).post(`/api/bids/${draft.body.bid.id}/withdraw`).set("x-mock-user-id", "u-revoked-supplier");
+    expect(withdrawn.status).toBe(200);
+
+    registration!.status = "rejected";
+    const resubmit = await request(runtime.app)
+      .post(`/api/bids/${draft.body.bid.id}/resubmit`)
+      .set("x-mock-user-id", "u-revoked-supplier")
+      .send({ amount: 166600, responseSummary: "should not resubmit after reject" });
+    expectDenied(resubmit, "SUPPLIER_REGISTRATION_NOT_QUALIFIED", ["should not resubmit after reject"]);
+  });
+
   it("records bid abandonment reason and exposes opening room security boundary", async () => {
     seedSupplier(runtime, "sup-abandon", "u-abandon-supplier", runtime.ctx.state.projects.find((item) => item.id === "p-pre")!.category);
 
@@ -159,6 +243,15 @@ describe("Phase 3 bidding, locking and abnormal view approvals", () => {
     const buyerSummary = await request(runtime.app).get("/api/projects/p-pre/bids/summary").set("x-mock-user-id", "u2");
     expect(buyerSummary.status).toBe(200);
     expect(buyerSummary.body.submittedCount).toBe(1);
+    expect(buyerSummary.body.effectiveSubmittedCount).toBe(1);
+    expect(buyerSummary.body.bidProgress).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          supplierId: "sup-1",
+          status: "submitted"
+        })
+      ])
+    );
     expect(buyerSummary.text).not.toContain("186000");
     expect(buyerSummary.text).not.toContain("responseFileMetadata");
 
@@ -200,6 +293,87 @@ describe("Phase 3 bidding, locking and abnormal view approvals", () => {
 
     const update = await request(runtime.app).patch("/api/bids/bid-award-submitted").set("x-mock-user-id", "u3").send({ amount: 100 });
     expectDenied(update, "BID_LOCKED", ["100"]);
+  });
+
+  it("keeps bid control access aligned with project execution visibility and reports safe progress counts", async () => {
+    runtime.ctx.state.projects.push({
+      id: "p-buyer-owned",
+      code: "CG-BUYER-OWNED",
+      sourceRequestId: "req-buyer-owned",
+      name: "Buyer owned runtime project",
+      orgId: "org-hotel",
+      orgName: "上海滨江华礼酒店",
+      type: "内部公开招采",
+      status: "bidding_open",
+      displayStatus: "bidding open",
+      category: runtime.ctx.state.projects.find((item) => item.id === "p-pre")!.category,
+      budgetLabel: "¥100,000",
+      buyer: "刘明",
+      attachments: [],
+      sourceLineItems: [],
+      quoteDeadlineAt: "2099-12-31T17:00:00.000Z",
+      beforeDeadline: true,
+      qualificationRequirements: [],
+      quoteRequirements: [],
+      deliveryRequirements: [],
+      clarificationRecords: [],
+      externalTradeFlag: false,
+      participantSupplierIds: [],
+      assignedExpertIds: []
+    });
+    runtime.ctx.state.supplierInvitations.push({
+      id: "inv-buyer-owned-sup-1",
+      projectId: "p-buyer-owned",
+      announcementId: "ann-buyer-owned",
+      supplierId: "sup-1",
+      status: "sent",
+      notificationStatus: "sent",
+      notifiedAt: "2026-06-30T10:00:00.000Z",
+      createdAt: "2026-06-30T10:00:00.000Z"
+    });
+    runtime.ctx.state.bids.push(
+      {
+        id: "bid-buyer-owned-draft",
+        projectId: "p-buyer-owned",
+        supplierId: "sup-1",
+        amount: 99000,
+        status: "draft",
+        submittedAt: null,
+        quoteDeadlineAt: "2099-12-31T17:00:00.000Z",
+        lockedAt: null,
+        fileId: "file-buyer-owned-draft",
+        fileName: "draft.pdf"
+      },
+      {
+        id: "bid-buyer-owned-submitted",
+        projectId: "p-buyer-owned",
+        supplierId: "sup-2",
+        amount: 98000,
+        status: "submitted",
+        submittedAt: "2026-06-30T11:00:00.000Z",
+        quoteDeadlineAt: "2099-12-31T17:00:00.000Z",
+        lockedAt: null,
+        fileId: "file-buyer-owned-submitted",
+        fileName: "submitted.pdf"
+      }
+    );
+
+    const summary = await request(runtime.app).get("/api/projects/p-buyer-owned/bids/summary").set("x-mock-user-id", "u2");
+
+    expect(summary.status).toBe(200);
+    expect(summary.body.draftCount).toBe(1);
+    expect(summary.body.submittedCount).toBe(1);
+    expect(summary.body.effectiveSubmittedCount).toBe(1);
+    expect(summary.body.totalInvitedSuppliers).toBe(2);
+    expect(summary.body.bidProgress).toHaveLength(2);
+    expect(summary.text).not.toContain("99000");
+    expect(summary.text).not.toContain("98000");
+
+    const approval = await request(runtime.app)
+      .post("/api/bid-view-approvals")
+      .set("x-mock-user-id", "u2")
+      .send({ projectId: "p-buyer-owned", targetSupplierId: "sup-1", viewContent: "response_file_metadata" });
+    expect(approval.status).toBe(201);
   });
 
   it("generates and freezes comparison report after deadline", async () => {

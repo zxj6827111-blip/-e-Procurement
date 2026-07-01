@@ -38,7 +38,7 @@ describe("Stage 2 supplier admission, procurement request and project initiation
 
     const createdSupplier = await request(runtime1.app)
       .post("/api/suppliers/admissions")
-      .set("x-mock-user-id", "u2")
+      .set("x-mock-user-id", "u1")
       .send({
         name: "Stage2 持久化供应商",
         category: "客房一次性用品",
@@ -63,7 +63,7 @@ describe("Stage 2 supplier admission, procurement request and project initiation
 
     const createdRequest = await request(runtime1.app)
       .post("/api/procurement-requests")
-      .set("x-mock-user-id", "u2")
+      .set("x-mock-user-id", "u8")
       .send({
         title: "Stage2 持久化采购申请",
         orgId: "org-hotel",
@@ -99,7 +99,7 @@ describe("Stage 2 supplier admission, procurement request and project initiation
     expect(createdRequest.status).toBe(201);
     const requestId = createdRequest.body.procurementRequest.id as string;
 
-    const submitted = await request(runtime1.app).post(`/api/procurement-requests/${requestId}/submit`).set("x-mock-user-id", "u2");
+    const submitted = await request(runtime1.app).post(`/api/procurement-requests/${requestId}/submit`).set("x-mock-user-id", "u8");
     expect(submitted.status).toBe(200);
 
     const approved = await request(runtime1.app)
@@ -169,7 +169,7 @@ describe("Stage 2 supplier admission, procurement request and project initiation
 
     const created = await request(runtime.app)
       .post("/api/procurement-requests")
-      .set("x-mock-user-id", "u2")
+      .set("x-mock-user-id", "u8")
       .send({
         title: "Stage2 审批前校验",
         orgId: "org-hotel",
@@ -181,18 +181,29 @@ describe("Stage 2 supplier admission, procurement request and project initiation
     expect(created.status).toBe(201);
     const requestId = created.body.procurementRequest.id as string;
 
-    await request(runtime.app).post(`/api/procurement-requests/${requestId}/submit`).set("x-mock-user-id", "u2");
+    await request(runtime.app).post(`/api/procurement-requests/${requestId}/submit`).set("x-mock-user-id", "u8");
 
     const methodDenied = await request(runtime.app)
       .post(`/api/procurement-requests/${requestId}/method-decision`)
       .set("x-mock-user-id", "u2")
       .send({ ruleId: "pmr-1" });
-    expectDenied(methodDenied, "PROCUREMENT_REQUEST_APPROVAL_REQUIRED");
+    expectDenied(methodDenied, "PROCUREMENT_REQUEST_SCOPE_DENIED");
 
     const projectDenied = await request(runtime.app)
       .post("/api/projects")
       .set("x-mock-user-id", "u2")
       .send({ requestId, name: "未审批不得立项" });
-    expectDenied(projectDenied, "PROCUREMENT_REQUEST_NOT_READY");
+    expectDenied(projectDenied, "PROCUREMENT_REQUEST_SCOPE_DENIED");
+
+    await request(runtime.app)
+      .post(`/api/procurement-requests/${requestId}/approve`)
+      .set("x-mock-user-id", "u1")
+      .send({ approved: true });
+
+    const notReadyProject = await request(runtime.app)
+      .post("/api/projects")
+      .set("x-mock-user-id", "u2")
+      .send({ requestId, name: "未判定方式不得立项" });
+    expectDenied(notReadyProject, "PROCUREMENT_REQUEST_NOT_READY");
   });
 });

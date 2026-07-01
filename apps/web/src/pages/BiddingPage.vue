@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { apiGet, apiPatch, apiPost, uploadFile } from "../api/http";
 import AuditLogRef from "../components/AuditLogRef.vue";
 import ErrorAlert from "../components/ErrorAlert.vue";
+import ProcessTimeline from "../components/ProcessTimeline.vue";
+import type { ProcessBusinessType } from "../api/process";
 import { isTestLikeText } from "../utils/business-display";
 import { formatDateTime, labelStatus } from "../utils/status-labels";
 
@@ -10,6 +13,7 @@ interface Project {
   id: string;
   code: string;
   name: string;
+  type: string;
   beforeDeadline: boolean;
   externalTradeFlag: boolean;
 }
@@ -32,10 +36,16 @@ interface Bid {
   versionNo?: number;
 }
 
+interface Registration {
+  projectId: string;
+  status: string;
+}
+
 const projects = ref<Project[]>([]);
 const bids = ref<Bid[]>([]);
 const suppliers = ref<Array<{ id: string; name: string }>>([]);
-const selectedProjectId = ref("p-pre");
+const registrations = ref<Registration[]>([]);
+const selectedProjectId = ref("");
 const selectedBidId = ref("");
 const amount = ref(188800);
 const taxRate = ref(0.13);
@@ -48,6 +58,15 @@ const responseFile = ref<File | null>(null);
 const responseFileName = ref("");
 const auditLogId = ref("");
 const error = ref("");
+const businessDialog = ref("");
+const processRefreshKey = ref(0);
+const route = useRoute();
+const router = useRouter();
+const biddingEntryHint = "报价响应只开放给报名资格已通过的供应商。请先在“报名资料”提交材料，采购经办人审核通过后，才可以在这里保存草稿并提交报价。";
+const emptyProjectHint = computed(() => {
+  if (projects.value.length > 0) return "";
+  return "暂无可报价项目。请先确认已在“报名资料”提交报名材料，并等待采购经办人审核通过。";
+});
 
 function projectLabel(projectId: string) {
   const project = projects.value.find((item) => item.id === projectId);
@@ -60,6 +79,14 @@ function supplierName(supplierId: string, fallback?: string) {
 
 function bidLabel(bid: Bid, index?: number) {
   return `报价单${index === undefined ? "" : ` ${index + 1}`} / ${supplierName(bid.supplierId, bid.supplierName)} / ${labelStatus(bid.status)}`;
+}
+
+function projectProcessType(projectId: string): ProcessBusinessType {
+  const project = projects.value.find((item) => item.id === projectId);
+  const method = `${(project as Project & { type?: string } | undefined)?.type ?? ""}`.toLowerCase();
+  if (method.includes("direct") || method.includes("直接")) return "direct_purchase";
+  if (method.includes("comparison") || method.includes("rfq") || method.includes("询价") || method.includes("比选")) return "rfq";
+  return "tender";
 }
 
 function onFileChange(event: Event) {
@@ -90,16 +117,33 @@ async function bidPayload() {
   return payload;
 }
 
-async function load() {
-  const [projectData, supplierData] = await Promise.all([
-    apiGet<{ projects: Project[] }>("/api/projects"),
-    apiGet<{ suppliers: Array<{ id: string; name: string }> }>("/api/suppliers").catch(() => ({ suppliers: [] }))
-  ]);
-  projects.value = projectData.projects.filter((item) => !item.externalTradeFlag && !isTestLikeText(item.name));
-  suppliers.value = supplierData.suppliers;
-  if (!projects.value.some((item) => item.id === selectedProjectId.value)) {
-    selectedProjectId.value = projects.value[0]?.id ?? "";
+function routeProjectId() {
+  const value = route.query.projectId;
+  return Array.isArray(value) ? String(value[0] ?? "") : String(value ?? "");
+}
+
+function pickProjectFromRouteOrFallback(preferRoute: boolean) {
+  const queryProjectId = routeProjectId();
+  if (preferRoute && queryProjectId && projects.value.some((item) => item.id === queryProjectId)) {
+    selectedProjectId.value = queryProjectId;
+    return;
   }
+  if (!projects.value.some((item) => item.id === selectedProjectId.value)) {
+    selectedProjectId.value = (queryProjectId && projects.value.some((item) => item.id === queryProjectId) ? queryProjectId : projects.value[0]?.id) ?? "";
+  }
+}
+
+async function load(options: { preferRoute?: boolean } = {}) {
+  const [projectData, supplierData, registrationData] = await Promise.all([
+    apiGet<{ projects: Project[] }>("/api/projects"),
+    apiGet<{ suppliers: Array<{ id: string; name: string }> }>("/api/suppliers").catch(() => ({ suppliers: [] })),
+    apiGet<{ registrations: Registration[] }>("/api/registrations").catch(() => ({ registrations: [] }))
+  ]);
+  registrations.value = registrationData.registrations;
+  const qualifiedProjectIds = new Set(registrations.value.filter((item) => item.status === "qualified").map((item) => item.projectId));
+  projects.value = projectData.projects.filter((item) => !item.externalTradeFlag && !isTestLikeText(item.name) && qualifiedProjectIds.has(item.id));
+  suppliers.value = supplierData.suppliers;
+  pickProjectFromRouteOrFallback(Boolean(options.preferRoute));
   if (selectedProjectId.value) {
     const summary = await apiGet<{ bids?: Bid[] }>(`/api/projects/${selectedProjectId.value}/bids/summary`);
     bids.value = summary.bids ?? [];
@@ -111,26 +155,53 @@ async function load() {
 
 async function run(action: () => Promise<{ auditLogId?: string; bid?: Bid }>) {
   error.value = "";
+  businessDialog.value = "";
   try {
     const result = await action();
     auditLogId.value = result.auditLogId ?? "";
     selectedBidId.value = result.bid?.id ?? selectedBidId.value;
+    processRefreshKey.value += 1;
     await load();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "操作失败";
+    const message = err instanceof Error ? err.message : "操作失败";
+    if (message.includes("当前项目还不能报价") || message.includes("报名")) {
+      businessDialog.value = message;
+    } else {
+      error.value = message;
+    }
   }
 }
 
-onMounted(load);
+function onProjectChange() {
+  void load();
+}
+
+function closeBusinessDialog() {
+  businessDialog.value = "";
+}
+
+async function goRegistration() {
+  businessDialog.value = "";
+  await router.push("/supplier-registration");
+}
+
+onMounted(() => {
+  void load({ preferRoute: true });
+});
+watch(() => route.query.projectId, () => {
+  void load({ preferRoute: true });
+});
 </script>
 
 <template>
   <section class="panel">
     <h2>报价响应</h2>
+    <p class="notice">{{ biddingEntryHint }}</p>
     <div class="form-grid">
       <label>
         项目
-        <select v-model="selectedProjectId" @change="load">
+        <select v-model="selectedProjectId" @change="onProjectChange">
+          <option v-if="!projects.length" value="">暂无可报价项目</option>
           <option v-for="project in projects" :key="project.id" :value="project.id">{{ project.code }} / {{ project.name }}</option>
         </select>
       </label>
@@ -176,6 +247,8 @@ onMounted(load);
       </button>
     </div>
 
+    <p v-if="emptyProjectHint" class="notice">{{ emptyProjectHint }}</p>
+
     <table>
       <thead>
         <tr>
@@ -205,6 +278,14 @@ onMounted(load);
       </tbody>
     </table>
 
+    <ProcessTimeline
+      v-if="selectedProjectId"
+      :business-type="projectProcessType(selectedProjectId)"
+      :business-id="selectedProjectId"
+      title="招采响应流程轨迹"
+      :refresh-key="processRefreshKey"
+    />
+
     <div class="form-grid">
       <label>
         报价单
@@ -220,5 +301,16 @@ onMounted(load);
 
     <AuditLogRef :audit-log-id="auditLogId" />
     <ErrorAlert v-if="error" :message="error" />
+
+    <div v-if="businessDialog" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="bidding-dialog-title">
+      <section class="modal-panel">
+        <h3 id="bidding-dialog-title">暂时不能提交报价</h3>
+        <p>{{ businessDialog }}</p>
+        <div class="modal-actions">
+          <button type="button" class="secondary-button" @click="closeBusinessDialog">知道了</button>
+          <button type="button" @click="goRegistration">去报名资料</button>
+        </div>
+      </section>
+    </div>
   </section>
 </template>

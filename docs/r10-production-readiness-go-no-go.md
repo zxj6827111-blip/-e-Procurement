@@ -65,3 +65,19 @@ UAT 不应验证为：
 5. 完成 HTTPS、Secure Cookie、CORS 白名单、反向代理、安全头和密钥管理。
 6. 完成日志、指标、告警、值班、RPO/RTO、应急预案和回滚手册。
 7. 客户业务、财务、审计、运维和安全共同签署生产验收。
+
+## M6-C 最终复核
+
+日期：2026-06-28
+
+M6-C 复核后结论：
+
+| 场景 | 结论 | 证据 |
+|---|---|---|
+| 本地演示 / 内部走查 | Go | M6-C API、浏览器、readiness、备份恢复 |
+| 客户 UAT | Go | `docs/m6c-final-security-ops-go-no-go-report.md` |
+| 客户二次开发基础 | Go | adapter 契约、Process 影子层、BPMN 试点治理、运维文档 |
+| 受控小范围试运行 | Conditional Go | 需限定范围、保留回滚、明确未真实联调边界 |
+| 正式生产上线 | Conditional No-Go | 未完成真实 SSO、正式数据库、对象存储、杀毒、监控告警和外部系统端到端联调 |
+
+M6-C 明确不改变 R8 主执行源，不把 Process Layer 或 BPMN pilot 宣称为生产执行源，不把 mock adapter、SQLite、本地文件或本地浏览器验收当作正式生产证据。

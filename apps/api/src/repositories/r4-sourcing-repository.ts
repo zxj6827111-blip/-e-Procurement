@@ -2,6 +2,7 @@ import type { RuntimeDb } from "../runtime/index.js";
 import type {
   Bid,
   BidLineItem,
+  ProcurementDocument,
   ProcurementDocumentAttachment,
   ProcurementProject,
   ProcurementRequest,
@@ -56,16 +57,20 @@ function mergeById<T extends { id: string }>(target: T[], source: T[]) {
 }
 
 export class R4SourcingRepository {
-  constructor(private readonly runtimeDb: RuntimeDb) {}
+  constructor(private readonly runtimeDb: RuntimeDb) {
+    this.migrate();
+  }
 
   syncSourcingState(state: {
     procurementRequests: ProcurementRequest[];
+    procurementDocuments: ProcurementDocument[];
     projects: ProcurementProject[];
     supplierInvitations: SupplierInvitation[];
     supplierRegistrations: SupplierRegistration[];
     bids: Bid[];
   }) {
     mergeById(state.procurementRequests, this.listProcurementRequests());
+    mergeById(state.procurementDocuments, this.listProcurementDocuments());
     mergeById(state.projects, this.listProjects());
     mergeById(state.supplierInvitations, this.listSupplierInvitations());
     mergeById(state.supplierRegistrations, this.listSupplierParticipations());
@@ -154,6 +159,56 @@ export class R4SourcingRepository {
   deleteProcurementRequest(requestId: string) {
     this.runtimeDb.db.prepare("delete from r2_procurement_request_items where request_id = ?").run(requestId);
     this.runtimeDb.db.prepare("delete from r2_procurement_requests where id = ?").run(requestId);
+  }
+
+  listProcurementDocuments(): ProcurementDocument[] {
+    const rows = this.runtimeDb.db.prepare("select * from r2_procurement_documents order by id").all() as Row[];
+    return rows.map((row) => this.procurementDocumentFromRow(row));
+  }
+
+  upsertProcurementDocument(document: ProcurementDocument) {
+    const now = new Date().toISOString();
+    run(
+      this.runtimeDb.db.prepare(
+        `insert into r2_procurement_documents (
+          id, project_id, title, version_no, document_status, review_status, content_summary,
+          attachment_metadata_json, previous_document_id, created_by, created_at, updated_at,
+          published_at, locked_at, synced_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        on conflict(id) do update set
+          project_id = excluded.project_id,
+          title = excluded.title,
+          version_no = excluded.version_no,
+          document_status = excluded.document_status,
+          review_status = excluded.review_status,
+          content_summary = excluded.content_summary,
+          attachment_metadata_json = excluded.attachment_metadata_json,
+          previous_document_id = excluded.previous_document_id,
+          created_by = excluded.created_by,
+          created_at = excluded.created_at,
+          updated_at = excluded.updated_at,
+          published_at = excluded.published_at,
+          locked_at = excluded.locked_at,
+          synced_at = excluded.synced_at`
+      ),
+      [
+        document.id,
+        document.projectId,
+        document.title,
+        document.versionNo,
+        document.status,
+        document.reviewStatus,
+        document.contentSummary,
+        JSON.stringify(document.attachmentMetadata ?? []),
+        document.previousDocumentId ?? null,
+        document.createdBy,
+        document.createdAt,
+        document.updatedAt,
+        document.publishedAt,
+        document.lockedAt,
+        now
+      ]
+    );
   }
 
   listProjects(): ProcurementProject[] {
@@ -559,6 +614,29 @@ export class R4SourcingRepository {
     for (const record of records) this.upsertClarification(projectId, record);
   }
 
+  private migrate() {
+    this.runtimeDb.db.exec(`
+      create table if not exists r2_procurement_documents (
+        id text primary key,
+        project_id text not null,
+        title text not null,
+        version_no integer not null,
+        document_status text not null,
+        review_status text not null,
+        content_summary text not null,
+        attachment_metadata_json text not null,
+        previous_document_id text null,
+        created_by text not null,
+        created_at text not null,
+        updated_at text not null,
+        published_at text null,
+        locked_at text null,
+        synced_at text not null
+      );
+      create index if not exists idx_r2_procurement_documents_project on r2_procurement_documents(project_id, document_status, review_status);
+    `);
+  }
+
   private requestFromRow(row: Row): ProcurementRequest {
     const requestId = String(row.id);
     const lineRows = this.runtimeDb.db.prepare("select * from r2_procurement_request_items where request_id = ? order by id").all(requestId) as Row[];
@@ -590,6 +668,25 @@ export class R4SourcingRepository {
       createdBy: optionalString(row.created_by),
       createdAt: optionalString(row.created_at),
       updatedAt: optionalString(row.updated_at)
+    };
+  }
+
+  private procurementDocumentFromRow(row: Row): ProcurementDocument {
+    return {
+      id: String(row.id),
+      projectId: String(row.project_id),
+      title: String(row.title),
+      versionNo: Number(row.version_no),
+      status: String(row.document_status) as ProcurementDocument["status"],
+      reviewStatus: String(row.review_status) as ProcurementDocument["reviewStatus"],
+      contentSummary: String(row.content_summary ?? ""),
+      attachmentMetadata: json<ProcurementDocumentAttachment[]>(row.attachment_metadata_json, []),
+      previousDocumentId: optionalString(row.previous_document_id),
+      createdBy: String(row.created_by),
+      createdAt: String(row.created_at),
+      updatedAt: String(row.updated_at),
+      publishedAt: row.published_at === null || row.published_at === undefined ? null : String(row.published_at),
+      lockedAt: row.locked_at === null || row.locked_at === undefined ? null : String(row.locked_at)
     };
   }
 

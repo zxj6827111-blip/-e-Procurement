@@ -22,6 +22,15 @@ export function integrationRoutes(ctx: AppContext) {
     return res.json({ adapters });
   });
 
+  router.get("/integration-contracts", (req, res) => {
+    if (!assertIntegrationOperator(ctx, req, res)) return;
+    const contracts = Object.values(ctx.adapters).map((adapter) => adapter.contract());
+    return res.json({
+      contracts,
+      boundary: "M6-B exposes adapter contracts and configured endpoint status only. verifiedIntegration=false means no real customer-system联调证据 has been attached."
+    });
+  });
+
   router.get("/integration-jobs", (req, res) => {
     if (!assertIntegrationOperator(ctx, req, res)) return;
     const jobs = Object.entries(ctx.adapters).flatMap(([key, adapter]) => adapter.logs().map((log) => ({ ...log, key })));

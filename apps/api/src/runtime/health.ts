@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { buildIntegrationAdapterContract, integrationAdapterContractDefinitions, type IntegrationLiveStatus } from "../adapters/integration-contracts.js";
 import { configuredEndpointKeys, validateRuntimeConfig, type RuntimeConfig } from "./config.js";
 import { createFileStorageBackend } from "./file-store.js";
 
@@ -26,14 +27,29 @@ export interface HealthStatus {
     corsConfigured: boolean;
     integrationConfiguredCount: number;
     integrationConfiguredProviders: string[];
+    integrationContractSummary: {
+      total: number;
+      endpointConfigured: number;
+      verifiedIntegration: number;
+      liveStatusCounts: Record<IntegrationLiveStatus, number>;
+      productionBoundary: string;
+    };
     integrationMaxAttempts: number;
     csrfStrategy: RuntimeConfig["csrfStrategy"];
     antivirusScanMode: RuntimeConfig["antivirusScanMode"];
   };
+  workflow: {
+    executionSource: RuntimeConfig["workflowExecutionSource"];
+    processLayerMode: RuntimeConfig["processLayerMode"];
+    bpmnPilotMode: RuntimeConfig["bpmnPilotMode"];
+    note: string;
+  };
   readiness: {
     productionReady: boolean;
     failureCount: number;
+    errorCount: number;
     warningCount: number;
+    infoCount: number;
     checks: ReturnType<typeof validateRuntimeConfig>;
   };
 }
@@ -59,7 +75,14 @@ export function buildHealthStatus(config: RuntimeConfig): HealthStatus {
   const checks = validateRuntimeConfig(config);
   const failureCount = checks.filter((check) => check.level === "failure").length;
   const warningCount = checks.filter((check) => check.level === "warning").length;
+  const infoCount = checks.filter((check) => check.level === "info").length;
   const configuredProviders = configuredEndpointKeys(config);
+  const integrationContracts = integrationAdapterContractDefinitions.map((definition) => buildIntegrationAdapterContract(definition, configuredProviders.includes(definition.key)));
+  const liveStatusCounts = {
+    contract_boundary: integrationContracts.filter((contract) => contract.liveStatus === "contract_boundary").length,
+    configured_endpoint_unverified: integrationContracts.filter((contract) => contract.liveStatus === "configured_endpoint_unverified").length,
+    verified_integration: integrationContracts.filter((contract) => contract.liveStatus === "verified_integration").length
+  };
   return {
     status: "ok",
     service: "e-procurement-api",
@@ -86,14 +109,29 @@ export function buildHealthStatus(config: RuntimeConfig): HealthStatus {
       corsConfigured: config.corsAllowedOrigins.length > 0,
       integrationConfiguredCount: configuredProviders.length,
       integrationConfiguredProviders: configuredProviders,
+      integrationContractSummary: {
+        total: integrationContracts.length,
+        endpointConfigured: integrationContracts.filter((contract) => contract.endpointConfigured).length,
+        verifiedIntegration: integrationContracts.filter((contract) => contract.verifiedIntegration).length,
+        liveStatusCounts,
+        productionBoundary: "M6-B records adapter contracts and configured endpoints only; production Go still requires real customer-system evidence."
+      },
       integrationMaxAttempts: config.integrationMaxAttempts,
       csrfStrategy: config.csrfStrategy,
       antivirusScanMode: config.antivirusScanMode
     },
+    workflow: {
+      executionSource: config.workflowExecutionSource,
+      processLayerMode: config.processLayerMode,
+      bpmnPilotMode: config.bpmnPilotMode,
+      note: "R8 Workflow remains the primary execution source; Process Layer and BPMN are not production execution engines in M6-A."
+    },
     readiness: {
       productionReady: config.appEnv === "production" && failureCount === 0 && warningCount === 0,
       failureCount,
+      errorCount: failureCount,
       warningCount,
+      infoCount,
       checks
     }
   };

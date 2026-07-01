@@ -58,8 +58,8 @@ export class R3SupplierProductRepository {
           supplier_type, supplier_source, social_credit_code, business_license_no, legal_representative,
           registered_address, business_scope, qualification_status, risk_note, restriction_reason, restricted_at,
           evaluation_score, admission_level, admission_rule_code, admission_rule_snapshot_json, regularized_at,
-          periodic_assessment_json, registration_trace_json, category_auth_json, updated_at
-        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          periodic_assessment_json, registration_trace_json, onboarding_profile_json, category_auth_json, updated_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         on conflict(id) do update set
           supplier_name = excluded.supplier_name,
           admission_status = excluded.admission_status,
@@ -85,6 +85,7 @@ export class R3SupplierProductRepository {
           regularized_at = excluded.regularized_at,
           periodic_assessment_json = excluded.periodic_assessment_json,
           registration_trace_json = excluded.registration_trace_json,
+          onboarding_profile_json = excluded.onboarding_profile_json,
           category_auth_json = excluded.category_auth_json,
           updated_at = excluded.updated_at`
       ),
@@ -114,6 +115,7 @@ export class R3SupplierProductRepository {
         supplier.regularizedAt ?? null,
         supplier.periodicAssessment ? JSON.stringify(supplier.periodicAssessment) : null,
         supplier.registrationTrace ? JSON.stringify(supplier.registrationTrace) : null,
+        supplier.onboardingProfile ? JSON.stringify(supplier.onboardingProfile) : null,
         JSON.stringify(supplier.categoryAuth ?? []),
         now
       ]
@@ -232,8 +234,9 @@ export class R3SupplierProductRepository {
           id, product_name, category, brand, unit, packing_quantity, min_order_qty, max_order_qty,
           tax_rate, invoice_name, tax_classification_code, detail_description, acceptance_guide,
           installation_requirement, tags_json, product_status, supplier_id, service_regions_json, procurement_category,
-          created_by, created_at, updated_at, synced_at
-        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          source_type, source_project_id, source_agreement_no, source_pricing_report_id, source_pricing_report_item_id,
+          listed_at, created_by, created_at, updated_at, synced_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         on conflict(id) do update set
           product_name = excluded.product_name,
           category = excluded.category,
@@ -253,6 +256,12 @@ export class R3SupplierProductRepository {
           supplier_id = excluded.supplier_id,
           service_regions_json = excluded.service_regions_json,
           procurement_category = excluded.procurement_category,
+          source_type = excluded.source_type,
+          source_project_id = excluded.source_project_id,
+          source_agreement_no = excluded.source_agreement_no,
+          source_pricing_report_id = excluded.source_pricing_report_id,
+          source_pricing_report_item_id = excluded.source_pricing_report_item_id,
+          listed_at = excluded.listed_at,
           updated_at = excluded.updated_at,
           synced_at = excluded.synced_at`
       ),
@@ -276,6 +285,12 @@ export class R3SupplierProductRepository {
         product.supplierId,
         JSON.stringify(product.serviceRegions ?? []),
         product.procurementCategory ?? null,
+        product.sourceType ?? null,
+        product.sourceProjectId ?? null,
+        product.sourceAgreementNo ?? null,
+        product.sourcePricingReportId ?? null,
+        product.sourcePricingReportItemId ?? null,
+        product.listedAt ?? null,
         product.createdBy,
         product.createdAt,
         product.updatedAt,
@@ -419,6 +434,7 @@ export class R3SupplierProductRepository {
       regularizedAt: optionalString(row.regularized_at),
       periodicAssessment: json(optionalString(row.periodic_assessment_json), undefined),
       registrationTrace: json(optionalString(row.registration_trace_json), undefined),
+      onboardingProfile: json(optionalString(row.onboarding_profile_json), undefined),
       supplierType: optionalString(row.supplier_type),
       supplierSource: optionalString(row.supplier_source),
       socialCreditCode: optionalString(row.social_credit_code),
@@ -508,6 +524,12 @@ export class R3SupplierProductRepository {
       supplierId: String(row.supplier_id),
       serviceRegions: json<string[]>(optionalString(row.service_regions_json), []),
       procurementCategory: optionalString(row.procurement_category),
+      sourceType: optionalString(row.source_type) as MallProduct["sourceType"],
+      sourceProjectId: optionalString(row.source_project_id),
+      sourceAgreementNo: optionalString(row.source_agreement_no),
+      sourcePricingReportId: optionalString(row.source_pricing_report_id),
+      sourcePricingReportItemId: optionalString(row.source_pricing_report_item_id),
+      listedAt: optionalString(row.listed_at) ?? null,
       imageFileIds: images.map((item) => item.file_id),
       attachmentFileIds: [],
       createdBy: String(row.created_by),

@@ -39,6 +39,7 @@ export function canReadProject(req: Request, project: ProcurementProject) {
   if (isProcurementBuyerRole(req.auth.roleId)) {
     return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || userOrgScope(req.auth.user).includes(project.orgId);
   }
+  if (req.auth.roleId === "group_manager") return userOrgScope(req.auth.user).includes(project.orgId);
   if (req.auth.roleId === "auditor" || req.auth.roleId === "finance_reviewer" || req.auth.roleId === "hotel_finance") return req.auth.orgScope.includes(project.orgId);
   if (isSupplierRole(req.auth.roleId)) return project.participantSupplierIds.some((supplierId) => supplierIdMatches(req.auth.user, supplierId));
   if (req.auth.roleId === "expert") return project.assignedExpertIds.includes(req.auth.user.expertId ?? "");

@@ -1,31 +1,10 @@
 import crypto from "node:crypto";
 import type { RuntimeConfig } from "../runtime/index.js";
 import type { RuntimeDb } from "../runtime/runtime-db.js";
+import { buildIntegrationAdapterContract, integrationAdapterContractDefinitions, type IntegrationAdapterContractDefinition } from "./integration-contracts.js";
 import type { AdapterCallLog, IntegrationAdapter, IntegrationAdapterMode, IntegrationCallOptions, IntegrationJobStatus } from "./types.js";
 
-interface AdapterDefinition {
-  key: string;
-  name: string;
-  envKey: string;
-  businessTypes: string[];
-}
-
-const adapterDefinitions = [
-  { key: "sso", name: "SSO 统一身份适配器", envKey: "SSO", businessTypes: ["identity.user_mapping", "identity.role_mapping", "identity.org_mapping"] },
-  { key: "oa", name: "OA 审批适配器", envKey: "OA", businessTypes: ["approval.push", "approval.callback", "workflow.status"] },
-  { key: "organizationUserSync", name: "组织与用户同步适配器", envKey: "ORG_USER", businessTypes: ["organization.sync", "department.sync", "user.sync"] },
-  { key: "masterData", name: "主数据适配器", envKey: "MASTER_DATA", businessTypes: ["supplier.sync", "product.sync", "category.sync"] },
-  { key: "erp", name: "ERP 采购结果适配器", envKey: "ERP", businessTypes: ["purchase_order.sync", "supplier.sync", "product.sync"] },
-  { key: "wms", name: "WMS 发货收货适配器", envKey: "WMS", businessTypes: ["shipment.sync", "receipt.callback", "logistics.sync"] },
-  { key: "contractSystem", name: "合同系统适配器", envKey: "CONTRACT", businessTypes: ["award_result.push", "contract_ledger.sync", "contract_attachment.sync"] },
-  { key: "finance", name: "财务与结算适配器", envKey: "FINANCE", businessTypes: ["settlement.push", "invoice.sync", "payment_request.push", "payment_status.callback"] },
-  { key: "fileService", name: "文件服务适配器", envKey: "FILE_SERVICE", businessTypes: ["file.scan", "file.archive", "file.lifecycle"] },
-  { key: "messageNotification", name: "消息通知适配器", envKey: "MESSAGE", businessTypes: ["email.send", "sms.send", "enterprise_im.send"] },
-  { key: "auditExport", name: "审计导出适配器", envKey: "AUDIT_EXPORT", businessTypes: ["audit.export", "audit.archive"] },
-  { key: "eSignature", name: "电子签章适配器", envKey: "E_SIGNATURE", businessTypes: ["signature.request", "signature.status"] },
-  { key: "ca", name: "CA 证书适配器", envKey: "CA", businessTypes: ["ca.verify", "ca.timestamp"] },
-  { key: "eInvoice", name: "电子发票平台适配器", envKey: "E_INVOICE", businessTypes: ["invoice.issue", "invoice.status"] }
-] as const satisfies readonly AdapterDefinition[];
+const adapterDefinitions = integrationAdapterContractDefinitions;
 
 class RuntimeIntegrationAdapter implements IntegrationAdapter {
   readonly mode: IntegrationAdapterMode;
@@ -33,7 +12,7 @@ class RuntimeIntegrationAdapter implements IntegrationAdapter {
   constructor(
     private readonly runtimeDb: RuntimeDb,
     private readonly config: RuntimeConfig,
-    private readonly definition: AdapterDefinition
+    private readonly definition: IntegrationAdapterContractDefinition
   ) {
     this.mode = endpointFor(config, definition) ? "http" : config.appEnv === "local" ? "mock" : "test";
   }
@@ -120,6 +99,10 @@ class RuntimeIntegrationAdapter implements IntegrationAdapter {
     return rows.map(fromRow);
   }
 
+  contract() {
+    return buildIntegrationAdapterContract(this.definition, Boolean(endpointFor(this.config, this.definition)));
+  }
+
   private finishAttempt(row: IntegrationJobRow, shouldFail: boolean) {
     const now = new Date().toISOString();
     const attemptCount = row.attempt_count + 1;
@@ -148,7 +131,7 @@ export function createAdapters(runtimeDb: RuntimeDb, config: RuntimeConfig) {
 
 export type AdapterRegistry = ReturnType<typeof createAdapters>;
 
-function endpointFor(config: RuntimeConfig, definition: AdapterDefinition) {
+function endpointFor(config: RuntimeConfig, definition: IntegrationAdapterContractDefinition) {
   return config.integrationEndpoints[definition.key] ?? process.env[`INTEGRATION_${definition.envKey}_ENDPOINT`]?.trim() ?? null;
 }
 

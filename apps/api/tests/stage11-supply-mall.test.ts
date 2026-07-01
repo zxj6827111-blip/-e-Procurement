@@ -63,13 +63,101 @@ async function createListedProduct(runtime: ReturnType<typeof boot>) {
   const approved = await request(runtime.app).post(`/api/mall/prices/${price.body.price.id}/approve`).set("x-mock-user-id", "u2").send({ approved: true });
   expect(approved.status).toBe(200);
 
-  const listed = await request(runtime.app).post(`/api/mall/products/${product.body.product.id}/status`).set("x-mock-user-id", "u2").send({ status: "listed" });
+  const listed = await request(runtime.app)
+    .post(`/api/mall/products/${product.body.product.id}/status`)
+    .set("x-mock-user-id", "u2")
+    .send({
+      status: "listed",
+      sourceType: "agreement",
+      sourceAgreementNo: "AG-STAGE11-001",
+      purchasePrice: 1100,
+      salePrice: 1280,
+      taxRate: 0.13,
+      deliveryDays: 3,
+      effectiveFrom: "2026-07-01"
+    });
   expect(listed.status).toBe(200);
 
   return { product: listed.body.product, imageFileId: image.body.file.id, price: approved.body.price };
 }
 
 describe("Stage 11 supply chain mall expansion", () => {
+  it("blocks mall supplier-side operations before supplier admission is approved", async () => {
+    const runtime = boot();
+    const admission = await request(runtime.app)
+      .post("/api/suppliers/admissions")
+      .set("x-mock-user-id", "u1")
+      .send({ name: "待准入商城供应商", category: "客房一次性用品", contactName: "待准入联系人", contactPhone: "13900009998" });
+    expect(admission.status).toBe(201);
+    expect(admission.body.supplier.admissionStatus).toBe("pending");
+    const supplierId = admission.body.supplier.id as string;
+    const adminUserId = `u-pending-mall-admin-${supplierId}`;
+    const quotationUserId = `u-pending-mall-quotation-${supplierId}`;
+    runtime.ctx.state.users.push(
+      {
+        id: adminUserId,
+        name: "待准入商城管理员",
+        roleId: "supplier_admin",
+        orgId: "org-supplier",
+        supplierId,
+        status: "active"
+      },
+      {
+        id: quotationUserId,
+        name: "待准入商城报价员",
+        roleId: "supplier_quotation",
+        orgId: "org-supplier",
+        supplierId,
+        status: "active"
+      }
+    );
+
+    const product = await request(runtime.app)
+      .post("/api/mall/products")
+      .set("x-mock-user-id", adminUserId)
+      .send({ name: "未准入商品", specification: "标准", supplierId, procurementCategory: "客房一次性用品" });
+    expect(product.status).toBe(403);
+    expect(product.body.error.code).toBe("MALL_SUPPLIER_NOT_ADMITTED");
+
+    runtime.ctx.state.mallProducts.push({
+      id: "mp-pending-supplier",
+      name: "待准入供应商旧草稿",
+      category: "客房物资",
+      brand: "通用",
+      unit: "件",
+      skuCode: "SKU-PENDING-SUPPLIER",
+      specification: "标准",
+      status: "draft",
+      supplierId,
+      serviceRegions: ["全国"],
+      listedAt: null,
+      imageFileIds: [],
+      attachmentFileIds: [],
+      createdBy: adminUserId,
+      createdAt: "2026-07-01T00:00:00.000Z",
+      updatedAt: "2026-07-01T00:00:00.000Z"
+    });
+    const price = await request(runtime.app)
+      .post("/api/mall/products/mp-pending-supplier/prices")
+      .set("x-mock-user-id", quotationUserId)
+      .send({ price: 100, effectiveFrom: "2026-07-01" });
+    expect(price.status).toBe(403);
+    expect(price.body.error.code).toBe("MALL_SUPPLIER_NOT_ADMITTED");
+
+    const questionnaire = await request(runtime.app)
+      .post("/api/mall/questionnaires")
+      .set("x-mock-user-id", "u2")
+      .send({ title: "待准入不可提交问卷", targetSupplierIds: [supplierId], questions: ["说明"] });
+    expect(questionnaire.status).toBe(201);
+
+    const submission = await request(runtime.app)
+      .post(`/api/mall/questionnaires/${questionnaire.body.questionnaire.id}/submissions`)
+      .set("x-mock-user-id", adminUserId)
+      .send({ answers: [{ questionId: "q1", answer: "未准入提交" }] });
+    expect(submission.status).toBe(403);
+    expect(submission.body.error.code).toBe("MALL_SUPPLIER_NOT_ADMITTED");
+  });
+
   it("runs product image, pricing, cart, order, shipment, receipt, return, invoice and scenario workflows", async () => {
     const runtime = boot();
     const { product, imageFileId } = await createListedProduct(runtime);
@@ -309,6 +397,63 @@ describe("Stage 11 supply chain mall expansion", () => {
 
     const adminDenied = await request(runtime.app).post("/api/mall/fund-accounts/org-hotel/recharges").set("x-mock-user-id", "u6").send({ amount: 1000 });
     expect(adminDenied.status).toBe(403);
+  });
+
+  it("allows group procurement manager to see supplier draft products and complete listing pricing", async () => {
+    const runtime = boot();
+    const image = await request(runtime.app)
+      .post("/api/files/upload")
+      .set("x-mock-user-id", "u3")
+      .send({
+        originalName: "group-listing-product.png",
+        contentType: "image/png",
+        contentBase64: tinyPngBase64(),
+        attachmentKind: "mall_product_image",
+        objectType: "supplier",
+        objectId: "sup-1",
+        supplierId: "sup-1"
+      });
+    expect(image.status).toBe(201);
+
+    const product = await request(runtime.app)
+      .post("/api/mall/products")
+      .set("x-mock-user-id", "u3")
+      .send({
+        name: "集团上架验证商品",
+        category: "客房物资",
+        brand: "华礼优选",
+        unit: "件",
+        skuCode: "SKU-GROUP-LISTING",
+        specification: "标准",
+        supplierId: "sup-1",
+        serviceRegions: ["全国"],
+        procurementCategory: "客房一次性用品",
+        imageFileIds: [image.body.file.id]
+      });
+    expect(product.status).toBe(201);
+    expect(product.body.product.status).toBe("draft");
+
+    const groupVisibleProducts = await request(runtime.app).get("/api/mall/products").set("x-mock-user-id", "u1");
+    expect(groupVisibleProducts.status).toBe(200);
+    expect(groupVisibleProducts.body.products.some((item: { id: string }) => item.id === product.body.product.id)).toBe(true);
+
+    const listed = await request(runtime.app)
+      .post(`/api/mall/products/${product.body.product.id}/status`)
+      .set("x-mock-user-id", "u1")
+      .send({
+        status: "listed",
+        sourceType: "agreement",
+        sourceAgreementNo: "AG-GROUP-LISTING-001",
+        purchasePrice: 90,
+        salePrice: 120,
+        taxRate: 0.13,
+        deliveryDays: 3,
+        effectiveFrom: "2026-07-01"
+      });
+    expect(listed.status).toBe(200);
+    expect(listed.body.product.status).toBe("listed");
+    expect(listed.body.product.sourceTrace.agreementNo).toBe("AG-GROUP-LISTING-001");
+    expect(listed.body.product.sourceTrace.pricingReportNo).toContain("PR-MALL-");
   });
 
   it("covers PDF product tags, bulk listing, quotation export, refund reversal and invoice adapter boundaries", async () => {

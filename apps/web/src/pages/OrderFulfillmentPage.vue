@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { apiGet, apiPost } from "../api/http";
 import ErrorAlert from "../components/ErrorAlert.vue";
+import ProcessTimeline from "../components/ProcessTimeline.vue";
 import { useSessionStore } from "../stores/session";
 import { formatDateTime, labelStatus } from "../utils/status-labels";
 
@@ -78,6 +79,7 @@ const mallOrders = ref<MallOrder[]>([]);
 const loading = ref(false);
 const error = ref("");
 const message = ref("");
+const processRefreshKey = ref(0);
 const procurementReceiptForm = ref({
   receiptType: "full",
   exceptionType: "quantity_mismatch",
@@ -112,6 +114,7 @@ const procurementOrders = computed(() =>
     }))
   )
 );
+const selectedMallOrderId = computed(() => [...mallOrders.value].sort((a, b) => String(b.updatedAt ?? b.createdAt).localeCompare(String(a.updatedAt ?? a.createdAt)))[0]?.id ?? "");
 
 const summary = computed(() => {
   const allOrders = [...procurementOrders.value, ...mallOrders.value];
@@ -123,7 +126,7 @@ const summary = computed(() => {
   };
 });
 
-const canBuyerOperate = computed(() => ["group_manager", "buyer", "hotel_buyer", "platform_operator"].includes(session.roleId));
+const canBuyerOperate = computed(() => ["buyer", "hotel_buyer", "platform_operator"].includes(session.roleId));
 const canSupplierOperate = computed(() => ["supplier", "supplier_admin"].includes(session.roleId));
 
 function money(value: number | undefined) {
@@ -210,6 +213,7 @@ async function run(action: () => Promise<void>, successText: string) {
     await action();
     message.value = successText;
     await load();
+    processRefreshKey.value += 1;
   } catch (err) {
     error.value = err instanceof Error ? err.message : "操作失败";
   }
@@ -283,6 +287,14 @@ onMounted(load);
     <p v-if="message" class="notice">{{ message }}</p>
     <p v-if="loading" class="notice">正在加载订单履约数据...</p>
   </section>
+
+  <ProcessTimeline
+    v-if="selectedMallOrderId"
+    business-type="order_fulfillment"
+    :business-id="selectedMallOrderId"
+    title="商城订单履约流程"
+    :refresh-key="processRefreshKey"
+  />
 
   <section class="business-panel">
     <div class="panel-head">

@@ -105,7 +105,10 @@ async function createListedProduct(runtime: ReturnType<typeof boot>) {
   runtime.ctx.state.pricingReports.push(report);
   runtime.ctx.r5ReviewAwardRepository.upsertPricingReport(report);
 
-  const listed = await request(runtime.app).post(`/api/mall/products/${product.body.product.id}/status`).set("x-mock-user-id", "u2").send({ status: "listed" });
+  const listed = await request(runtime.app)
+    .post(`/api/mall/products/${product.body.product.id}/status`)
+    .set("x-mock-user-id", "u2")
+    .send({ status: "listed", sourceType: "award_project", sourceProjectId: "p-award" });
   expect(listed.status).toBe(200);
   return listed.body.product as { id: string };
 }
@@ -137,7 +140,7 @@ describe("R10 final UAT and production go/no-go evidence", () => {
 
     const admission = await request(runtime.app)
       .post("/api/suppliers/admissions")
-      .set("x-mock-user-id", "u2")
+      .set("x-mock-user-id", "u1")
       .send({
         name: "R10 备选供应商",
         category: "客房布草",
@@ -150,7 +153,7 @@ describe("R10 final UAT and production go/no-go evidence", () => {
 
     const review = await request(runtime.app)
       .post(`/api/suppliers/${admission.body.supplier.id}/reviews`)
-      .set("x-mock-user-id", "u2")
+      .set("x-mock-user-id", "u1")
       .send({ reviewType: "admission_assessment", status: "passed", score: 91, opinion: "R10 UAT 准入通过" });
     expect(review.status).toBe(201);
 

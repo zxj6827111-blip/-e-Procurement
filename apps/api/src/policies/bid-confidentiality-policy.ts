@@ -1,6 +1,7 @@
 import type { AuditService } from "../services/audit-service.js";
 import type { SeedState } from "../seed/data.js";
 import type { AuthContext, Bid, BidViewContent } from "../types.js";
+import { isSupplierRole, supplierIdMatches } from "../role-groups.js";
 import { deny } from "./policy-utils.js";
 
 export class BidConfidentialityPolicy {
@@ -28,8 +29,8 @@ export class BidConfidentialityPolicy {
       });
     }
 
-    if (context.roleId === "supplier") {
-      if (context.user.supplierId === bid.supplierId) return;
+    if (isSupplierRole(context.roleId)) {
+      if (supplierIdMatches(context.user, bid.supplierId)) return;
       deny(this.audit, context, {
         code: "SUPPLIER_BID_SCOPE_DENIED",
         message: "供应商只能查看本企业报价。",

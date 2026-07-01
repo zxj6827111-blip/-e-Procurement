@@ -1,9 +1,11 @@
 import { Router, type Request, type Response } from "express";
 import type { AppContext } from "../app-context.js";
-import type { AwardApproval, InternalProjectStatus, PricingReport, PricingReportItem, ProcurementProject, ResultNotification } from "../types.js";
+import type { AwardApproval, ContractLedger, InternalProjectStatus, MallPrice, MallProduct, PricingReport, PricingReportItem, ProcurementProject, ResultNotification } from "../types.js";
 
-const awardMaintainerRoles = new Set(["buyer", "group_manager"]);
-const awardReaderRoles = new Set(["buyer", "group_manager", "auditor"]);
+const awardMaintainerRoles = new Set(["buyer", "platform_operator"]);
+const awardLegacyApproverRoles = new Set(["group_manager", "buyer", "platform_operator"]);
+const awardReaderRoles = new Set(["buyer", "platform_operator", "group_manager", "auditor"]);
+const supplierResultReaderRoles = new Set(["supplier", "supplier_admin", "supplier_quotation"]);
 
 function denyResponse(
   ctx: AppContext,
@@ -40,7 +42,9 @@ function ensureProject(ctx: AppContext, projectId: string, res: Response) {
 }
 
 function canReadProject(req: Request, project: ProcurementProject) {
-  if (req.auth.roleId === "buyer") return req.auth.user.managedProjectIds?.includes(project.id) ?? false;
+  if (req.auth.roleId === "buyer" || req.auth.roleId === "platform_operator") {
+    return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || req.auth.orgScope.includes(project.orgId);
+  }
   if (req.auth.roleId === "group_manager" || req.auth.roleId === "auditor") return req.auth.orgScope.includes(project.orgId);
   return false;
 }
@@ -60,6 +64,14 @@ function assertAwardReader(ctx: AppContext, req: Request, res: Response, project
   }
   if (canReadProject(req, project)) return true;
   return denyResponse(ctx, req, res, 403, "PROJECT_SCOPE_DENIED", "Current user cannot read award approval for this project.", action, "project", project.id, project.id);
+}
+
+function assertAwardApprover(ctx: AppContext, req: Request, res: Response, project: ProcurementProject, action: string) {
+  if (!awardLegacyApproverRoles.has(req.auth.roleId)) {
+    return denyResponse(ctx, req, res, 403, "AWARD_APPROVER_REQUIRED", "Current role cannot approve award decisions.", action, "project", project.id, project.id);
+  }
+  if (canReadProject(req, project)) return true;
+  return denyResponse(ctx, req, res, 403, "PROJECT_SCOPE_DENIED", "Current user cannot approve award decision for this project.", action, "project", project.id, project.id);
 }
 
 function buildAwardRecommendation(ctx: AppContext, projectId: string) {
@@ -230,6 +242,41 @@ function latestApprovedAwardApproval(ctx: AppContext, projectId: string) {
   return [...ctx.state.awardApprovals].reverse().find((item) => item.projectId === projectId && item.approvalStatus === "approved");
 }
 
+function addSupplierRecipient(targets: Set<string>, supplierId?: string | null) {
+  const normalized = String(supplierId ?? "").trim();
+  if (normalized) targets.add(normalized);
+}
+
+function resultNotificationRecipientIds(ctx: AppContext, project: ProcurementProject, approval: AwardApproval) {
+  const targets = new Set<string>();
+  for (const supplierId of project.participantSupplierIds) addSupplierRecipient(targets, supplierId);
+  addSupplierRecipient(targets, approval.selectedSupplierId);
+  for (const bid of ctx.state.bids.filter((item) => item.projectId === project.id && ["submitted", "locked"].includes(item.status))) {
+    addSupplierRecipient(targets, bid.supplierId);
+  }
+  for (const registration of ctx.state.supplierRegistrations.filter((item) => item.projectId === project.id && item.status !== "rejected")) {
+    addSupplierRecipient(targets, registration.supplierId);
+  }
+  for (const notification of ctx.state.resultNotifications.filter((item) => item.projectId === project.id && item.scope === "supplier_self")) {
+    addSupplierRecipient(targets, notification.supplierId);
+  }
+  return Array.from(targets);
+}
+
+function supplierCanReadProjectResult(ctx: AppContext, project: ProcurementProject, supplierId: string) {
+  if (!supplierId) return false;
+  const approval = latestApprovedAwardApproval(ctx, project.id);
+  return (
+    project.participantSupplierIds.includes(supplierId) ||
+    approval?.selectedSupplierId === supplierId ||
+    ctx.state.resultNotifications.some((item) => item.projectId === project.id && item.supplierId === supplierId) ||
+    ctx.state.pricingReports.some((item) => item.projectId === project.id && item.selectedSupplierId === supplierId) ||
+    ctx.state.bids.some((item) => item.projectId === project.id && item.supplierId === supplierId) ||
+    ctx.state.supplierRegistrations.some((item) => item.projectId === project.id && item.supplierId === supplierId && item.status !== "rejected") ||
+    ctx.state.purchaseOrders.some((item) => item.projectId === project.id && item.supplierId === supplierId)
+  );
+}
+
 function latestSupplierResultNotifications(ctx: AppContext, project: ProcurementProject, supplierId: string) {
   const approval = latestApprovedAwardApproval(ctx, project.id);
   if (!approval) return [];
@@ -250,6 +297,173 @@ function latestSupplierResultNotifications(ctx: AppContext, project: Procurement
     if (!existing || currentTime >= existingTime) latestBySupplier.set(supplierId, notification);
   }
   return Array.from(latestBySupplier.values());
+}
+
+function resultWasSent(ctx: AppContext, project: ProcurementProject, approval: AwardApproval) {
+  const supplierSelfSent = ctx.state.resultNotifications.some((item) => item.projectId === project.id && item.awardApprovalId === approval.id && item.scope === "supplier_self" && item.status === "sent");
+  if (supplierSelfSent) return true;
+  const hasAnyResultNotification = ctx.state.resultNotifications.some((item) => item.projectId === project.id && item.awardApprovalId === approval.id && item.status === "sent");
+  return project.status === "result_notified" && !hasAnyResultNotification;
+}
+
+function fallbackSupplierResultNotification(ctx: AppContext, project: ProcurementProject, supplierId: string): ResultNotification | null {
+  const approval = latestApprovedAwardApproval(ctx, project.id);
+  if (!approval || !resultWasSent(ctx, project, approval)) return null;
+  if (!resultNotificationRecipientIds(ctx, project, approval).includes(supplierId)) return null;
+  const now = approval.approvedAt ?? approval.createdAt;
+  return {
+    id: `rn-view-${project.id}-${approval.id}-${supplierId}`,
+    projectId: project.id,
+    awardApprovalId: approval.id,
+    supplierId,
+    scope: "supplier_self",
+    status: "sent",
+    visibilityConfig: "supplier_self_only",
+    contentSummary: supplierId === approval.selectedSupplierId ? "贵司已被确定为本项目中标供应商，请等待后续定价报告、订单或合同通知。" : "感谢参与本项目，本次未中标。",
+    sentAt: now,
+    createdBy: "system",
+    createdAt: now
+  };
+}
+
+function latestResultNotificationsForApproval(ctx: AppContext, projectId: string, approvalId: string, scope: ResultNotification["scope"]) {
+  return ctx.state.resultNotifications.filter((item) => item.projectId === projectId && item.awardApprovalId === approvalId && item.scope === scope && item.status === "sent");
+}
+
+function confirmedAwardContract(ctx: AppContext, project: ProcurementProject, approval: AwardApproval): ContractLedger | undefined {
+  return [...ctx.state.contractLedgers]
+    .reverse()
+    .find((item) => item.projectId === project.id && item.supplierId === approval.selectedSupplierId && ["registered", "performing", "completed"].includes(item.status));
+}
+
+function latestPricingReportForAward(ctx: AppContext, project: ProcurementProject, approval: AwardApproval): PricingReport | undefined {
+  return [...ctx.state.pricingReports]
+    .reverse()
+    .find((item) => item.projectId === project.id && item.awardApprovalId === approval.id && item.selectedSupplierId === approval.selectedSupplierId && item.status !== "voided");
+}
+
+function nextMallProductId(ctx: AppContext) {
+  let index = ctx.state.mallProducts.length + 1;
+  let id = `mp-award-${index}`;
+  while (ctx.state.mallProducts.some((item) => item.id === id)) {
+    index += 1;
+    id = `mp-award-${index}`;
+  }
+  return id;
+}
+
+function nextMallPriceId(ctx: AppContext) {
+  let index = ctx.state.mallPrices.length + 1;
+  let id = `mprice-award-${index}`;
+  while (ctx.state.mallPrices.some((item) => item.id === id)) {
+    index += 1;
+    id = `mprice-award-${index}`;
+  }
+  return id;
+}
+
+function sanitizeSkuPart(value: string) {
+  return value.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").toUpperCase() || "AWARD";
+}
+
+function upsertAwardMallPrice(ctx: AppContext, req: Request, product: MallProduct, item: PricingReportItem): MallPrice {
+  const existing = ctx.state.mallPrices.find((price) => price.productId === product.id && price.supplierId === product.supplierId && price.approvalStatus === "approved");
+  const price: MallPrice = existing ?? {
+    id: nextMallPriceId(ctx),
+    productId: product.id,
+    supplierId: product.supplierId,
+    price: item.salePrice,
+    purchasePrice: item.purchasePrice,
+    salePrice: item.salePrice,
+    taxRate: item.taxRate,
+    deliveryDays: item.deliveryDays,
+    effectiveFrom: item.effectiveFrom,
+    effectiveTo: item.effectiveTo,
+    approvalStatus: "approved",
+    versionNo: 1,
+    createdBy: req.auth.user.id,
+    createdAt: new Date().toISOString()
+  };
+  price.price = item.salePrice;
+  price.purchasePrice = item.purchasePrice;
+  price.salePrice = item.salePrice;
+  price.taxRate = item.taxRate;
+  price.deliveryDays = item.deliveryDays;
+  price.effectiveFrom = item.effectiveFrom;
+  price.effectiveTo = item.effectiveTo;
+  price.approvalStatus = "approved";
+  if (!existing) ctx.state.mallPrices.push(price);
+  ctx.r3SupplierProductRepository.upsertPrice(price);
+  return price;
+}
+
+function autoListAwardProducts(ctx: AppContext, req: Request, project: ProcurementProject, approval: AwardApproval, report: PricingReport) {
+  const supplier = ctx.state.suppliers.find((item) => item.id === approval.selectedSupplierId);
+  const timestamp = new Date().toISOString();
+  const listedProducts: MallProduct[] = [];
+  for (const [index, item] of report.items.entries()) {
+    const existing = ctx.state.mallProducts.find(
+      (product) =>
+        product.supplierId === approval.selectedSupplierId &&
+        product.sourceProjectId === project.id &&
+        product.sourcePricingReportId === report.id &&
+        product.sourcePricingReportItemId === item.id
+    );
+    const product: MallProduct =
+      existing ??
+      {
+        id: nextMallProductId(ctx),
+        name: item.itemName,
+        category: project.category || "酒店物资",
+        brand: supplier?.name ?? "中标供应商",
+        unit: item.unit || "项",
+        skuCode: `AWARD-${sanitizeSkuPart(project.code)}-${index + 1}`,
+        specification: item.specification || item.itemName,
+        packingQuantity: 1,
+        minOrderQty: 1,
+        maxOrderQty: undefined,
+        taxRate: item.taxRate,
+        invoiceName: item.itemName,
+        taxClassificationCode: undefined,
+        detailDescription: `来源于${project.code}中标定价报告${report.reportNo}`,
+        acceptanceGuide: "按中标合同和采购订单验收。",
+        installationRequirement: undefined,
+        tags: ["中标商品", project.code],
+        status: "listed",
+        supplierId: approval.selectedSupplierId,
+        serviceRegions: ["全国"],
+        procurementCategory: project.category || "酒店物资",
+        sourceType: "award_project",
+        sourceProjectId: project.id,
+        sourcePricingReportId: report.id,
+        sourcePricingReportItemId: item.id,
+        listedAt: timestamp,
+        imageFileIds: [],
+        attachmentFileIds: [],
+        createdBy: req.auth.user.id,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+    product.name = item.itemName || product.name;
+    product.specification = item.specification || product.specification;
+    product.unit = item.unit || product.unit;
+    product.taxRate = item.taxRate ?? product.taxRate;
+    product.status = "listed";
+    product.sourceType = "award_project";
+    product.sourceProjectId = project.id;
+    product.sourcePricingReportId = report.id;
+    product.sourcePricingReportItemId = item.id;
+    product.listedAt = product.listedAt ?? timestamp;
+    product.updatedAt = timestamp;
+    item.productId = product.id;
+    if (!existing) ctx.state.mallProducts.push(product);
+    ctx.r3SupplierProductRepository.upsertProduct(product);
+    upsertAwardMallPrice(ctx, req, product, item);
+    listedProducts.push(product);
+  }
+  report.updatedAt = timestamp;
+  ctx.r5ReviewAwardRepository.upsertPricingReport(report);
+  return listedProducts;
 }
 
 export function awardRoutes(ctx: AppContext) {
@@ -302,6 +516,23 @@ export function awardRoutes(ctx: AppContext) {
     ctx.r5ReviewAwardRepository.upsertAwardApproval(approval);
     ctx.r4SourcingRepository.upsertProject(project);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "award_approval.create", "award_approval", approval.id, project.id);
+    ctx.eventBus.emit({
+      eventCode: "AwardApprovalCreated",
+      businessType: "award_approval",
+      businessId: approval.id,
+      businessTitle: `Award approval ${project.name}`,
+      actor: req.auth.user,
+      orgId: project.orgId,
+      supplierId: approval.selectedSupplierId,
+      projectId: project.id,
+      idempotencyKey: `award_approval:${approval.id}:created`,
+      payloadJson: {
+        projectId: project.id,
+        projectName: project.name,
+        approvalId: approval.id,
+        selectedSupplierId: approval.selectedSupplierId
+      }
+    });
     return res.status(201).json({ approval, auditLogId: auditLog.id });
   });
 
@@ -345,7 +576,7 @@ export function awardRoutes(ctx: AppContext) {
     if (!approval) return;
     const project = ensureProject(ctx, approval.projectId, res);
     if (!project) return;
-    if (!assertAwardMaintainer(ctx, req, res, project, "award_approval.approve.denied")) return;
+    if (!assertAwardApprover(ctx, req, res, project, "award_approval.approve.denied")) return;
     if (approval.approvalStatus !== "submitted") {
       return denyResponse(ctx, req, res, 400, "AWARD_APPROVAL_STATUS_DENIED", "Only submitted award approvals can be mock-approved.", "award_approval.status.denied", "award_approval", approval.id, project.id, `status=${approval.approvalStatus}`);
     }
@@ -392,14 +623,67 @@ export function awardRoutes(ctx: AppContext) {
     ctx.state.pricingReports.push(report);
     ctx.r5ReviewAwardRepository.upsertPricingReport(report);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "pricing_report.generate", "pricing_report", report.id, project.id, `awardApproval=${approval.id}`);
+    ctx.eventBus.emit({
+      eventCode: "PricingReportGenerated",
+      businessType: "contract_preparation",
+      businessId: project.id,
+      businessTitle: project.name,
+      actor: req.auth.user,
+      orgId: project.orgId,
+      supplierId: approval.selectedSupplierId,
+      projectId: project.id,
+      idempotencyKey: `contract_preparation:${project.id}:pricing_report:${report.id}`,
+      payloadJson: {
+        projectId: project.id,
+        projectName: project.name,
+        pricingReportId: report.id,
+        approvalId: approval.id
+      }
+    });
     return res.status(201).json({ pricingReport: report, auditLogId: auditLog.id });
   });
 
   router.get("/projects/:projectId/pricing-reports", (req, res) => {
     const project = ensureProject(ctx, req.params.projectId, res);
     if (!project) return;
+    if (supplierResultReaderRoles.has(req.auth.roleId)) {
+      const supplierId = req.auth.user.supplierId ?? "";
+      if (!supplierCanReadProjectResult(ctx, project, supplierId)) {
+        return denyResponse(ctx, req, res, 403, "SUPPLIER_RESULT_SCOPE_DENIED", "Supplier can only read own project pricing report.", "pricing_report.supplier_scope.denied", "project", project.id, project.id);
+      }
+      return res.json({ pricingReports: ctx.state.pricingReports.filter((item) => item.projectId === project.id && item.selectedSupplierId === supplierId) });
+    }
     if (!assertAwardReader(ctx, req, res, project, "pricing_report.read.denied")) return;
     return res.json({ pricingReports: ctx.state.pricingReports.filter((item) => item.projectId === project.id) });
+  });
+
+  router.post("/projects/:projectId/award-products/auto-list", (req, res) => {
+    const project = ensureProject(ctx, req.params.projectId, res);
+    if (!project) return;
+    if (!assertAwardMaintainer(ctx, req, res, project, "award_products.auto_list.denied")) return;
+    const approval = latestApprovedAwardApproval(ctx, project.id);
+    if (!approval) {
+      return denyResponse(ctx, req, res, 400, "AWARD_APPROVAL_NOT_APPROVED", "Approved award approval is required before listing awarded products.", "award_products.award.denied", "project", project.id, project.id);
+    }
+    const contract = confirmedAwardContract(ctx, project, approval);
+    if (!contract) {
+      return denyResponse(ctx, req, res, 400, "CONTRACT_CONFIRMATION_REQUIRED", "Supplier must confirm the contract before awarded products can be listed.", "award_products.contract.denied", "project", project.id, project.id);
+    }
+    let report = latestPricingReportForAward(ctx, project, approval);
+    if (!report) {
+      report = buildPricingReport(ctx, req, project, approval);
+      ctx.state.pricingReports.push(report);
+    }
+    const products = autoListAwardProducts(ctx, req, project, approval, report);
+    const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(
+      req.auth,
+      "award_products.auto_list",
+      "project",
+      project.id,
+      project.id,
+      `supplier=${approval.selectedSupplierId};products=${products.length};pricingReport=${report.id};contract=${contract.id}`
+    );
+    return res.status(201).json({ products, pricingReport: report, contract, auditLogId: auditLog.id });
   });
 
   router.get("/projects/:projectId/award-approvals", (req, res) => {
@@ -425,23 +709,31 @@ export function awardRoutes(ctx: AppContext) {
     if (visibilityConfig !== "supplier_self_only" && visibilityConfig !== "show_winner_name") {
       return denyResponse(ctx, req, res, 400, "RESULT_VISIBILITY_CONFIG_INVALID", "Result visibility config is invalid.", "result_notification.visibility.denied", "project", project.id, project.id);
     }
+    const typedScope = scope as ResultNotification["scope"];
+    const existingNotifications = latestResultNotificationsForApproval(ctx, project.id, approval.id, typedScope);
+    const expectedSupplierTargets = typedScope === "supplier_self" ? resultNotificationRecipientIds(ctx, project, approval) : [];
+    const existingSupplierTargets = new Set(existingNotifications.map((item) => item.supplierId).filter(Boolean));
+    const missingSupplierTargets = expectedSupplierTargets.filter((supplierId) => !existingSupplierTargets.has(supplierId));
+    if (existingNotifications.length > 0 && (typedScope !== "supplier_self" || missingSupplierTargets.length === 0)) {
+      return res.json({ notifications: existingNotifications });
+    }
     const now = new Date().toISOString();
     const baseIndex = ctx.state.resultNotifications.length;
-    const notificationTargets = scope === "supplier_self" ? project.participantSupplierIds : [undefined];
+    const notificationTargets = typedScope === "supplier_self" ? missingSupplierTargets : [undefined];
     const notifications: ResultNotification[] = notificationTargets.map((supplierId, index) => ({
       id: `rn-${baseIndex + index + 1}`,
       projectId: project.id,
       awardApprovalId: approval.id,
       supplierId,
-      scope: scope as ResultNotification["scope"],
+      scope: typedScope,
       status: "sent",
       visibilityConfig: visibilityConfig as ResultNotification["visibilityConfig"],
       contentSummary:
         scope === "internal_publicity"
-          ? "internal result publicity notification"
+          ? "内部中标结果公示通知"
           : supplierId === approval.selectedSupplierId
-            ? "selected supplier notification"
-            : "not selected supplier notification",
+            ? "贵司已被确定为本项目中标供应商，请等待后续定价报告、订单或合同通知。"
+            : "感谢参与本项目，本次未中标。",
       sentAt: now,
       createdBy: req.auth.user.id,
       createdAt: now
@@ -453,19 +745,38 @@ export function awardRoutes(ctx: AppContext) {
     }
     projectToResultNotified(project);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "result_notification.send", "project", project.id, project.id, `count=${notifications.length}`);
+    ctx.eventBus.emit({
+      eventCode: "ResultNotificationSent",
+      businessType: "review_award",
+      businessId: project.id,
+      businessTitle: project.name,
+      actor: req.auth.user,
+      orgId: project.orgId,
+      projectId: project.id,
+      idempotencyKey: `review_award:${project.id}:result_notification:${approval.id}:${scope}`,
+      payloadJson: {
+        projectId: project.id,
+        projectName: project.name,
+        approvalId: approval.id,
+        scope,
+        notificationCount: notifications.length
+      }
+    });
     return res.status(201).json({ notifications, auditLogId: auditLog.id });
   });
 
   router.get("/projects/:projectId/result-notifications", (req, res) => {
     const project = ensureProject(ctx, req.params.projectId, res);
     if (!project) return;
-    if (req.auth.roleId === "supplier") {
+    if (supplierResultReaderRoles.has(req.auth.roleId)) {
       const supplierId = req.auth.user.supplierId ?? "";
-      if (!project.participantSupplierIds.includes(supplierId)) {
+      if (!supplierCanReadProjectResult(ctx, project, supplierId)) {
         return denyResponse(ctx, req, res, 403, "SUPPLIER_RESULT_SCOPE_DENIED", "Supplier can only read own project result notification.", "result_notification.supplier_scope.denied", "project", project.id, project.id);
       }
+      const supplierNotifications = latestSupplierResultNotifications(ctx, project, supplierId);
+      const visibleNotifications = supplierNotifications.length > 0 ? supplierNotifications : [fallbackSupplierResultNotification(ctx, project, supplierId)].filter((item): item is ResultNotification => Boolean(item));
       return res.json({
-        notifications: latestSupplierResultNotifications(ctx, project, supplierId)
+        notifications: visibleNotifications
           .map((item) => publicResultForSupplier(ctx, item, supplierId))
           .filter(Boolean)
       });
@@ -482,6 +793,10 @@ export function awardRoutes(ctx: AppContext) {
     if (!approval) {
       return denyResponse(ctx, req, res, 400, "AWARD_APPROVAL_NOT_APPROVED", "Approved award approval is required before internal publicity.", "internal_publicity.approval.denied", "project", project.id, project.id);
     }
+    const existing = [...ctx.state.internalPublicityRecords].reverse().find((item) => item.projectId === project.id && item.awardApprovalId === approval.id && item.status === "published");
+    if (existing) {
+      return res.json({ publicityRecord: existing });
+    }
     const now = new Date().toISOString();
     const record = {
       id: `ipr-${ctx.state.internalPublicityRecords.length + 1}`,
@@ -496,6 +811,22 @@ export function awardRoutes(ctx: AppContext) {
     };
     ctx.state.internalPublicityRecords.push(record);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "internal_publicity.publish", "internal_publicity", record.id, project.id);
+    ctx.eventBus.emit({
+      eventCode: "InternalPublicityPublished",
+      businessType: "review_award",
+      businessId: project.id,
+      businessTitle: project.name,
+      actor: req.auth.user,
+      orgId: project.orgId,
+      projectId: project.id,
+      idempotencyKey: `review_award:${project.id}:internal_publicity:${record.id}`,
+      payloadJson: {
+        projectId: project.id,
+        projectName: project.name,
+        approvalId: approval.id,
+        publicityRecordId: record.id
+      }
+    });
     return res.status(201).json({ publicityRecord: record, auditLogId: auditLog.id });
   });
 

@@ -40,12 +40,12 @@ function expectDenied(response: request.Response, code: string, sensitiveTokens:
 async function createRequestProject(runtime: ReturnType<typeof boot>) {
   const created = await request(runtime.app)
     .post("/api/procurement-requests")
-    .set("x-mock-user-id", "u2")
+    .set("x-mock-user-id", "u8")
     .send({
       title: "R4 寻源主源采购申请",
       orgId: "org-hotel",
       requestDepartment: "客房部",
-      requesterName: "R4 Buyer",
+      requesterName: "酒店采购",
       category: "客房一次性用品",
       budgetLabel: "R4 预算",
       budgetAmount: 96000,
@@ -81,16 +81,16 @@ async function createRequestProject(runtime: ReturnType<typeof boot>) {
   const requestId = created.body.procurementRequest.id as string;
   const patched = await request(runtime.app)
     .patch(`/api/procurement-requests/${requestId}`)
-    .set("x-mock-user-id", "u2")
+    .set("x-mock-user-id", "u8")
     .send({ purpose: "R4 草稿编辑后提交", lineItems: created.body.procurementRequest.lineItems });
   expect(patched.status).toBe(200);
 
-  const submitted = await request(runtime.app).post(`/api/procurement-requests/${requestId}/submit`).set("x-mock-user-id", "u2");
+  const submitted = await request(runtime.app).post(`/api/procurement-requests/${requestId}/submit`).set("x-mock-user-id", "u8");
   expect(submitted.status).toBe(200);
 
   const lockedEdit = await request(runtime.app)
     .patch(`/api/procurement-requests/${requestId}`)
-    .set("x-mock-user-id", "u2")
+    .set("x-mock-user-id", "u8")
     .send({ lineItems: [{ itemName: "不应允许改明细", specification: "x", quantity: 1, unit: "项" }] });
   expect(lockedEdit.status).toBe(400);
   expect(lockedEdit.body.error.code).toBe("PROCUREMENT_REQUEST_LOCKED");
@@ -222,6 +222,7 @@ describe("R4 sourcing procurement master-source migration", () => {
       question.body.clarification.id
     )).toEqual({ clarification_status: "answered", answer: "需要加盖企业公章。" });
 
+    runtime.ctx.state.projects.find((item) => item.id === projectId)!.participantSupplierIds = [];
     const draft = await request(runtime.app)
       .post(`/api/projects/${projectId}/bids`)
       .set("x-mock-user-id", "u3")

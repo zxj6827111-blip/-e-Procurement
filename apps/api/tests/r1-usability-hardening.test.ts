@@ -53,12 +53,21 @@ describe("R1 usability hardening", () => {
       .send({
         title: "R1 可用性采购文件",
         contentSummary: "用于验证采购文件作废入口"
-      });
+    });
     expect(created.status).toBe(201);
+
+    const submitReview = await request(runtime.app).post(`/api/procurement-documents/${created.body.procurementDocument.id}/submit-review`).set("x-mock-user-id", "u2");
+    expect(submitReview.status).toBe(410);
+    expect(submitReview.body.error.code).toBe("PROCUREMENT_DOCUMENT_REVIEW_DISABLED");
+
+    const groupPublish = await request(runtime.app).post(`/api/procurement-documents/${created.body.procurementDocument.id}/publish`).set("x-mock-user-id", "u1");
+    expect(groupPublish.status).toBe(403);
+    expect(groupPublish.body.error.code).toBe("PHASE2_BUSINESS_ACTION_DENIED");
 
     const published = await request(runtime.app).post(`/api/procurement-documents/${created.body.procurementDocument.id}/publish`).set("x-mock-user-id", "u2");
     expect(published.status).toBe(200);
     expect(published.body.procurementDocument.status).toBe("locked");
+    expect(published.body.procurementDocument.reviewStatus).toBe("approved");
 
     const supplierBeforeVoid = await request(runtime.app).get("/api/procurement-documents").set("x-mock-user-id", "u3");
     expect(supplierBeforeVoid.status).toBe(200);
@@ -80,5 +89,40 @@ describe("R1 usability hardening", () => {
     const publishAgain = await request(runtime.app).post(`/api/procurement-documents/${created.body.procurementDocument.id}/publish`).set("x-mock-user-id", "u2");
     expect(publishAgain.status).toBe(400);
     expect(publishAgain.body.error.code).toBe("PROCUREMENT_DOCUMENT_VOIDED");
+  });
+
+  it("persists procurement document locked status across runtime reloads", async () => {
+    const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "eproc-r1-doc-persist-"));
+    const options = {
+      runtime: {
+        appEnv: "test",
+        dataRoot,
+        mockAuthEnabled: true,
+        seedOnBoot: false
+      }
+    } as const;
+    const firstCtx = createAppContext(options);
+    const firstApp = createApp(firstCtx);
+
+    const created = await request(firstApp)
+      .post("/api/projects/p-award/procurement-documents")
+      .set("x-mock-user-id", "u2")
+      .send({
+        title: "R1 persisted procurement document",
+        contentSummary: "status must survive context reload"
+      });
+    expect(created.status).toBe(201);
+
+    const published = await request(firstApp).post(`/api/procurement-documents/${created.body.procurementDocument.id}/publish`).set("x-mock-user-id", "u2");
+    expect(published.status).toBe(200);
+
+    const secondApp = createApp(createAppContext(options));
+    const documents = await request(secondApp).get("/api/procurement-documents").set("x-mock-user-id", "u2");
+    expect(documents.status).toBe(200);
+    const persisted = documents.body.procurementDocuments.find((item: { id: string }) => item.id === created.body.procurementDocument.id);
+    expect(persisted).toMatchObject({
+      status: "locked",
+      reviewStatus: "approved"
+    });
   });
 });

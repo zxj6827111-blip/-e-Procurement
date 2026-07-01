@@ -47,14 +47,21 @@ async function createAndSubmit(runtime: ReturnType<typeof boot>, userId: string,
 describe("Eight-role procurement flow regression", () => {
   it("blocks procurement request self approval and lets authorized roles approve within org scope", async () => {
     const runtime = boot();
-    const buyerRequest = await createAndSubmit(runtime, "u2", "self approval must fail");
+    const buyerCreate = await request(runtime.app)
+      .post("/api/procurement-requests")
+      .set("x-mock-user-id", "u2")
+      .send(requestPayload("buyer should not create request"));
+    expect(buyerCreate.status).toBe(403);
+    expect(buyerCreate.body.error.code).toBe("PROCUREMENT_REQUEST_INITIATOR_REQUIRED");
+
+    const buyerRequest = await createAndSubmit(runtime, "u8", "self approval must fail");
 
     const selfApproval = await request(runtime.app)
       .post(`/api/procurement-requests/${buyerRequest.requestId}/approve`)
       .set("x-mock-user-id", "u2")
       .send({ approved: true });
     expect(selfApproval.status).toBe(403);
-    expect(selfApproval.body.error.code).toBe("PROCUREMENT_REQUEST_SELF_APPROVAL_DENIED");
+    expect(selfApproval.body.error.code).toBe("PROCUREMENT_REQUEST_APPROVER_REQUIRED");
 
     const managerApproval = await request(runtime.app)
       .post(`/api/procurement-requests/${buyerRequest.requestId}/approve`)
@@ -63,7 +70,7 @@ describe("Eight-role procurement flow regression", () => {
     expect(managerApproval.status).toBe(200);
     expect(managerApproval.body.procurementRequest.approvalStatus).toBe("approved");
 
-    const hotelRequest = await createAndSubmit(runtime, "u8", "hotel request can be taken over by buyer");
+    const hotelRequest = await createAndSubmit(runtime, "u8", "hotel request requires group approval");
 
     const hotelSelfApproval = await request(runtime.app)
       .post(`/api/procurement-requests/${hotelRequest.requestId}/approve`)
@@ -72,24 +79,112 @@ describe("Eight-role procurement flow regression", () => {
     expect(hotelSelfApproval.status).toBe(403);
     expect(hotelSelfApproval.body.error.code).toBe("PROCUREMENT_REQUEST_APPROVER_REQUIRED");
 
-    const buyerList = await request(runtime.app).get("/api/procurement-requests").set("x-mock-user-id", "u2");
-    expect(buyerList.status).toBe(200);
-    expect(buyerList.body.procurementRequests.map((item: { id: string }) => item.id)).toContain(hotelRequest.requestId);
+    const managerList = await request(runtime.app).get("/api/procurement-requests").set("x-mock-user-id", "u1");
+    expect(managerList.status).toBe(200);
+    expect(managerList.body.procurementRequests.map((item: { id: string }) => item.id)).toContain(hotelRequest.requestId);
 
-    const buyerTasks = await request(runtime.app).get("/api/workflow/tasks").set("x-mock-user-id", "u2");
-    expect(buyerTasks.status).toBe(200);
-    expect(buyerTasks.body.tasks.map((item: { id: string }) => item.id)).toContain(hotelRequest.workflowTaskId);
+    const managerTasks = await request(runtime.app).get("/api/workflow/tasks").set("x-mock-user-id", "u1");
+    expect(managerTasks.status).toBe(200);
+    expect(managerTasks.body.tasks.map((item: { id: string }) => item.id)).toContain(hotelRequest.workflowTaskId);
 
     const buyerApproval = await request(runtime.app)
       .post(`/api/procurement-requests/${hotelRequest.requestId}/approve`)
       .set("x-mock-user-id", "u2")
-      .send({ approved: true, opinion: "buyer took over hotel request" });
-    expect(buyerApproval.status).toBe(200);
-    expect(buyerApproval.body.procurementRequest.approvalStatus).toBe("approved");
+      .send({ approved: true, opinion: "buyer should not approve group task" });
+    expect(buyerApproval.status).toBe(403);
+    expect(buyerApproval.body.error.code).toBe("PROCUREMENT_REQUEST_APPROVER_REQUIRED");
+
+    const groupApproval = await request(runtime.app)
+      .post(`/api/procurement-requests/${hotelRequest.requestId}/approve`)
+      .set("x-mock-user-id", "u1")
+      .send({ approved: true, opinion: "group approved hotel request" });
+    expect(groupApproval.status).toBe(200);
+    expect(groupApproval.body.procurementRequest.approvalStatus).toBe("approved");
 
     const method = await request(runtime.app).post(`/api/procurement-requests/${hotelRequest.requestId}/method-decision`).set("x-mock-user-id", "u2").send({ ruleId: "pmr-2" });
     expect(method.status).toBe(200);
     expect(method.body.procurementRequest.status).toBe("method_decided");
+  });
+
+  it("lets request stakeholders read pre-project attachments without exposing them to unrelated roles", async () => {
+    const runtime = boot();
+    const uploaded = await request(runtime.app)
+      .post("/api/files/upload")
+      .set("x-mock-user-id", "u8")
+      .send({
+        originalName: "REQ-004-request-detail.doc",
+        contentType: "application/msword",
+        contentBase64: Buffer.from("hotel request doc", "utf8").toString("base64"),
+        attachmentKind: "procurement_request_attachment",
+        objectType: "procurement_request",
+        objectId: "pending-request-regression"
+      });
+    expect(uploaded.status).toBe(201);
+
+    const created = await request(runtime.app)
+      .post("/api/procurement-requests")
+      .set("x-mock-user-id", "u8")
+      .send({
+        ...requestPayload("hotel request attachment review"),
+        attachments: [uploaded.body.file]
+      });
+    expect(created.status).toBe(201);
+    const requestId = created.body.procurementRequest.id as string;
+    expect(created.body.procurementRequest.attachments[0].id).toBe(uploaded.body.file.id);
+
+    const creatorDownload = await request(runtime.app).get(`/api/files/${uploaded.body.file.id}/download`).set("x-mock-user-id", "u8");
+    expect(creatorDownload.status).toBe(200);
+    expect(creatorDownload.text).toBe("hotel request doc");
+
+    const buyerBeforeApprovalDownload = await request(runtime.app).get(`/api/files/${uploaded.body.file.id}/download`).set("x-mock-user-id", "u2");
+    expect(buyerBeforeApprovalDownload.status).toBe(403);
+
+    const submitted = await request(runtime.app).post(`/api/procurement-requests/${requestId}/submit`).set("x-mock-user-id", "u8");
+    expect(submitted.status).toBe(200);
+
+    const listed = await request(runtime.app).get("/api/procurement-requests").set("x-mock-user-id", "u1");
+    expect(listed.status).toBe(200);
+    const reviewTarget = listed.body.procurementRequests.find((item: { id: string }) => item.id === requestId);
+    expect(reviewTarget.attachments[0].fileName).toBe("REQ-004-request-detail.doc");
+
+    const groupDownload = await request(runtime.app).get(`/api/files/${uploaded.body.file.id}/download`).set("x-mock-user-id", "u1");
+    expect(groupDownload.status).toBe(200);
+    expect(groupDownload.text).toBe("hotel request doc");
+
+    const approved = await request(runtime.app)
+      .post(`/api/procurement-requests/${requestId}/approve`)
+      .set("x-mock-user-id", "u1")
+      .send({ approved: true, opinion: "attachment approved" });
+    expect(approved.status).toBe(200);
+
+    const buyerDownload = await request(runtime.app).get(`/api/files/${uploaded.body.file.id}/download`).set("x-mock-user-id", "u2");
+    expect(buyerDownload.status).toBe(200);
+    expect(buyerDownload.text).toBe("hotel request doc");
+
+    for (const userId of ["u5", "u6", "u9", "u12", "u13"]) {
+      const denied = await request(runtime.app).get(`/api/files/${uploaded.body.file.id}/download`).set("x-mock-user-id", userId);
+      expect(denied.status).toBe(403);
+    }
+
+    const hiddenFromFinanceList = await request(runtime.app).get("/api/files").set("x-mock-user-id", "u9");
+    expect(hiddenFromFinanceList.status).toBe(200);
+    expect(hiddenFromFinanceList.body.files.map((item: { id: string }) => item.id)).not.toContain(uploaded.body.file.id);
+
+    const supplierDenied = await request(runtime.app).get(`/api/files/${uploaded.body.file.id}/download`).set("x-mock-user-id", "u12");
+    expect(supplierDenied.status).toBe(403);
+  });
+
+  it("rejects forged procurement request attachment metadata", async () => {
+    const runtime = boot();
+    const forged = await request(runtime.app)
+      .post("/api/procurement-requests")
+      .set("x-mock-user-id", "u8")
+      .send({
+        ...requestPayload("forged attachment reference"),
+        attachments: [{ id: "file-does-not-exist", fileName: "fake.pdf", contentType: "application/pdf", sizeBytes: 12 }]
+      });
+    expect(forged.status).toBe(400);
+    expect(forged.body.error.code).toBe("PROCUREMENT_REQUEST_ATTACHMENT_INVALID");
   });
 
   it("supports formal bid cutoff before locking, comparison, expert review and award approval", async () => {
@@ -167,7 +262,7 @@ describe("Eight-role procurement flow regression", () => {
     const awardId = award.body.approval.id as string;
     const submittedAward = await request(runtime.app).post(`/api/award-approvals/${awardId}/submit`).set("x-mock-user-id", "u2");
     expect(submittedAward.status).toBe(200);
-    const approvedAward = await request(runtime.app).post(`/api/award-approvals/${awardId}/mock-approve`).set("x-mock-user-id", "u1").send({ approved: true });
+    const approvedAward = await request(runtime.app).post(`/api/award-approvals/${awardId}/mock-approve`).set("x-mock-user-id", "u2").send({ approved: true });
     expect(approvedAward.status).toBe(200);
     expect(approvedAward.body.approval.approvalStatus).toBe("approved");
   });

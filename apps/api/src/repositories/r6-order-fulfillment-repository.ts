@@ -156,6 +156,7 @@ export class R6OrderFulfillmentRepository {
   resolvePriceSource(product: MallProduct, prices: MallPrice[]): MallPriceSource | null {
     const pricingReport = this.findPricingReportSource(product);
     if (pricingReport) return pricingReport;
+    if (product.sourceType || product.sourcePricingReportId || product.sourcePricingReportItemId) return null;
     const quoted = [...prices]
       .filter((price) => price.productId === product.id && price.approvalStatus === "approved" && this.isEffective(price.effectiveFrom, price.effectiveTo))
       .sort((a, b) => b.versionNo - a.versionNo)[0];
@@ -176,18 +177,29 @@ export class R6OrderFulfillmentRepository {
   }
 
   private findPricingReportSource(product: MallProduct): MallPriceSource | null {
+    const where = product.sourcePricingReportItemId
+      ? "item.id = ? and item.product_id = ? and item.supplier_id = ?"
+      : product.sourcePricingReportId
+        ? "item.pricing_report_id = ? and item.product_id = ? and item.supplier_id = ?"
+        : "item.product_id = ? and item.supplier_id = ?";
+    const params = product.sourcePricingReportItemId
+      ? [product.sourcePricingReportItemId, product.id, product.supplierId]
+      : product.sourcePricingReportId
+        ? [product.sourcePricingReportId, product.id, product.supplierId]
+        : [product.id, product.supplierId];
     const rows = this.runtimeDb.db
       .prepare(
         `select
            item.id as item_id, item.pricing_report_id, item.project_id, item.sale_price,
            item.purchase_price, item.effective_from, item.effective_to,
+           item.tax_rate, item.delivery_days,
            report.report_no, report.report_status
          from r2_pricing_report_items item
          join r2_pricing_reports report on report.id = item.pricing_report_id
-         where item.product_id = ? and item.supplier_id = ?
+         where ${where}
          order by item.updated_at desc`
       )
-      .all(product.id, product.supplierId) as Row[];
+      .all(...params) as Row[];
     const row = rows.find((item) => ["generated", "approved"].includes(String(item.report_status)) && this.isEffective(String(item.effective_from), optionalString(item.effective_to)));
     if (!row) return null;
     return {
@@ -197,6 +209,8 @@ export class R6OrderFulfillmentRepository {
       label: "R5 已批准/有效定价报告明细",
       price: Number(row.sale_price),
       purchasePrice: Number(row.purchase_price),
+      taxRate: row.tax_rate === null || row.tax_rate === undefined ? undefined : Number(row.tax_rate),
+      deliveryDays: row.delivery_days === null || row.delivery_days === undefined ? undefined : Number(row.delivery_days),
       effectiveFrom: String(row.effective_from),
       effectiveTo: optionalString(row.effective_to),
       trace: { reportNo: optionalString(row.report_no), projectId: optionalString(row.project_id) }
@@ -213,6 +227,7 @@ export class R6OrderFulfillmentRepository {
     const reasons: string[] = [];
     if (product.status !== "listed") reasons.push("商品未上架");
     if (!priceSource) reasons.push("缺少有效价格来源");
+    if (!product.sourceType) reasons.push("商品未关联中标项目或协议来源");
     if (!this.supplierAdmitted(product.supplierId)) reasons.push("供应商未准入或已受限");
     if (!this.inServiceRegion(product, user.orgId)) reasons.push("超出供货区域");
     return reasons;

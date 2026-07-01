@@ -7,6 +7,7 @@ import type {
   ExpertAssignment,
   PricingReport,
   PricingReportItem,
+  ScoringDetailValue,
   ScoringSheet,
   ScoringTemplate,
   User
@@ -83,7 +84,16 @@ export class R5ReviewAwardRepository {
       name: String(row.expert_name),
       category: String(row.category),
       status: String(row.expert_status),
-      accountUserIds: json<string[]>(row.account_user_ids_json, [])
+      accountUserIds: json<string[]>(row.account_user_ids_json, []),
+      ownerOrgId: optionalString(row.owner_org_id),
+      branchOrgId: optionalString(row.branch_org_id),
+      reviewScopes: json<string[]>(row.review_scopes_json, []),
+      supplierAssessmentScopes: json<string[]>(row.supplier_assessment_scopes_json, []),
+      sharedAccount: boolFromSql(row.shared_account),
+      active: boolFromSql(row.active_flag ?? 1),
+      avoidanceTags: json<string[]>(row.avoidance_tags_json, []),
+      maintainedAt: optionalString(row.maintained_at),
+      maintenanceLog: optionalString(row.maintenance_log)
     }));
   }
 
@@ -91,16 +101,45 @@ export class R5ReviewAwardRepository {
     const now = new Date().toISOString();
     run(
       this.runtimeDb.db.prepare(
-        `insert into r2_experts (id, expert_name, category, expert_status, account_user_ids_json, updated_at)
-         values (?, ?, ?, ?, ?, ?)
+        `insert into r2_experts (
+           id, expert_name, category, expert_status, account_user_ids_json, owner_org_id,
+           branch_org_id, review_scopes_json, supplier_assessment_scopes_json, shared_account,
+           active_flag, avoidance_tags_json, maintained_at, maintenance_log, updated_at
+         )
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          on conflict(id) do update set
            expert_name = excluded.expert_name,
            category = excluded.category,
            expert_status = excluded.expert_status,
            account_user_ids_json = excluded.account_user_ids_json,
+           owner_org_id = excluded.owner_org_id,
+           branch_org_id = excluded.branch_org_id,
+           review_scopes_json = excluded.review_scopes_json,
+           supplier_assessment_scopes_json = excluded.supplier_assessment_scopes_json,
+           shared_account = excluded.shared_account,
+           active_flag = excluded.active_flag,
+           avoidance_tags_json = excluded.avoidance_tags_json,
+           maintained_at = excluded.maintained_at,
+           maintenance_log = excluded.maintenance_log,
            updated_at = excluded.updated_at`
       ),
-      [expert.id, expert.name, expert.category, expert.status, JSON.stringify(accountUserIds), now]
+      [
+        expert.id,
+        expert.name,
+        expert.category,
+        expert.status,
+        JSON.stringify(accountUserIds),
+        expert.ownerOrgId ?? null,
+        expert.branchOrgId ?? null,
+        JSON.stringify(expert.reviewScopes ?? []),
+        JSON.stringify(expert.supplierAssessmentScopes ?? []),
+        expert.sharedAccount ? 1 : 0,
+        expert.active === false ? 0 : 1,
+        JSON.stringify(expert.avoidanceTags ?? []),
+        expert.maintainedAt ?? now,
+        expert.maintenanceLog ?? null,
+        now
+      ]
     );
   }
 
@@ -216,7 +255,7 @@ export class R5ReviewAwardRepository {
       versionNo: Number(row.version_no),
       submittedAt: nullableString(row.submitted_at),
       lockedAt: nullableString(row.locked_at),
-      details: json<Record<string, number>>(row.details_json, {})
+      details: json<Record<string, number | ScoringDetailValue>>(row.details_json, {})
     }));
   }
 
@@ -435,8 +474,8 @@ export class R5ReviewAwardRepository {
       `insert into r2_pricing_report_items (
         id, pricing_report_id, project_id, supplier_id, product_id, item_name, specification,
         quantity, unit, purchase_price, sale_price, service_fee_rate, gross_margin_rate,
-        effective_from, effective_to, updated_at
-      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        tax_rate, delivery_days, effective_from, effective_to, updated_at
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     for (const item of report.items) {
       run(statement, [
@@ -453,6 +492,8 @@ export class R5ReviewAwardRepository {
         item.salePrice,
         item.serviceFeeRate,
         item.grossMarginRate,
+        item.taxRate ?? null,
+        item.deliveryDays ?? null,
         item.effectiveFrom,
         item.effectiveTo ?? null,
         now
@@ -492,8 +533,14 @@ export class R5ReviewAwardRepository {
       salePrice: Number(row.sale_price),
       serviceFeeRate: Number(row.service_fee_rate),
       grossMarginRate: Number(row.gross_margin_rate),
+      taxRate: optionalNumber(row.tax_rate),
+      deliveryDays: optionalNumber(row.delivery_days),
       effectiveFrom: String(row.effective_from),
       effectiveTo: optionalString(row.effective_to)
     };
   }
+}
+
+function optionalNumber(value: SqlValue | undefined) {
+  return value === null || value === undefined ? undefined : Number(value);
 }

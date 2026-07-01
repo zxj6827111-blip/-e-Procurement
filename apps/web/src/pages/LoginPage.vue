@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { RouterLink } from "vue-router";
 import { useRouter } from "vue-router";
 import AuditLogRef from "../components/AuditLogRef.vue";
 import ErrorAlert from "../components/ErrorAlert.vue";
@@ -46,13 +47,18 @@ function defaultRoute(roleId: string) {
   return roleDefaultRoutes[roleId] ?? "/";
 }
 
+function postLoginRoute(roleId: string, passwordChangeRequired?: boolean) {
+  if (passwordChangeRequired && ["supplier", "supplier_admin", "supplier_quotation"].includes(roleId)) return "/account-security";
+  return defaultRoute(roleId);
+}
+
 async function login() {
   error.value = "";
   loading.value = true;
   try {
     const data = await session.login(username.value, password.value);
     auditLogId.value = data.auditLogId ?? "";
-    await router.replace(defaultRoute(data.roleId));
+    await router.replace(postLoginRoute(data.roleId, data.passwordChangeRequired));
   } catch (err) {
     error.value = err instanceof Error ? err.message : "登录失败";
     auditLogId.value = String((err as { auditLogId?: string }).auditLogId ?? "");
@@ -67,7 +73,7 @@ async function enterDemo() {
   try {
     const data = await session.demoLogin(selectedUserId.value);
     auditLogId.value = data.auditLogId ?? "";
-    await router.replace(defaultRoute(data.roleId));
+    await router.replace(postLoginRoute(data.roleId, data.passwordChangeRequired));
   } catch (err) {
     error.value = err instanceof Error ? err.message : "账号进入失败";
     auditLogId.value = String((err as { auditLogId?: string }).auditLogId ?? "");
@@ -99,6 +105,11 @@ onMounted(() => {
         <h1>进入采购业务系统</h1>
       </div>
 
+      <div class="login-secondary-actions">
+        <span>供应商首次入驻可先提交企业资料，集团审核通过后再参与采购项目。</span>
+        <RouterLink class="secondary-button" to="/supplier-onboarding-register">供应商注册</RouterLink>
+      </div>
+
       <div v-if="session.mockAuthEnabled" class="demo-entry">
         <div class="demo-grid">
           <button
@@ -119,7 +130,7 @@ onMounted(() => {
         </button>
       </div>
 
-      <details class="password-login">
+      <details class="password-login" open>
         <summary>账号密码登录</summary>
         <div class="form-grid">
           <label>

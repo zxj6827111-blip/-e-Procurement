@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { apiGet, apiPost, uploadFile } from "../api/http";
 import AuditLogRef from "../components/AuditLogRef.vue";
 import ErrorAlert from "../components/ErrorAlert.vue";
+import ProcessTimeline from "../components/ProcessTimeline.vue";
 import WorkflowSurfaceSummary from "../components/WorkflowSurfaceSummary.vue";
 import { useSessionStore } from "../stores/session";
 import { businessRecordLabel } from "../utils/business-display";
@@ -46,10 +47,11 @@ const projectAuditLogs = ref<AuditLog[]>([]);
 const sensitiveLogs = ref<AuditLog[]>([]);
 const auditLogId = ref("");
 const error = ref("");
+const processRefreshKey = ref(0);
 
 const archiveItemNames = computed(() => new Map(archiveItems.value.map((item) => [item.id, item.itemName])));
 const supplementRequestLabels = computed(() => new Map(supplementRequests.value.map((item, index) => [item.id, `补档申请 ${index + 1}`])));
-const canMaintainArchive = computed(() => ["group_manager", "buyer", "hotel_buyer", "platform_operator"].includes(session.roleId));
+const canMaintainArchive = computed(() => ["buyer", "platform_operator"].includes(session.roleId));
 
 async function load() {
   archiveItems.value = (await apiGet<{ archiveItems: ArchiveItem[] }>(`/api/projects/${selectedProjectId.value}/archive-items`)).archiveItems;
@@ -73,6 +75,7 @@ async function run(action: () => Promise<{ auditLogId?: string; supplementReques
     auditLogId.value = result.auditLogId ?? "";
     selectedSupplementRequestId.value = result.supplementRequest?.id ?? selectedSupplementRequestId.value;
     await load();
+    processRefreshKey.value += 1;
   } catch (err) {
     error.value = err instanceof Error ? err.message : "操作失败";
   }
@@ -111,6 +114,14 @@ onMounted(load);
     <h2>项目档案与审计</h2>
 
     <WorkflowSurfaceSummary title="档案补档审批与消息" :business-types="['archive_supplement']" compact />
+
+    <ProcessTimeline
+      v-if="selectedProjectId"
+      business-type="archive"
+      :business-id="selectedProjectId"
+      title="档案归集流程"
+      :refresh-key="processRefreshKey"
+    />
 
     <div v-if="canMaintainArchive" class="form-grid">
       <label>

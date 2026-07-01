@@ -87,7 +87,7 @@ watch(
         <p class="eyebrow">R8 站内消息</p>
         <h2>消息中心</h2>
       </div>
-      <RouterLink class="secondary-button link-button" to="/my-tasks">我的任务</RouterLink>
+      <RouterLink class="secondary-button link-button" to="/my-tasks">待办中心</RouterLink>
     </div>
 
     <div class="metrics">

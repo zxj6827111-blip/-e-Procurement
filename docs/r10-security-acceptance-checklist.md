@@ -63,3 +63,19 @@
 | UAT 安全验收 | Go |
 | 小范围内部试运行 | Conditional Go，需限制数据范围并保留审计 |
 | 正式生产 | Conditional No-Go，必须完成真实身份、对象存储、防病毒、正式数据库、监控告警和安全测试 |
+
+## 6. M6-C 最终安全收口
+
+日期：2026-06-28
+
+| 检查项 | 结果 | 证据 |
+|---|---|---|
+| 供应商隔离、组织隔离、专家/财务/管理员边界 | 通过 | `apps/api/tests/m6c-final-security-ops.test.ts` |
+| 审计监督只读、系统管理员不访问实质业务数据 | 通过 | `apps/api/tests/m6c-final-security-ops.test.ts`、`output/m6c-browser-evidence/m6c-browser-role-smoke.json` |
+| 文件类型、大小、路径名清洗、下载审计 | 通过 | `apps/api/tests/m6c-final-security-ops.test.ts` |
+| Process timeline DTO 脱敏 | 通过 | 不暴露 `payloadJson`、`sourceJson`、`opinion`、`actorId`、`assigneeUserId` |
+| BPMN pilot health 权限和脱敏 | 通过 | 业务角色拒绝，审计只读，业务 ID 不直接暴露 |
+| 生产 mock auth 禁用 | 通过 | `apps/api/tests/m6c-final-security-ops.test.ts` |
+| 九角色浏览器验收 | 通过 | `output/m6c-browser-evidence/` |
+
+M6-C 不改变生产结论：正式生产仍需真实 SSO、对象存储、防病毒、正式数据库、监控告警和安全测试后复评。

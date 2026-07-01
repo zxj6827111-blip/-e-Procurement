@@ -88,7 +88,20 @@ async function createR3ListedProduct(runtime: ReturnType<typeof boot>) {
   const approved = await request(runtime.app).post(`/api/mall/prices/${price.body.price.id}/approve`).set("x-mock-user-id", "u2").send({ approved: true });
   expect(approved.status).toBe(200);
 
-  const listed = await request(runtime.app).post(`/api/mall/products/${product.body.product.id}/status`).set("x-mock-user-id", "u2").send({ status: "listed" });
+  const listed = await request(runtime.app)
+    .post(`/api/mall/products/${product.body.product.id}/status`)
+    .set("x-mock-user-id", "u2")
+    .send({
+      status: "listed",
+      sourceType: "award_project",
+      sourceProjectId: "p-award",
+      purchasePrice: 95,
+      salePrice: 118,
+      taxRate: 0.13,
+      deliveryDays: 3,
+      effectiveFrom: "2026-01-01",
+      effectiveTo: "2099-12-31"
+    });
   expect(listed.status).toBe(200);
 
   return { productId: product.body.product.id as string, priceId: price.body.price.id as string, imageFileId: image.body.file.id as string };
@@ -101,7 +114,7 @@ describe("R3 supplier and product center master source", () => {
 
     const supplier = await request(runtime1.app)
       .post("/api/suppliers/admissions")
-      .set("x-mock-user-id", "u2")
+      .set("x-mock-user-id", "u1")
       .send({
         name: "R3 主源供应商",
         category: "客房一次性用品",
@@ -136,7 +149,7 @@ describe("R3 supplier and product center master source", () => {
 
     const sample = await request(runtime1.app)
       .post(`/api/suppliers/${supplierId}/seal-samples`)
-      .set("x-mock-user-id", "u2")
+      .set("x-mock-user-id", "u1")
       .send({
         sampleName: "R3 布草封样",
         specification: "80支全棉",
@@ -281,13 +294,17 @@ describe("R3 supplier and product center master source", () => {
       tax_rate: number;
       invoice_name: string;
       service_regions_json: string;
-    }>(runtime1, "select product_name, product_status, packing_quantity, tax_rate, invoice_name, service_regions_json from r2_products where id = ?", productId);
+      source_type: string;
+      source_project_id: string;
+    }>(runtime1, "select product_name, product_status, packing_quantity, tax_rate, invoice_name, service_regions_json, source_type, source_project_id from r2_products where id = ?", productId);
     expect(productRow).toMatchObject({
       product_name: "R3 商品中心主源商品",
       product_status: "listed",
       packing_quantity: 12,
       tax_rate: 0.13,
-      invoice_name: "客房一次性用品"
+      invoice_name: "客房一次性用品",
+      source_type: "award_project",
+      source_project_id: "p-award"
     });
     expect(JSON.parse(productRow?.service_regions_json ?? "[]")).toEqual(["华东", "华南"]);
 
@@ -323,9 +340,27 @@ describe("R3 supplier and product center master source", () => {
       });
     expect(noImage.status).toBe(201);
 
-    const blocked = await request(runtime1.app).post(`/api/mall/products/${noImage.body.product.id}/status`).set("x-mock-user-id", "u2").send({ status: "listed" });
+    const blocked = await request(runtime1.app)
+      .post(`/api/mall/products/${noImage.body.product.id}/status`)
+      .set("x-mock-user-id", "u2")
+      .send({
+        status: "listed",
+        sourceType: "award_project",
+        sourceProjectId: "p-award",
+        purchasePrice: 50,
+        salePrice: 60,
+        effectiveFrom: "2026-01-01"
+      });
     expect(blocked.status).toBe(400);
     expect(blocked.body.error.code).toBe("MALL_PRODUCT_LISTING_BLOCKED");
+
+    const operatorProducts = await request(runtime1.app).get("/api/mall/products").set("x-mock-user-id", "u10");
+    expect(operatorProducts.status).toBe(200);
+    expect(operatorProducts.body.products.map((item: { id: string }) => item.id)).toContain(noImage.body.product.id);
+
+    const hotelProducts = await request(runtime1.app).get("/api/mall/products").set("x-mock-user-id", "u8");
+    expect(hotelProducts.status).toBe(200);
+    expect(hotelProducts.body.products.map((item: { id: string }) => item.id)).not.toContain(noImage.body.product.id);
 
     const runtime2 = boot(dataRoot);
     const listedProducts = await request(runtime2.app).get("/api/mall/products").set("x-mock-user-id", "u2");
@@ -337,7 +372,8 @@ describe("R3 supplier and product center master source", () => {
       invoiceName: "客房一次性用品",
       status: "listed"
     });
-    expect(rebootedProduct.activePrice).toMatchObject({ id: priceId, salePrice: 118, deliveryDays: 3 });
+    expect(rebootedProduct.activePrice).toMatchObject({ salePrice: 118, deliveryDays: 3, sourceType: "pricing_report" });
+    expect(rebootedProduct.priceSource).toMatchObject({ type: "pricing_report" });
   });
 
   it("records supplier performance evaluation into the R3 supplier center formal table", async () => {

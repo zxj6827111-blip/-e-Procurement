@@ -14,7 +14,7 @@ import type {
   MallShipment,
   SupplierEvaluation
 } from "../types.js";
-import { isFinanceReviewRole, isFinanceRole, isProcurementBuyerRole, isSupplierAdminRole, isSupplierQuotationRole, isSupplierRole, supplierIdMatches, userOrgScope } from "../role-groups.js";
+import { isFinanceReviewRole, isFinanceRole, isMallListingOperatorRole, isProcurementBuyerRole, isSupplierAdminRole, isSupplierQuotationRole, isSupplierRole, supplierIdMatches, userOrgScope } from "../role-groups.js";
 import { denyResponse } from "./permission-helpers.js";
 
 const readerRoles = new Set(["buyer", "group_manager", "hotel_buyer", "hotel_finance", "platform_operator", "supplier", "supplier_admin", "supplier_quotation", "finance_reviewer", "auditor"]);
@@ -24,6 +24,12 @@ const invoiceVerificationBoundary = "本地模拟发票验真 adapter：完成�
 function assertBuyer(ctx: AppContext, req: Request, res: Response, action: string) {
   if (isProcurementBuyerRole(req.auth.roleId)) return true;
   denyResponse(ctx, req, res, 403, "MALL_BUYER_REQUIRED", "Only buyer-side roles can perform this mall action.", action, "mall", "operation");
+  return false;
+}
+
+function assertListingOperator(ctx: AppContext, req: Request, res: Response, action: string) {
+  if (isMallListingOperatorRole(req.auth.roleId)) return true;
+  denyResponse(ctx, req, res, 403, "MALL_LISTING_OPERATOR_REQUIRED", "只有集团采购管理、采购经办或平台运营账号可以进行商品定价上架。", action, "mall", "listing");
   return false;
 }
 
@@ -52,6 +58,7 @@ function now() {
 function productVisible(req: Request, product: MallProduct) {
   if (isSupplierRole(req.auth.roleId)) return supplierIdMatches(req.auth.user, product.supplierId);
   if (req.auth.roleId === "auditor") return true;
+  if (isMallListingOperatorRole(req.auth.roleId)) return true;
   if (isFinanceRole(req.auth.roleId)) return product.status === "listed";
   if (isProcurementBuyerRole(req.auth.roleId)) return product.status === "listed" || product.createdBy === req.auth.user.id;
   return false;
@@ -73,6 +80,12 @@ function supplierAdmitted(ctx: AppContext, supplierId: string) {
   return admissionStatus === "admitted" && supplier.status !== "restricted";
 }
 
+function assertSupplierAdmittedForMall(ctx: AppContext, req: Request, res: Response, supplierId: string, action: string) {
+  if (supplierAdmitted(ctx, supplierId)) return true;
+  denyResponse(ctx, req, res, 403, "MALL_SUPPLIER_NOT_ADMITTED", "供应商尚未通过集团准入评审，不能进行商城商品、价格或问卷业务操作。", action, "supplier", supplierId);
+  return false;
+}
+
 function priceAvailable(price: MallPrice) {
   if (price.approvalStatus !== "approved") return false;
   if (!price.effectiveTo) return true;
@@ -83,12 +96,157 @@ function activePrice(ctx: AppContext, productId: string) {
   return [...ctx.state.mallPrices].reverse().find((item) => item.productId === productId && priceAvailable(item));
 }
 
-function listingBlockReason(ctx: AppContext, product: MallProduct) {
+function listingPrerequisiteBlockReason(ctx: AppContext, product: MallProduct) {
   if (!supplierAdmitted(ctx, product.supplierId)) return "商品所属供应商未准入或已受限，不能上架。";
   if (!product.skuCode.trim() || !product.specification.trim()) return "商品缺少 SKU 或规格，不能上架。";
   if (product.imageFileIds.length === 0) return "商品缺少图片，不能上架。";
-  if (!ctx.r6OrderFulfillmentRepository.resolvePriceSource(product, ctx.state.mallPrices)) return "商品缺少已审批且未过期的定价报告或供应商报价，不能上架。";
+  if (!product.sourceType) return "商品未关联中标项目或协议来源，不能上架。";
+  if (product.sourceType === "award_project" && !product.sourceProjectId) return "商品未选择中标项目来源，不能上架。";
+  if (product.sourceType === "agreement" && !product.sourceAgreementNo) return "商品未填写协议来源，不能上架。";
   return null;
+}
+
+function listingBlockReason(ctx: AppContext, product: MallProduct) {
+  const prerequisiteReason = listingPrerequisiteBlockReason(ctx, product);
+  if (prerequisiteReason) return prerequisiteReason;
+  const source = ctx.r6OrderFulfillmentRepository.resolvePriceSource(product, ctx.state.mallPrices);
+  if (!source || source.type !== "pricing_report") return "商品缺少已生成并有效的定价报告，不能上架。";
+  return null;
+}
+
+function productSourceTrace(ctx: AppContext, product: MallProduct) {
+  const project = product.sourceProjectId ? ctx.state.projects.find((item) => item.id === product.sourceProjectId) : undefined;
+  const report = product.sourcePricingReportId ? ctx.state.pricingReports.find((item) => item.id === product.sourcePricingReportId) : undefined;
+  return {
+    type: product.sourceType ?? "未关联",
+    projectId: product.sourceProjectId,
+    projectCode: project?.code,
+    projectName: project?.name,
+    agreementNo: product.sourceAgreementNo,
+    pricingReportId: product.sourcePricingReportId,
+    pricingReportNo: report?.reportNo,
+    pricingReportItemId: product.sourcePricingReportItemId
+  };
+}
+
+function productSourceCompleted(ctx: AppContext, product: MallProduct) {
+  if (!product.sourceType) return false;
+  if (product.sourceType === "award_project" && !product.sourceProjectId) return false;
+  if (product.sourceType === "agreement" && !product.sourceAgreementNo) return false;
+  return Boolean(ctx.r6OrderFulfillmentRepository.resolvePriceSource(product, ctx.state.mallPrices));
+}
+
+function validSourceType(value: unknown): MallProduct["sourceType"] | undefined {
+  const next = String(value ?? "");
+  return next === "award_project" || next === "agreement" ? next : undefined;
+}
+
+function activePricingReportsForProduct(ctx: AppContext, product: MallProduct) {
+  const reports = ctx.state.pricingReports.filter((report) => {
+    if (!["generated", "approved"].includes(report.status)) return false;
+    if (report.selectedSupplierId !== product.supplierId) return false;
+    if (product.sourceType === "award_project" && product.sourceProjectId && report.projectId !== product.sourceProjectId) return false;
+    if (product.sourceType === "agreement" && product.sourceAgreementNo) {
+      const basisAgreementNo = typeof report.basisJson.sourceAgreementNo === "string" ? report.basisJson.sourceAgreementNo : undefined;
+      if (report.projectId !== `agreement:${product.sourceAgreementNo}` && basisAgreementNo !== product.sourceAgreementNo) return false;
+    }
+    return report.items.some((item) => item.productId === product.id);
+  });
+  return reports.map((report) => ({
+    ...report,
+    items: report.items.filter((item) => item.productId === product.id)
+  }));
+}
+
+function ensurePricingReportForProduct(ctx: AppContext, req: Request, product: MallProduct, input: Record<string, unknown>) {
+  const selectedReportId = String(input.pricingReportId ?? product.sourcePricingReportId ?? "").trim();
+  const selectedItemId = String(input.pricingReportItemId ?? product.sourcePricingReportItemId ?? "").trim();
+  const existingReports = activePricingReportsForProduct(ctx, product);
+  const existingReport = existingReports.find((report) => report.id === selectedReportId) ?? existingReports[0];
+  const existingItem = existingReport?.items.find((item) => item.id === selectedItemId) ?? existingReport?.items[0];
+  if (existingReport && existingItem) {
+    return { report: existingReport, item: existingItem };
+  }
+
+  const projectId = product.sourceProjectId ?? String(input.sourceProjectId ?? "").trim();
+  const purchasePrice = Number(input.purchasePrice ?? 0);
+  const salePrice = Number(input.salePrice ?? input.price ?? 0);
+  if (!Number.isFinite(purchasePrice) || purchasePrice <= 0 || !Number.isFinite(salePrice) || salePrice <= 0) {
+    throw new Error("请填写采购价和销售价，才能生成商品定价报告。");
+  }
+  const serviceFeeRate = purchasePrice > 0 ? Math.max(0, Number(((salePrice - purchasePrice) / purchasePrice).toFixed(4))) : 0;
+  const grossMarginRate = salePrice > 0 ? Math.max(0, Number(((salePrice - purchasePrice) / salePrice).toFixed(4))) : 0;
+  const reportId = `pr-mall-${ctx.state.pricingReports.length + 1}`;
+  const itemId = `${reportId}-item-1`;
+  const timestamp = now();
+  const report = {
+    id: reportId,
+    projectId: projectId || `agreement:${product.sourceAgreementNo ?? product.id}`,
+    awardApprovalId: product.sourceType === "award_project" ? String(input.awardApprovalId ?? `mall-source:${product.id}`) : `agreement:${product.sourceAgreementNo ?? product.id}`,
+    sourceReportId: product.sourceType === "award_project" ? String(input.sourceReportId ?? product.sourceProjectId ?? product.id) : String(input.sourceAgreementNo ?? product.sourceAgreementNo ?? product.id),
+    selectedSupplierId: product.supplierId,
+    reportNo: String(input.reportNo ?? `PR-MALL-${product.skuCode || product.id}`),
+    status: "generated" as const,
+    items: [
+      {
+        id: itemId,
+        productId: product.id,
+        itemName: product.name,
+        specification: product.specification,
+        quantity: 1,
+        unit: product.unit,
+        purchasePrice,
+        salePrice,
+        serviceFeeRate,
+        grossMarginRate,
+        taxRate: input.taxRate === undefined ? product.taxRate : Number(input.taxRate),
+        deliveryDays: input.deliveryDays === undefined ? undefined : Number(input.deliveryDays),
+        effectiveFrom: String(input.effectiveFrom ?? timestamp.slice(0, 10)),
+        effectiveTo: input.effectiveTo === undefined ? undefined : String(input.effectiveTo)
+      }
+    ],
+    basisJson: {
+      source: product.sourceType,
+      sourceProjectId: projectId || undefined,
+      sourceAgreementNo: product.sourceAgreementNo,
+      productId: product.id
+    },
+    createdBy: req.auth.user.id,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    approvedAt: timestamp
+  };
+  ctx.state.pricingReports.push(report);
+  ctx.r5ReviewAwardRepository.upsertPricingReport(report);
+  return { report, item: report.items[0]! };
+}
+
+function applyProductSource(ctx: AppContext, req: Request, res: Response, product: MallProduct, input: Record<string, unknown>) {
+  const sourceType = input.sourceType === undefined ? product.sourceType : validSourceType(input.sourceType);
+  if (input.sourceType !== undefined && !sourceType) {
+    res.status(400).json({ error: { code: "MALL_PRODUCT_SOURCE_INVALID", message: "商品来源类型必须是中标项目或协议来源。" } });
+    return false;
+  }
+  if (sourceType !== undefined) product.sourceType = sourceType;
+  if (input.sourceProjectId !== undefined) product.sourceProjectId = String(input.sourceProjectId || "").trim() || undefined;
+  if (input.sourceAgreementNo !== undefined) product.sourceAgreementNo = String(input.sourceAgreementNo || "").trim() || undefined;
+  if (input.sourcePricingReportId !== undefined) product.sourcePricingReportId = String(input.sourcePricingReportId || "").trim() || undefined;
+  if (input.sourcePricingReportItemId !== undefined) product.sourcePricingReportItemId = String(input.sourcePricingReportItemId || "").trim() || undefined;
+  if (product.sourceType === "award_project") {
+    const project = product.sourceProjectId ? ctx.state.projects.find((item) => item.id === product.sourceProjectId) : undefined;
+    const approval = product.sourceProjectId
+      ? [...ctx.state.awardApprovals].reverse().find((item) => item.projectId === product.sourceProjectId && item.selectedSupplierId === product.supplierId && item.approvalStatus === "approved")
+      : undefined;
+    if (!project || !approval) {
+      res.status(400).json({ error: { code: "MALL_PRODUCT_SOURCE_AWARD_REQUIRED", message: "商品必须关联已定标且中标供应商一致的项目，才能作为中标来源上架。" } });
+      return false;
+    }
+  }
+  if (product.sourceType === "agreement" && !product.sourceAgreementNo) {
+    res.status(400).json({ error: { code: "MALL_PRODUCT_SOURCE_AGREEMENT_REQUIRED", message: "协议来源商品必须填写协议编号或协议名称。" } });
+    return false;
+  }
+  return true;
 }
 
 function fileMetadata(ctx: AppContext, fileIds: string[]) {
@@ -103,6 +261,17 @@ function fileMetadata(ctx: AppContext, fileIds: string[]) {
       sizeBytes: file.sizeBytes,
       uploadedAt: file.createdAt
     }));
+}
+
+function mallOrderProjectId(ctx: AppContext, order: MallOrder) {
+  return ctx.r7SettlementFinanceRepository.listSettlementBills().find((bill) => bill.purchaseOrderId === order.id)?.projectId;
+}
+
+function mallInvoiceBill(ctx: AppContext, invoice: MallSettlementInvoice) {
+  const formalInvoice = ctx.r7SettlementFinanceRepository.getInvoice(invoice.id);
+  if (!formalInvoice) return undefined;
+  const bill = ctx.r7SettlementFinanceRepository.getSettlementBill(formalInvoice.settlementBillId);
+  return bill ? { formalInvoice, bill } : undefined;
 }
 
 function productResponse(ctx: AppContext, product: MallProduct, user = ctx.state.users[0]!) {
@@ -137,6 +306,15 @@ function productResponse(ctx: AppContext, product: MallProduct, user = ctx.state
         }
       : activePrice(ctx, product.id) ?? null,
     priceSource: priceSource ? { ...priceSource, sourceTrace: priceSource.trace } : null,
+    sourceTrace: productSourceTrace(ctx, product),
+    sourceCompleted: productSourceCompleted(ctx, product),
+    availablePricingReports: activePricingReportsForProduct(ctx, product).map((report) => ({
+      id: report.id,
+      reportNo: report.reportNo,
+      projectId: report.projectId,
+      status: report.status,
+      items: report.items.map((item) => ({ id: item.id, salePrice: item.salePrice, purchasePrice: item.purchasePrice, effectiveFrom: item.effectiveFrom, effectiveTo: item.effectiveTo }))
+    })),
     saleable: Boolean(offer?.saleable),
     blockReasons: offer?.blockReasons ?? [],
     statusLabel: offer?.statusLabel ?? product.status
@@ -272,6 +450,7 @@ export function mallRoutes(ctx: AppContext) {
     const supplierId = String(req.body?.supplierId ?? req.auth.user.supplierId ?? "");
     if (isSupplierAdminRole(req.auth.roleId)) {
       if (!assertSupplier(ctx, req, res, supplierId, "mall_product.create.denied")) return;
+      if (!assertSupplierAdmittedForMall(ctx, req, res, supplierId, "mall_product.create.denied")) return;
     } else if (!assertBuyer(ctx, req, res, "mall_product.create.denied")) {
       return;
     }
@@ -298,6 +477,12 @@ export function mallRoutes(ctx: AppContext) {
       supplierId,
       serviceRegions: Array.isArray(req.body?.serviceRegions) ? req.body.serviceRegions.map(String) : ["全国"],
       procurementCategory: req.body?.procurementCategory === undefined ? undefined : String(req.body.procurementCategory),
+      sourceType: validSourceType(req.body?.sourceType),
+      sourceProjectId: req.body?.sourceProjectId === undefined ? undefined : String(req.body.sourceProjectId),
+      sourceAgreementNo: req.body?.sourceAgreementNo === undefined ? undefined : String(req.body.sourceAgreementNo),
+      sourcePricingReportId: req.body?.sourcePricingReportId === undefined ? undefined : String(req.body.sourcePricingReportId),
+      sourcePricingReportItemId: req.body?.sourcePricingReportItemId === undefined ? undefined : String(req.body.sourcePricingReportItemId),
+      listedAt: null,
       imageFileIds: Array.isArray(req.body?.imageFileIds) ? req.body.imageFileIds.map(String) : [],
       attachmentFileIds: Array.isArray(req.body?.attachmentFileIds) ? req.body.attachmentFileIds.map(String) : [],
       createdBy: req.auth.user.id,
@@ -316,6 +501,7 @@ export function mallRoutes(ctx: AppContext) {
     if (!product) return res.status(404).json({ error: { code: "MALL_PRODUCT_NOT_FOUND", message: "Mall product was not found." } });
     if (isSupplierAdminRole(req.auth.roleId)) {
       if (!assertSupplier(ctx, req, res, product.supplierId, "mall_product.update.denied")) return;
+      if (!assertSupplierAdmittedForMall(ctx, req, res, product.supplierId, "mall_product.update.denied")) return;
     } else if (!assertBuyer(ctx, req, res, "mall_product.update.denied")) {
       return;
     }
@@ -324,6 +510,9 @@ export function mallRoutes(ctx: AppContext) {
     }
     for (const key of ["packingQuantity", "minOrderQty", "maxOrderQty", "taxRate"] as const) {
       if (req.body?.[key] !== undefined) product[key] = Number(req.body[key]);
+    }
+    if (["sourceType", "sourceProjectId", "sourceAgreementNo", "sourcePricingReportId", "sourcePricingReportItemId"].some((key) => req.body?.[key] !== undefined)) {
+      if (!applyProductSource(ctx, req, res, product, req.body ?? {})) return;
     }
     if (Array.isArray(req.body?.serviceRegions)) product.serviceRegions = req.body.serviceRegions.map(String);
     if (Array.isArray(req.body?.tags)) product.tags = normalizeStringArray(req.body.tags);
@@ -337,7 +526,7 @@ export function mallRoutes(ctx: AppContext) {
 
   router.post("/mall/products/bulk-status", (req, res) => {
     syncProductsFromR3(ctx);
-    if (!assertBuyer(ctx, req, res, "mall_product.bulk-status.denied")) return;
+    if (!assertListingOperator(ctx, req, res, "mall_product.bulk-status.denied")) return;
     const status = String(req.body?.status ?? "");
     if (!["listed", "delisted", "draft"].includes(status)) {
       return res.status(400).json({ error: { code: "MALL_PRODUCT_STATUS_INVALID", message: "Mall product status is invalid." } });
@@ -371,16 +560,27 @@ export function mallRoutes(ctx: AppContext) {
     syncProductsFromR3(ctx);
     const product = ctx.state.mallProducts.find((item) => item.id === req.params.productId);
     if (!product) return res.status(404).json({ error: { code: "MALL_PRODUCT_NOT_FOUND", message: "Mall product was not found." } });
-    if (!assertBuyer(ctx, req, res, "mall_product.status.denied")) return;
+    if (!assertListingOperator(ctx, req, res, "mall_product.status.denied")) return;
     const status = String(req.body?.status ?? "");
     if (!["listed", "delisted", "draft"].includes(status)) {
       return res.status(400).json({ error: { code: "MALL_PRODUCT_STATUS_INVALID", message: "Mall product status is invalid." } });
     }
     if (status === "listed") {
+      if (!applyProductSource(ctx, req, res, product, req.body ?? {})) return;
+      const prerequisiteReason = listingPrerequisiteBlockReason(ctx, product);
+      if (prerequisiteReason) return res.status(400).json({ error: { code: "MALL_PRODUCT_LISTING_BLOCKED", message: prerequisiteReason } });
+      try {
+        const { report, item } = ensurePricingReportForProduct(ctx, req, product, req.body ?? {});
+        product.sourcePricingReportId = report.id;
+        product.sourcePricingReportItemId = item.id;
+      } catch (error) {
+        return res.status(400).json({ error: { code: "MALL_PRODUCT_PRICING_REPORT_REQUIRED", message: error instanceof Error ? error.message : "商品缺少定价报告，不能上架。" } });
+      }
       const reason = listingBlockReason(ctx, product);
       if (reason) return res.status(400).json({ error: { code: "MALL_PRODUCT_LISTING_BLOCKED", message: reason } });
     }
     product.status = status as MallProduct["status"];
+    product.listedAt = status === "listed" ? now() : product.listedAt ?? null;
     product.updatedAt = now();
     ctx.r3SupplierProductRepository.upsertProduct(product);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "mall_product.status.update", "mall_product", product.id, undefined, status);
@@ -393,6 +593,7 @@ export function mallRoutes(ctx: AppContext) {
     if (!product) return res.status(404).json({ error: { code: "MALL_PRODUCT_NOT_FOUND", message: "Mall product was not found." } });
     if (isSupplierQuotationRole(req.auth.roleId)) {
       if (!assertSupplierQuotation(ctx, req, res, product.supplierId, "mall_price.create.denied")) return;
+      if (!assertSupplierAdmittedForMall(ctx, req, res, product.supplierId, "mall_price.create.denied")) return;
     } else if (!assertBuyer(ctx, req, res, "mall_price.create.denied")) {
       return;
     }
@@ -524,6 +725,23 @@ export function mallRoutes(ctx: AppContext) {
     const fundAccount = reserveOrderPayment(ctx, order, req.auth.user.id);
     ctx.r6OrderFulfillmentRepository.syncOrderFulfillmentState(ctx.state);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "mall_order.submit", "mall_order", order.id, undefined, `amount=${order.totalAmount}`);
+    ctx.eventBus.emit({
+      eventCode: "PurchaseOrderCreated",
+      businessType: "mall_order",
+      businessId: order.id,
+      businessTitle: order.orderNo,
+      actor: req.auth.user,
+      orgId: order.orgId,
+      supplierId: order.supplierId,
+      projectId: mallOrderProjectId(ctx, order),
+      idempotencyKey: `mall_order:${order.id}:created`,
+      payloadJson: {
+        status: order.status,
+        totalAmount: order.totalAmount,
+        paymentStatus: order.paymentStatus,
+        lineCount: order.lineItems.length
+      }
+    });
     return res.status(201).json({ order, fundAccount, paymentAdapterBoundary: simulatedFundBoundary, auditLogId: auditLog.id });
   });
 
@@ -594,6 +812,24 @@ export function mallRoutes(ctx: AppContext) {
     const fundAccount = reserveOrderPayment(ctx, order, req.auth.user.id);
     ctx.r6OrderFulfillmentRepository.syncOrderFulfillmentState(ctx.state);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "mall_order.copy", "mall_order", order.id, undefined, `source=${source.id}`);
+    ctx.eventBus.emit({
+      eventCode: "PurchaseOrderCreated",
+      businessType: "mall_order",
+      businessId: order.id,
+      businessTitle: order.orderNo,
+      actor: req.auth.user,
+      orgId: order.orgId,
+      supplierId: order.supplierId,
+      projectId: mallOrderProjectId(ctx, order),
+      idempotencyKey: `mall_order:${order.id}:created`,
+      payloadJson: {
+        status: order.status,
+        totalAmount: order.totalAmount,
+        paymentStatus: order.paymentStatus,
+        sourceOrderId: source.id,
+        lineCount: order.lineItems.length
+      }
+    });
     return res.status(201).json({ order, sourceOrderId: source.id, fundAccount, paymentAdapterBoundary: simulatedFundBoundary, auditLogId: auditLog.id });
   });
 
@@ -668,7 +904,7 @@ export function mallRoutes(ctx: AppContext) {
         createdBy: req.auth.user.id,
         note: String(req.body?.note ?? "本地模拟退款/冲正台账，真实资金退回待客户支付/财务系统资料。")
       });
-      const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, `mall_payment.${action}`, "mall_order", order.id, undefined, `amount=${order.totalAmount}`);
+    const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, `mall_payment.${action}`, "mall_order", order.id, undefined, `amount=${order.totalAmount}`);
       return res.json({ order, account, ledger, adapterBoundary: simulatedFundBoundary, auditLogId: auditLog.id });
     }
     account.occupiedAmount = Math.max(0, account.occupiedAmount - order.totalAmount);
@@ -684,6 +920,22 @@ export function mallRoutes(ctx: AppContext) {
       note: String(req.body?.note ?? "本地模拟支付扣款台账，真实支付待客户支付/财务系统资料。")
     });
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "mall_payment.capture", "mall_order", order.id, undefined, `amount=${order.totalAmount}`);
+    ctx.eventBus.emit({
+      eventCode: "PaymentCaptured",
+      businessType: "mall_order",
+      businessId: order.id,
+      businessTitle: order.orderNo,
+      actor: req.auth.user,
+      orgId: order.orgId,
+      supplierId: order.supplierId,
+      projectId: mallOrderProjectId(ctx, order),
+      idempotencyKey: `mall_order:${order.id}:payment_captured`,
+      payloadJson: {
+        paymentStatus: order.paymentStatus,
+        totalAmount: order.totalAmount,
+        ledgerId: ledger.id
+      }
+    });
     return res.json({ order, account, ledger, adapterBoundary: simulatedFundBoundary, auditLogId: auditLog.id });
   });
 
@@ -698,6 +950,20 @@ export function mallRoutes(ctx: AppContext) {
     }
     ctx.r6OrderFulfillmentRepository.syncOrderFulfillmentState(ctx.state);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "mall_order.confirm", "mall_order", order.id);
+    ctx.eventBus.emit({
+      eventCode: "SupplierOrderConfirmed",
+      businessType: "mall_order",
+      businessId: order.id,
+      businessTitle: order.orderNo,
+      actor: req.auth.user,
+      orgId: order.orgId,
+      supplierId: order.supplierId,
+      projectId: mallOrderProjectId(ctx, order),
+      idempotencyKey: `mall_order:${order.id}:supplier_confirmed`,
+      payloadJson: {
+        status: order.status
+      }
+    });
     return res.json({ order, auditLogId: auditLog.id });
   });
 
@@ -723,6 +989,22 @@ export function mallRoutes(ctx: AppContext) {
     ctx.state.mallShipments.push(shipment);
     ctx.r6OrderFulfillmentRepository.syncOrderFulfillmentState(ctx.state);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "mall_shipment.create", "mall_order", order.id);
+    ctx.eventBus.emit({
+      eventCode: "OrderShipped",
+      businessType: "mall_order",
+      businessId: order.id,
+      businessTitle: order.orderNo,
+      actor: req.auth.user,
+      orgId: order.orgId,
+      supplierId: order.supplierId,
+      projectId: mallOrderProjectId(ctx, order),
+      idempotencyKey: `mall_order:${order.id}:shipment:${shipment.id}`,
+      payloadJson: {
+        status: order.status,
+        shipmentId: shipment.id,
+        trackingNo: shipment.trackingNo
+      }
+    });
     return res.status(201).json({ shipment, order, auditLogId: auditLog.id });
   });
 
@@ -754,6 +1036,20 @@ export function mallRoutes(ctx: AppContext) {
     }
     ctx.r6OrderFulfillmentRepository.syncOrderFulfillmentState(ctx.state);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "mall_order.receive", "mall_order", order.id);
+    ctx.eventBus.emit({
+      eventCode: "OrderReceived",
+      businessType: "mall_order",
+      businessId: order.id,
+      businessTitle: order.orderNo,
+      actor: req.auth.user,
+      orgId: order.orgId,
+      supplierId: order.supplierId,
+      projectId: mallOrderProjectId(ctx, order),
+      idempotencyKey: `mall_order:${order.id}:received`,
+      payloadJson: {
+        status: order.status
+      }
+    });
     return res.json({ order, shipments: ctx.state.mallShipments.filter((item) => item.orderId === order.id), auditLogId: auditLog.id });
   });
 
@@ -876,6 +1172,22 @@ export function mallRoutes(ctx: AppContext) {
     if (supplier) supplier.evaluationScore = evaluation.score;
     ctx.r6OrderFulfillmentRepository.syncOrderFulfillmentState(ctx.state);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "mall_evaluation.submit", "supplier_evaluation", evaluation.id);
+    ctx.eventBus.emit({
+      eventCode: "SupplierEvaluationSubmitted",
+      businessType: "mall_order",
+      businessId: order.id,
+      businessTitle: order.orderNo,
+      actor: req.auth.user,
+      orgId: order.orgId,
+      supplierId: order.supplierId,
+      projectId: mallOrderProjectId(ctx, order),
+      idempotencyKey: `mall_order:${order.id}:evaluation:${evaluation.id}`,
+      payloadJson: {
+        projectId: mallOrderProjectId(ctx, order),
+        evaluationId: evaluation.id,
+        score: evaluation.score
+      }
+    });
     return res.status(201).json({ evaluation, auditLogId: auditLog.id });
   });
 
@@ -941,6 +1253,23 @@ export function mallRoutes(ctx: AppContext) {
       sourceJson: { route: "mall_invoice.upload", orderId: order.id, settlementBillId: bill.id }
     });
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "mall_invoice.upload", "mall_invoice", invoice.id);
+    ctx.eventBus.emit({
+      eventCode: "InvoiceSubmitted",
+      businessType: "invoice",
+      businessId: invoice.id,
+      businessTitle: invoice.id,
+      actor: req.auth.user,
+      orgId: order.orgId,
+      supplierId: order.supplierId,
+      projectId: mallOrderProjectId(ctx, order),
+      idempotencyKey: `invoice:${invoice.id}:submitted`,
+      payloadJson: {
+        projectId: mallOrderProjectId(ctx, order),
+        settlementBillId: bill.id,
+        orderId: order.id,
+        amount: invoice.amount
+      }
+    });
     return res.status(201).json({ invoice, workflow, invoiceVerificationAdapterBoundary: invoiceVerificationBoundary, auditLogId: auditLog.id });
   });
 
@@ -953,6 +1282,7 @@ export function mallRoutes(ctx: AppContext) {
     if (!invoice) return res.status(404).json({ error: { code: "MALL_INVOICE_NOT_FOUND", message: "Mall invoice was not found." } });
     const formalInvoice = ctx.r7SettlementFinanceRepository.getInvoice(invoice.id);
     if (!formalInvoice) return res.status(404).json({ error: { code: "MALL_INVOICE_NOT_FOUND", message: "Mall invoice was not found." } });
+    const invoiceBill = mallInvoiceBill(ctx, invoice)?.bill;
     if (!ctx.r7SettlementFinanceRepository.canReviewInvoice(req.auth.user, req.auth.roleId, formalInvoice)) {
       return denyResponse(ctx, req, res, 403, "MALL_INVOICE_SCOPE_DENIED", "Current role cannot review this mall invoice.", "mall_invoice.scope.denied", "mall_invoice", invoice.id);
     }
@@ -966,6 +1296,23 @@ export function mallRoutes(ctx: AppContext) {
       invoice.rejectReason = rejectReason;
       invoice.verificationAdapterBoundary = invoiceVerificationBoundary;
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "mall_invoice.verify.reject_tax", "mall_invoice", invoice.id, undefined, invoice.rejectReason);
+      ctx.eventBus.emit({
+        eventCode: "InvoiceRejected",
+        businessType: "invoice",
+        businessId: invoice.id,
+        businessTitle: invoice.id,
+        actor: req.auth.user,
+        orgId: invoiceBill?.orgId,
+        supplierId: formalInvoice.supplierId,
+        projectId: invoiceBill?.projectId,
+        idempotencyKey: `invoice:${invoice.id}:rejected`,
+        payloadJson: {
+          projectId: invoiceBill?.projectId,
+          settlementBillId: formalInvoice.settlementBillId,
+          orderId: invoice.orderId,
+          status: invoice.status
+        }
+      });
       return res.json({ invoice, invoiceVerificationAdapterBoundary: invoiceVerificationBoundary, auditLogId: auditLog.id });
     }
     const reviewed = ctx.r7SettlementFinanceRepository.reviewInvoice(invoice.id, req.auth.user, req.body?.approved !== false, req.body?.opinion === undefined ? undefined : String(req.body.opinion));
@@ -988,6 +1335,23 @@ export function mallRoutes(ctx: AppContext) {
       // Preserve existing mall invoice verification behavior for pre-R8 invoices.
     }
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "mall_invoice.verify", "mall_invoice", invoice.id, undefined, invoice.status);
+    ctx.eventBus.emit({
+      eventCode: req.body?.approved === false ? "InvoiceRejected" : "InvoiceApproved",
+      businessType: "invoice",
+      businessId: invoice.id,
+      businessTitle: invoice.id,
+      actor: req.auth.user,
+      orgId: invoiceBill?.orgId,
+      supplierId: formalInvoice.supplierId,
+      projectId: invoiceBill?.projectId,
+      idempotencyKey: `invoice:${invoice.id}:${req.body?.approved === false ? "rejected" : "approved"}`,
+      payloadJson: {
+        projectId: invoiceBill?.projectId,
+        settlementBillId: formalInvoice.settlementBillId,
+        orderId: invoice.orderId,
+        status: invoice.status
+      }
+    });
     return res.json({ invoice, invoiceVerificationAdapterBoundary: invoiceVerificationBoundary, auditLogId: auditLog.id });
   });
 
@@ -1025,6 +1389,7 @@ export function mallRoutes(ctx: AppContext) {
     if (!isSupplierRole(req.auth.roleId) && !isProcurementBuyerRole(req.auth.roleId)) {
       return denyResponse(ctx, req, res, 403, "MALL_QUESTIONNAIRE_SUBMIT_DENIED", "Current role cannot submit this questionnaire.", "mall_questionnaire.submit.denied", "mall_questionnaire", questionnaire.id);
     }
+    if (isSupplierRole(req.auth.roleId) && !assertSupplierAdmittedForMall(ctx, req, res, req.auth.user.supplierId ?? "", "mall_questionnaire.submit.denied")) return;
     if (isSupplierRole(req.auth.roleId) && questionnaire.targetSupplierIds?.length && !questionnaire.targetSupplierIds.some((supplierId) => supplierIdMatches(req.auth.user, supplierId))) {
       return denyResponse(ctx, req, res, 403, "MALL_QUESTIONNAIRE_SUPPLIER_SCOPE_DENIED", "Supplier cannot submit this questionnaire.", "mall_questionnaire.supplier_scope.denied", "mall_questionnaire", questionnaire.id);
     }
@@ -1170,6 +1535,23 @@ export function mallRoutes(ctx: AppContext) {
     const fundAccount = reserveOrderPayment(ctx, order, req.auth.user.id);
     ctx.r6OrderFulfillmentRepository.syncOrderFulfillmentState(ctx.state);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "mall_scenario_template.order", "mall_scenario_template", template.id, undefined, `order=${order.id}`);
+    ctx.eventBus.emit({
+      eventCode: "PurchaseOrderCreated",
+      businessType: "mall_order",
+      businessId: order.id,
+      businessTitle: order.orderNo,
+      actor: req.auth.user,
+      orgId: order.orgId,
+      supplierId: order.supplierId,
+      idempotencyKey: `mall_order:${order.id}:created`,
+      payloadJson: {
+        status: order.status,
+        totalAmount: order.totalAmount,
+        paymentStatus: order.paymentStatus,
+        templateId: template.id,
+        lineCount: order.lineItems.length
+      }
+    });
     return res.status(201).json({ template, order, fundAccount, paymentAdapterBoundary: simulatedFundBoundary, auditLogId: auditLog.id });
   });
 

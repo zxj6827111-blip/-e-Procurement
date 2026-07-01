@@ -2,6 +2,18 @@ export type R8RoleId = "group_manager" | "buyer" | "supplier" | "expert" | "audi
 
 export type R8ApprovalBusinessType =
   | "procurement_request"
+  | "procurement_document"
+  | "supplier_onboarding"
+  | "sourcing"
+  | "rfq"
+  | "tender"
+  | "direct_purchase"
+  | "review_award"
+  | "contract_preparation"
+  | "order_fulfillment"
+  | "settlement"
+  | "payment"
+  | "archive"
   | "award_approval"
   | "archive_supplement"
   | "price_approval"
@@ -134,7 +146,19 @@ export interface R8ApprovalRuleView extends R8ApprovalRuleDto {
 }
 
 export const r8BusinessTypeLabels: Record<R8ApprovalBusinessType, string> = {
+  procurement_document: "采购文件",
   procurement_request: "采购申请",
+  supplier_onboarding: "供应商准入",
+  sourcing: "招采主流程",
+  rfq: "RFQ 询价",
+  tender: "TENDER 招标",
+  direct_purchase: "DIRECT 直接采购",
+  review_award: "评审定标",
+  contract_preparation: "合同准备",
+  order_fulfillment: "订单履约",
+  settlement: "结算流程",
+  payment: "付款流程",
+  archive: "档案归集",
   award_approval: "定标审批",
   archive_supplement: "档案补档",
   price_approval: "价格审批",
@@ -147,7 +171,53 @@ export const r8BusinessTypeLabels: Record<R8ApprovalBusinessType, string> = {
 };
 
 export const r8TaskTypeLabels: Record<string, string> = {
+  approval_procurement_document: "待审核采购文件",
   approval_procurement_request: "待审批采购申请",
+  procurement_method_decision: "待判定采购方式",
+  procurement_project_generation: "待生成采购项目",
+  supplier_profile_completion: "待补全供应商资料",
+  supplier_qualification_review: "待审核供应商资质",
+  supplier_admission_approval: "待审批供应商准入",
+  supplier_category_authorization: "待授权供应商品类",
+  sourcing_prepare_announcement: "待准备招采公告",
+  sourcing_invite_supplier: "待邀请供应商",
+  sourcing_supplier_registration: "待供应商报名",
+  sourcing_registration_qualification: "待确认报名资格",
+  sourcing_supplier_quote: "待供应商报价",
+  sourcing_bid_cutoff: "待截标",
+  sourcing_bid_lock: "待锁标 / 开标",
+  sourcing_comparison_preparation: "待生成比价报告",
+  sourcing_award_preparation: "待进入定标准备",
+  direct_supplier_confirmation: "待确认直接采购供应商",
+  direct_pricing_confirmation: "待确认直接采购定价",
+  review_award_expert_assignment: "待抽取 / 指定专家",
+  review_award_expert_confirmation: "待专家确认",
+  review_award_expert_scoring: "待专家评分",
+  review_award_score_summary: "待评分汇总",
+  review_award_comparison_report: "待生成比选报告",
+  review_award_review_report: "待生成评审报告",
+  review_award_review_report_freeze: "待冻结评审报告",
+  review_award_approval_submit: "待提交定标审批",
+  review_award_approval_followup: "待跟踪定标审批",
+  review_award_result_preparation: "待发布定标结果",
+  contract_preparation_result_publish: "待确认结果发布",
+  contract_preparation_pricing_report: "待生成定价报告",
+  contract_preparation_contract_entry: "待登记合同台账",
+  order_supplier_confirm: "待供应商确认订单",
+  order_supplier_ship: "待供应商发货",
+  order_buyer_receive: "待收货验收",
+  order_supplier_evaluation: "待供应商评价",
+  settlement_submit: "待提交结算",
+  settlement_review: "待审核结算",
+  settlement_material_upload: "待补充结算材料",
+  settlement_material_review: "待审核结算材料",
+  settlement_invoice_submit: "待提交发票",
+  invoice_review_process: "待审核发票",
+  payment_review: "待复核付款",
+  archive_check: "待检查档案完整性",
+  archive_supplement_request: "待发起补档",
+  archive_supplement_approval: "待审批补档",
+  archive_supplement_apply: "待应用补档",
   approval_award: "待审批定标",
   archive_supplement: "待审批补档",
   price_approval: "待审批价格",
@@ -208,11 +278,29 @@ export function formatR8DateTime(value?: string | null) {
 }
 
 export function r8BusinessTargetPath(type: R8ApprovalBusinessType, businessId: string, projectId?: string) {
+  if (type === "procurement_request") {
+    const query = new URLSearchParams();
+    if (projectId) query.set("projectId", projectId);
+    const suffix = query.toString() ? `?${query.toString()}` : "";
+    return `/procurement-requests/${encodeURIComponent(businessId)}${suffix}`;
+  }
   const query = new URLSearchParams({ businessType: type, businessId });
   if (projectId) query.set("projectId", projectId);
   const suffix = `?${query.toString()}`;
   const map: Record<R8ApprovalBusinessType, string> = {
+    procurement_document: `/procurement-documents${suffix}`,
     procurement_request: `/procurement-requests${suffix}`,
+    supplier_onboarding: `/suppliers${suffix}`,
+    sourcing: `/project-workbench${suffix}`,
+    rfq: `/announcements-invitations${suffix}`,
+    tender: `/announcements-invitations${suffix}`,
+    direct_purchase: `/project-workbench${suffix}`,
+    review_award: `/expert-review${suffix}`,
+    contract_preparation: `/award-result${suffix}`,
+    order_fulfillment: `/order-fulfillment${suffix}`,
+    settlement: `/settlement-materials${suffix}`,
+    payment: `/payment-status${suffix}`,
+    archive: `/archive-audit${suffix}`,
     award_approval: `/award-result${suffix}`,
     archive_supplement: `/archive-audit${suffix}`,
     price_approval: `/award-result${suffix}`,
@@ -228,7 +316,19 @@ export function r8BusinessTargetPath(type: R8ApprovalBusinessType, businessId: s
 
 export function r8BusinessTargetLabel(type: R8ApprovalBusinessType) {
   const map: Record<R8ApprovalBusinessType, string> = {
+    procurement_document: "打开采购文件",
     procurement_request: "打开采购申请",
+    supplier_onboarding: "打开供应商档案",
+    sourcing: "打开项目执行",
+    rfq: "打开询价流程",
+    tender: "打开招标流程",
+    direct_purchase: "打开直接采购流程",
+    review_award: "打开评审定标流程",
+    contract_preparation: "打开合同准备流程",
+    order_fulfillment: "打开订单履约流程",
+    settlement: "打开结算流程",
+    payment: "打开付款流程",
+    archive: "打开档案流程",
     award_approval: "打开定标审批",
     archive_supplement: "打开档案补档",
     price_approval: "打开价格审批",
@@ -256,25 +356,33 @@ export function canCompleteR8Task(task: R8WorkflowTaskDto, user: R8WorkflowUserC
 }
 
 export function toR8WorkflowTaskView(task: R8WorkflowTaskDto, user: R8WorkflowUserContext): R8WorkflowTaskView {
+  const targetPath =
+    user.roleId === "expert" && task.businessType === "review_award"
+      ? r8BusinessTargetPath("expert_scoring", task.businessId, task.projectId)
+      : r8BusinessTargetPath(task.businessType, task.businessId, task.projectId);
   return {
     ...task,
     businessTypeLabel: r8BusinessTypeLabels[task.businessType] ?? task.businessType,
     taskTypeLabel: r8TaskTypeLabels[task.taskType] ?? r8BusinessTypeLabels[task.businessType] ?? task.taskType,
     statusLabel: r8LabelStatus(task.status),
     assigneeLabel: task.assigneeUserId ? `指定用户 ${task.assigneeUserId}` : task.assigneeRoleId ? r8RoleLabels[task.assigneeRoleId] ?? task.assigneeRoleId : "未指定",
-    targetPath: r8BusinessTargetPath(task.businessType, task.businessId, task.projectId),
+    targetPath,
     targetLabel: r8BusinessTargetLabel(task.businessType),
     canComplete: canCompleteR8Task(task, user)
   };
 }
 
 export function toR8WorkflowNotificationView(message: R8WorkflowNotificationDto): R8WorkflowNotificationView {
+  const targetPath =
+    message.recipientRoleId === "expert" && message.businessType === "review_award"
+      ? r8BusinessTargetPath("expert_scoring", message.businessId, message.projectId)
+      : r8BusinessTargetPath(message.businessType, message.businessId, message.projectId);
   return {
     ...message,
     businessTypeLabel: r8BusinessTypeLabels[message.businessType] ?? message.businessType,
     eventTypeLabel: r8LabelStatus(message.eventType.split(".").at(-1)),
     readLabel: message.read ? "已读" : "未读",
-    targetPath: r8BusinessTargetPath(message.businessType, message.businessId, message.projectId),
+    targetPath,
     targetLabel: r8BusinessTargetLabel(message.businessType)
   };
 }

@@ -36,10 +36,10 @@ function all<T>(runtime: ReturnType<typeof boot>, sql: string, ...params: SqlPar
 async function createReadyRequest(runtime: ReturnType<typeof boot>) {
   const created = await request(runtime.app)
     .post("/api/procurement-requests")
-    .set("x-mock-user-id", "u2")
+    .set("x-mock-user-id", "u8")
     .send({
       title: "R8 workflow request",
-      orgId: "org-east",
+      orgId: "org-hotel",
       requestDepartment: "R8 test department",
       requesterName: "R8 requester",
       budgetLabel: "1000",
@@ -61,7 +61,7 @@ async function createReadyRequest(runtime: ReturnType<typeof boot>) {
 
 async function submitWorkflowRequest(runtime: ReturnType<typeof boot>) {
   const procurementRequest = await createReadyRequest(runtime);
-  const submitted = await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u2");
+  const submitted = await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u8");
   expect(submitted.status).toBe(200);
   return submitted.body as {
     procurementRequest: { id: string; approvalStatus: string };
@@ -153,7 +153,10 @@ function addPricingReport(runtime: ReturnType<typeof boot>, productId: string, s
 async function createReceivedOrder(runtime: ReturnType<typeof boot>, quantity = 2, salePrice = 100) {
   const product = await createProduct(runtime);
   addPricingReport(runtime, product.id, salePrice);
-  const listed = await request(runtime.app).post(`/api/mall/products/${product.id}/status`).set("x-mock-user-id", "u2").send({ status: "listed" });
+  const listed = await request(runtime.app)
+    .post(`/api/mall/products/${product.id}/status`)
+    .set("x-mock-user-id", "u2")
+    .send({ status: "listed", sourceType: "award_project", sourceProjectId: "p-award" });
   expect(listed.status).toBe(200);
   const cart = await request(runtime.app).post("/api/mall/cart/items").set("x-mock-user-id", "u2").send({ productId: product.id, quantity });
   expect(cart.status).toBe(200);
@@ -238,6 +241,40 @@ describe("R8 workflow, task center and notification formal source", () => {
     expect(auditorRule.body.approvalRule.approvalOrder).toEqual([]);
   });
 
+  it("matches high-value hotel procurement requests to an enabled approval rule", async () => {
+    const runtime = boot();
+    const created = await request(runtime.app)
+      .post("/api/procurement-requests")
+      .set("x-mock-user-id", "u8")
+      .send({
+        title: "R8 high value hotel request",
+        orgId: "org-hotel",
+        requestDepartment: "客房部",
+        requesterName: "刘明",
+        budgetLabel: "按酒店制度执行",
+        budgetAmount: 5555555,
+        lineItems: [
+          {
+            itemName: "环保牙具套装",
+            category: "客房一次性用品",
+            specification: "竹柄",
+            quantity: 500,
+            unit: "套",
+            estimatedUnitPrice: 7.2,
+            budgetAmount: 3600
+          }
+        ]
+      });
+    expect(created.status).toBe(201);
+
+    const submitted = await request(runtime.app).post(`/api/procurement-requests/${created.body.procurementRequest.id}/submit`).set("x-mock-user-id", "u8");
+
+    expect(submitted.status).toBe(200);
+    expect(submitted.body.procurementRequest.approvalStatus).toBe("submitted");
+    expect(submitted.body.workflow.approvalInstance.ruleCode).toBe("approval-procurement-request-high-value");
+    expect(single(runtime, "select task_status from r2_task_items where approval_instance_id = ?", submitted.body.workflow.approvalInstance.id)).toEqual({ task_status: "pending" });
+  });
+
   it("creates approval instances, pending tasks and notifications from procurement submission with role boundaries", async () => {
     const runtime = boot();
     const submitted = await submitWorkflowRequest(runtime);
@@ -304,7 +341,7 @@ describe("R8 workflow, task center and notification formal source", () => {
         businessType: "procurement_request",
         businessId: procurementRequest.id,
         title: "bad scope",
-        orgId: "org-hotel"
+        orgId: "org-east"
       });
     expect(adminMismatch.status).toBe(400);
     expect(adminMismatch.body.error.code).toBe("WORKFLOW_BUSINESS_SCOPE_MISMATCH");
@@ -318,7 +355,7 @@ describe("R8 workflow, task center and notification formal source", () => {
       });
     expect(adminMissing.status).toBe(404);
 
-    const submitted = await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u2");
+    const submitted = await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u8");
     expect(submitted.status).toBe(200);
     const instanceId = submitted.body.workflow.approvalInstance.id;
     const legacyApproved = await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/approve`).set("x-mock-user-id", "u1").send({ approved: true });
@@ -341,11 +378,11 @@ describe("R8 workflow, task center and notification formal source", () => {
     expect(rejected.status).toBe(200);
     expect(single(runtime, "select approval_status from r2_procurement_requests where id = ?", submitted.procurementRequest.id)).toEqual({ approval_status: "rejected" });
 
-    const notifications = await request(runtime.app).get("/api/workflow/notifications").set("x-mock-user-id", "u2");
+    const notifications = await request(runtime.app).get("/api/workflow/notifications").set("x-mock-user-id", "u8");
     expect(notifications.status).toBe(200);
     const target = notifications.body.notifications.find((item: { businessId: string; read: boolean }) => item.businessId === submitted.procurementRequest.id && item.read === false);
     expect(target).toBeTruthy();
-    const read = await request(runtime.app).post(`/api/workflow/notifications/${target.id}/read`).set("x-mock-user-id", "u2");
+    const read = await request(runtime.app).post(`/api/workflow/notifications/${target.id}/read`).set("x-mock-user-id", "u8");
     expect(read.status).toBe(200);
     expect(read.body.notification.read).toBe(true);
   });
@@ -438,10 +475,10 @@ describe("R8 workflow, task center and notification formal source", () => {
     expect(taskView.businessTypeLabel).toBe("采购申请");
     expect(taskView.taskTypeLabel).toBe("待审批采购申请");
     expect(taskView.statusLabel).toBe("待处理");
-    expect(taskView.targetPath).toContain("/procurement-requests?");
+    expect(taskView.targetPath).toContain(`/procurement-requests/${submitted.procurementRequest.id}`);
     expect(taskView.canComplete).toBe(true);
 
-    const buyerMessages = await request(runtime.app).get("/api/workflow/notifications").set("x-mock-user-id", "u2");
+    const buyerMessages = await request(runtime.app).get("/api/workflow/notifications").set("x-mock-user-id", "u8");
     expect(buyerMessages.status).toBe(200);
     const message = buyerMessages.body.notifications.find((item: { businessId: string }) => item.businessId === submitted.procurementRequest.id);
     expect(message).toBeTruthy();

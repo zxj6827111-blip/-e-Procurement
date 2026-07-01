@@ -27,6 +27,7 @@ export class RuntimeDb {
         username text not null unique,
         password_hash text not null,
         status text not null default 'active',
+        password_change_required integer not null default 0,
         last_login_at text null,
         created_at text not null,
         updated_at text not null
@@ -105,6 +106,7 @@ export class RuntimeDb {
     this.addColumnIfMissing("stored_files", "deleted_by", "text null");
     this.addColumnIfMissing("stored_files", "deleted_reason", "text null");
     this.addColumnIfMissing("stored_files", "deleted_at", "text null");
+    this.addColumnIfMissing("auth_accounts", "password_change_required", "integer not null default 0");
     this.addColumnIfMissing("integration_jobs", "business_type", "text not null default 'integration'");
     this.addColumnIfMissing("integration_jobs", "business_id", "text not null default 'n/a'");
     this.addColumnIfMissing("integration_jobs", "request_id", "text not null default 'n/a'");

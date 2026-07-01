@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import { apiGet, apiPost } from "../api/http";
 import ErrorAlert from "../components/ErrorAlert.vue";
+import ProcessTimeline from "../components/ProcessTimeline.vue";
 import { useSessionStore } from "../stores/session";
 import { formatDateTime, labelStatus } from "../utils/status-labels";
 
@@ -54,6 +55,7 @@ const organizations = ref<Organization[]>([]);
 const loading = ref(false);
 const error = ref("");
 const message = ref("");
+const processRefreshKey = ref(0);
 const fundOperationForm = ref({
   rechargeAmount: 5000,
   rechargeNote: "门店采购备用金补充",
@@ -65,6 +67,7 @@ const canMaintainFunds = computed(() => ["group_manager", "buyer", "hotel_buyer"
 const allLedgerEntries = computed(() => accounts.value.flatMap((account) => account.ledgerEntries.map((entry) => ({ ...entry, account }))));
 const payableOrders = computed(() => orders.value.filter((order) => order.paymentStatus === "payment_reserved" || order.status === "received"));
 const orderNos = computed(() => new Map(orders.value.map((order) => [order.id, order.orderNo])));
+const selectedPaymentBusinessId = computed(() => payableOrders.value[0]?.id ?? orders.value[0]?.id ?? allLedgerEntries.value.find((entry) => entry.entryType === "payment_request")?.id ?? "");
 const summary = computed(() => ({
   balance: accounts.value.reduce((sum, item) => sum + Number(item.balance ?? 0), 0),
   credit: accounts.value.reduce((sum, item) => sum + Number(item.creditLimit ?? 0), 0),
@@ -146,6 +149,7 @@ async function run(action: () => Promise<void>, successText: string) {
     await action();
     message.value = successText;
     await load();
+    processRefreshKey.value += 1;
   } catch (err) {
     error.value = err instanceof Error ? err.message : "操作失败";
   }
@@ -190,6 +194,14 @@ onMounted(load);
     <p v-if="message" class="notice">{{ message }}</p>
     <p v-if="loading" class="notice">正在加载资金状态...</p>
   </section>
+
+  <ProcessTimeline
+    v-if="selectedPaymentBusinessId"
+    business-type="payment"
+    :business-id="selectedPaymentBusinessId"
+    title="付款流程"
+    :refresh-key="processRefreshKey"
+  />
 
   <section v-if="canMaintainFunds" class="business-panel">
     <div class="panel-head">

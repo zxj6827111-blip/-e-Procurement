@@ -12,13 +12,16 @@ import { authRoutes } from "./routes/auth-routes.js";
 import { awardRoutes } from "./routes/award-routes.js";
 import { bidRoutes } from "./routes/bid-routes.js";
 import { bidViewRoutes } from "./routes/bid-view-routes.js";
+import { bpmnDefinitionRoutes } from "./routes/bpmn-definition-routes.js";
 import { contractPerformanceRoutes } from "./routes/contract-performance-routes.js";
 import { expertReviewRoutes } from "./routes/expert-review-routes.js";
 import { externalTradeRoutes } from "./routes/external-trade-routes.js";
 import { fileRoutes } from "./routes/file-routes.js";
 import { integrationRoutes } from "./routes/integration-routes.js";
+import { internalEventRoutes } from "./routes/internal-event-routes.js";
 import { mallRoutes } from "./routes/mall-routes.js";
 import { organizationRoutes } from "./routes/organization-routes.js";
+import { processRoutes } from "./routes/process-routes.js";
 import { procurementParticipationRoutes } from "./routes/procurement-participation-routes.js";
 import { projectWorkbenchRoutes } from "./routes/project-workbench-routes.js";
 import { projectRoutes } from "./routes/project-routes.js";
@@ -70,9 +73,26 @@ export function createApp(ctx: AppContext = createAppContext()) {
 
   const api = express.Router();
   api.use((req, res, next) => {
-    const publicPaths = new Set(["/auth/login", "/auth/mock-login", "/auth/providers", "/auth/session", "/auth/sso/mock-callback", "/suppliers/register", "/suppliers/registration-boundary"]);
+    const publicPaths = new Set([
+      "/auth/login",
+      "/auth/mock-login",
+      "/auth/mock-users",
+      "/auth/providers",
+      "/auth/session",
+      "/auth/sso/mock-callback",
+      "/suppliers/register",
+      "/suppliers/registration-boundary"
+    ]);
     if (publicPaths.has(req.path)) return next();
     if (!requireAuthenticated(req, res)) return;
+    if (supplierPasswordChangeRequired(ctx, req)) {
+      return res.status(403).json({
+        error: {
+          code: "PASSWORD_CHANGE_REQUIRED",
+          message: "Supplier account must change temporary password before using business functions."
+        }
+      });
+    }
     next();
   });
   api.use(authRoutes(ctx));
@@ -91,9 +111,12 @@ export function createApp(ctx: AppContext = createAppContext()) {
   api.use(archiveRoutes(ctx));
   api.use(auditRoutes(ctx));
   api.use(integrationRoutes(ctx));
+  api.use(internalEventRoutes(ctx));
   api.use(mallRoutes(ctx));
   api.use(settlementFinanceRoutes(ctx));
   api.use(workflowTaskRoutes(ctx));
+  api.use(processRoutes(ctx));
+  api.use(bpmnDefinitionRoutes(ctx));
 
   app.use("/api", api);
 
@@ -115,4 +138,12 @@ export function createApp(ctx: AppContext = createAppContext()) {
 
 function isPayloadTooLargeError(error: unknown) {
   return Boolean(error && typeof error === "object" && "type" in error && (error as { type?: string }).type === "entity.too.large");
+}
+
+function supplierPasswordChangeRequired(ctx: AppContext, req: express.Request) {
+  const supplierRoles = new Set(["supplier", "supplier_admin", "supplier_quotation"]);
+  if (!supplierRoles.has(req.auth.roleId)) return false;
+  if (["/auth/session", "/auth/logout", "/me", "/me/change-password"].includes(req.path)) return false;
+  const account = ctx.authStore.getAccountsByUserIds([req.auth.user.id])[0];
+  return Boolean(account?.passwordChangeRequired);
 }

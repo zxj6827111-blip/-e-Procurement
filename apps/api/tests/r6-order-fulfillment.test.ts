@@ -86,7 +86,10 @@ async function createApprovedQuotation(runtime: ReturnType<typeof boot>, product
 }
 
 async function listProduct(runtime: ReturnType<typeof boot>, productId: string) {
-  const listed = await request(runtime.app).post(`/api/mall/products/${productId}/status`).set("x-mock-user-id", "u2").send({ status: "listed" });
+  const listed = await request(runtime.app)
+    .post(`/api/mall/products/${productId}/status`)
+    .set("x-mock-user-id", "u2")
+    .send({ status: "listed", sourceType: "award_project", sourceProjectId: "p-award" });
   expect(listed.status).toBe(200);
   return listed.body.product;
 }
@@ -174,6 +177,7 @@ describe("R6 order fulfillment formal source", () => {
 
     const outRegion = await createProduct(runtime, { skuCode: "SKU-R6-NORTH", serviceRegions: ["华北"] });
     await createApprovedQuotation(runtime, outRegion.id, 100);
+    addPricingReport(runtime, outRegion.id, 100);
     await listProduct(runtime, outRegion.id);
     const blockedCart = await request(runtime.app).post("/api/mall/cart/items").set("x-mock-user-id", "u2").send({ productId: outRegion.id, quantity: 1 });
     expect(blockedCart.status).toBe(400);
@@ -181,7 +185,17 @@ describe("R6 order fulfillment formal source", () => {
 
     const restricted = await createProduct(runtime, { skuCode: "SKU-R6-RESTRICTED", supplierId: "sup-4" }, "u2");
     addPricingReport(runtime, restricted.id, 70);
-    const restrictedList = await request(runtime.app).post(`/api/mall/products/${restricted.id}/status`).set("x-mock-user-id", "u2").send({ status: "listed" });
+    const restrictedList = await request(runtime.app)
+      .post(`/api/mall/products/${restricted.id}/status`)
+      .set("x-mock-user-id", "u2")
+      .send({
+        status: "listed",
+        sourceType: "agreement",
+        sourceAgreementNo: "AG-R6-RESTRICTED",
+        purchasePrice: 60,
+        salePrice: 70,
+        effectiveFrom: "2026-01-01"
+      });
     expect(restrictedList.status).toBe(400);
   });
 

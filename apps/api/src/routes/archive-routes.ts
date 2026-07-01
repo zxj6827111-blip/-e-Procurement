@@ -43,6 +43,10 @@ function assertMaintainer(ctx: AppContext, req: Request, res: Response, projectI
   return project;
 }
 
+function readableArchiveProjectIds(ctx: AppContext, req: Request) {
+  return new Set(ctx.state.projects.filter((project) => canReadProject(req, project)).map((project) => project.id));
+}
+
 function syncArchiveStatus(items: AppContext["state"]["archiveItems"]) {
   const missing = items.filter((entry) => entry.requiredFlag && !entry.collectedFlag);
   const status = missing.length > 0 ? "incomplete" : "complete";
@@ -56,12 +60,34 @@ export function archiveRoutes(ctx: AppContext) {
   const router = Router();
 
   router.get("/archive-templates", (_req, res) => res.json({ archiveTemplates: ctx.state.archiveTemplates }));
-  router.get("/archive-items", (_req, res) => res.json({ archiveItems: ctx.state.archiveItems }));
+  router.get("/archive-items", (req, res) => {
+    const readableProjectIds = readableArchiveProjectIds(ctx, req);
+    if (readableProjectIds.size === 0) {
+      return denyResponse(ctx, req, res, 403, "ARCHIVE_READ_DENIED", "Current role cannot read archive data.", "archive.read.denied", "archive", "archive-items");
+    }
+    return res.json({ archiveItems: ctx.state.archiveItems.filter((entry) => readableProjectIds.has(entry.projectId)) });
+  });
 
   router.get("/projects/:projectId/archive-items", (req, res) => {
     const project = assertReadable(ctx, req, res, req.params.projectId, "archive.read.denied");
     if (!project) return;
     ensureArchiveSnapshot(ctx, project);
+    if (req.auth.roleId === "auditor") {
+      ctx.eventBus.emit({
+        eventCode: "ArchiveAuditViewed",
+        businessType: "archive",
+        businessId: project.id,
+        businessTitle: project.name,
+        actor: req.auth.user,
+        orgId: project.orgId,
+        projectId: project.id,
+        idempotencyKey: `archive:${project.id}:audit_view:${req.auth.user.id}`,
+        payloadJson: {
+          projectId: project.id,
+          projectName: project.name
+        }
+      });
+    }
     return res.json({ archiveItems: ctx.state.archiveItems.filter((entry) => entry.projectId === req.params.projectId) });
   });
 
@@ -70,6 +96,20 @@ export function archiveRoutes(ctx: AppContext) {
     if (!project) return;
     ensureArchiveSnapshot(ctx, project);
     const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "archive.snapshot", "project", project.id, project.id);
+    ctx.eventBus.emit({
+      eventCode: "ArchiveSnapshotCreated",
+      businessType: "archive",
+      businessId: project.id,
+      businessTitle: project.name,
+      actor: req.auth.user,
+      orgId: project.orgId,
+      projectId: project.id,
+      idempotencyKey: `archive:${project.id}:snapshot`,
+      payloadJson: {
+        projectId: project.id,
+        projectName: project.name
+      }
+    });
     return res.status(201).json({
       projectId: project.id,
       archiveItems: ctx.state.archiveItems.filter((entry) => entry.projectId === project.id),
@@ -84,6 +124,22 @@ export function archiveRoutes(ctx: AppContext) {
     const items = ctx.state.archiveItems.filter((entry) => entry.projectId === req.params.projectId);
     const { status, missing } = syncArchiveStatus(items);
     const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "archive.check", "project", req.params.projectId, req.params.projectId, `missing=${missing.length}`);
+    ctx.eventBus.emit({
+      eventCode: "ArchiveChecked",
+      businessType: "archive",
+      businessId: project.id,
+      businessTitle: project.name,
+      actor: req.auth.user,
+      orgId: project.orgId,
+      projectId: project.id,
+      idempotencyKey: `archive:${project.id}:check:${status}`,
+      payloadJson: {
+        projectId: project.id,
+        projectName: project.name,
+        status,
+        missingCount: missing.length
+      }
+    });
     return res.json({ projectId: req.params.projectId, status, missingItems: missing, auditLogId: log.id });
   });
 
@@ -106,6 +162,20 @@ export function archiveRoutes(ctx: AppContext) {
     project.status = project.externalTradeFlag ? "external_archived" : "archived";
     project.displayStatus = "档案已封存";
     const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "archive.seal", "project", req.params.projectId, req.params.projectId);
+    ctx.eventBus.emit({
+      eventCode: "ArchiveSealed",
+      businessType: "archive",
+      businessId: project.id,
+      businessTitle: project.name,
+      actor: req.auth.user,
+      orgId: project.orgId,
+      projectId: project.id,
+      idempotencyKey: `archive:${project.id}:sealed`,
+      payloadJson: {
+        projectId: project.id,
+        projectName: project.name
+      }
+    });
     return res.json({ projectId: req.params.projectId, archiveItems: items, auditLogId: log.id });
   });
 
@@ -144,6 +214,22 @@ export function archiveRoutes(ctx: AppContext) {
     request.auditLogId = log.id;
     ctx.state.archiveSupplementRequests.push(request);
     item.status = "supplement_requested";
+    ctx.eventBus.emit({
+      eventCode: "ArchiveSupplementRequested",
+      businessType: "archive",
+      businessId: project.id,
+      businessTitle: project.name,
+      actor: req.auth.user,
+      orgId: project.orgId,
+      projectId: project.id,
+      idempotencyKey: `archive:${project.id}:supplement_requested:${request.id}`,
+      payloadJson: {
+        projectId: project.id,
+        projectName: project.name,
+        supplementRequestId: request.id,
+        archiveItemId: item.id
+      }
+    });
     return res.status(201).json({ supplementRequest: request, auditLogId: log.id });
   });
 
@@ -168,6 +254,23 @@ export function archiveRoutes(ctx: AppContext) {
       supplementRequest.projectId
     );
     supplementRequest.auditLogId = log.id;
+    ctx.eventBus.emit({
+      eventCode: approved ? "ArchiveSupplementApproved" : "ArchiveSupplementRejected",
+      businessType: "archive",
+      businessId: project.id,
+      businessTitle: project.name,
+      actor: req.auth.user,
+      orgId: project.orgId,
+      projectId: project.id,
+      idempotencyKey: `archive:${project.id}:supplement_${approved ? "approved" : "rejected"}:${supplementRequest.id}`,
+      payloadJson: {
+        projectId: project.id,
+        projectName: project.name,
+        supplementRequestId: supplementRequest.id,
+        archiveItemId: supplementRequest.archiveItemId,
+        approved
+      }
+    });
     return res.json({ supplementRequest, archiveItem: item, auditLogId: log.id });
   });
 
@@ -205,10 +308,34 @@ export function archiveRoutes(ctx: AppContext) {
     const { status, missing } = syncArchiveStatus(projectItems);
     const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "archive_supplement.apply", "archive_supplement_request", supplementRequest.id, item.projectId, `missing=${missing.length}`);
     supplementRequest.auditLogId = log.id;
+    ctx.eventBus.emit({
+      eventCode: "ArchiveSupplementApplied",
+      businessType: "archive",
+      businessId: project.id,
+      businessTitle: project.name,
+      actor: req.auth.user,
+      orgId: project.orgId,
+      projectId: project.id,
+      idempotencyKey: `archive:${project.id}:supplement_applied:${supplementRequest.id}`,
+      payloadJson: {
+        projectId: project.id,
+        projectName: project.name,
+        supplementRequestId: supplementRequest.id,
+        archiveItemId: item.id,
+        status,
+        missingCount: missing.length
+      }
+    });
     return res.json({ supplementRequest, archiveItem: item, status, auditLogId: log.id });
   });
 
-  router.get("/archive-supplement-requests", (_req, res) => res.json({ archiveSupplementRequests: ctx.state.archiveSupplementRequests }));
+  router.get("/archive-supplement-requests", (req, res) => {
+    const readableProjectIds = readableArchiveProjectIds(ctx, req);
+    if (readableProjectIds.size === 0) {
+      return denyResponse(ctx, req, res, 403, "ARCHIVE_SUPPLEMENT_READ_DENIED", "Current role cannot read archive supplement requests.", "archive_supplement_request.read.denied", "archive_supplement_request", "archive-supplement-requests");
+    }
+    return res.json({ archiveSupplementRequests: ctx.state.archiveSupplementRequests.filter((entry) => readableProjectIds.has(entry.projectId)) });
+  });
 
   return router;
 }

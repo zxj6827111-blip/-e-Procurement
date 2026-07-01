@@ -28,56 +28,68 @@ interface NavItem {
   roles: RoleId[];
 }
 
-const groupManagerRoles: RoleId[] = ["group_manager", "buyer", "platform_operator"];
+const groupManagerRoles: RoleId[] = ["group_manager"];
+const procurementExecutorRoles: RoleId[] = ["buyer", "platform_operator"];
+const platformOperatorRoles: RoleId[] = ["platform_operator"];
+const procurementBusinessRoles: RoleId[] = [...groupManagerRoles, ...procurementExecutorRoles];
 const hotelBuyerRoles: RoleId[] = ["hotel_buyer"];
 const supplierRoles: RoleId[] = ["supplier", "supplier_admin", "supplier_quotation"];
 const financeRoles: RoleId[] = ["hotel_finance", "finance_reviewer"];
 const auditRoles: RoleId[] = ["auditor"];
-const businessRoles: RoleId[] = [...groupManagerRoles, ...hotelBuyerRoles, ...supplierRoles, ...financeRoles, ...auditRoles, "expert"];
+const businessRoles: RoleId[] = [...procurementBusinessRoles, ...hotelBuyerRoles, ...supplierRoles, ...financeRoles, ...auditRoles, "expert"];
 
 const navItems: NavItem[] = [
-  { label: "工作台", to: "/", roles: [...businessRoles] },
-  { label: "采购需求", to: "/procurement-requests", roles: [...groupManagerRoles] },
-  { label: "项目立项", to: "/project-initiation", roles: [...groupManagerRoles] },
-  { label: "项目工作台", to: "/project-workbench", roles: [...groupManagerRoles, ...hotelBuyerRoles] },
-  { label: "采购文件", to: "/procurement-documents", roles: [...groupManagerRoles] },
-  { label: "公告与邀请", to: "/announcements-invitations", roles: [...groupManagerRoles] },
-  { label: "报名资料", to: "/supplier-registration", roles: ["buyer", "platform_operator"] },
-  { label: "报价保密", to: "/bid-control", roles: [...groupManagerRoles] },
-  { label: "专家评审管理", to: "/expert-review", roles: [...groupManagerRoles] },
-  { label: "专家评审", to: "/expert-scoring", roles: ["expert"] },
+  { label: "首页", to: "/", roles: [...businessRoles] },
+  { label: "需求审批", to: "/procurement-requests", roles: [...groupManagerRoles] },
+  { label: "项目监督", to: "/project-workbench", roles: [...groupManagerRoles] },
+  { label: "报价监督", to: "/bid-control", roles: [...groupManagerRoles] },
+  { label: "专家库评审", to: "/expert-review", roles: [...groupManagerRoles] },
+  { label: "评分模板", to: "/scoring-templates", roles: [...groupManagerRoles] },
   { label: "定标审批", to: "/award-result", roles: [...groupManagerRoles] },
-  { label: "外部备案", to: "/external-trade", roles: [...groupManagerRoles] },
-  { label: "外部联调", to: "/integration-boundary", roles: ["group_manager", "auditor", "admin"] },
-  { label: "供应商与商品", to: "/suppliers", roles: [...groupManagerRoles] },
-  { label: "商品定价", to: "/supply-mall", roles: [...groupManagerRoles] },
+  { label: "供应商治理", to: "/suppliers", roles: [...groupManagerRoles] },
+  { label: "项目档案", to: "/archive-audit", roles: [...groupManagerRoles] },
+  { label: "待办中心", to: "/my-tasks", roles: [...procurementExecutorRoles] },
+  { label: "需求转项目", to: "/procurement-requests", roles: [...procurementExecutorRoles] },
+  { label: "项目执行", to: "/project-workbench", roles: [...procurementExecutorRoles] },
+  { label: "中标结果", to: "/award-result", roles: [...procurementExecutorRoles] },
+  { label: "专家抽取", to: "/expert-review", roles: [...procurementExecutorRoles] },
+  { label: "评分模板", to: "/scoring-templates", roles: [...platformOperatorRoles] },
+  { label: "专家评审", to: "/expert-scoring", roles: ["expert"] },
+  { label: "外部联调", to: "/integration-boundary", roles: ["auditor", "admin"] },
+  { label: "商品定价", to: "/supply-mall", roles: [...groupManagerRoles, ...platformOperatorRoles] },
   { label: "商品目录", to: "/supply-mall", roles: [...hotelBuyerRoles] },
   { label: "商品维护", to: "/supply-mall", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
-  { label: "供应商档案", to: "/suppliers", roles: ["supplier", "supplier_admin"] },
+  { label: "供应商档案", to: "/suppliers", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
+  { label: "账号安全", to: "/account-security", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
   { label: "报名资料", to: "/supplier-registration", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
   { label: "报价响应", to: "/bidding", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
+  { label: "中标结果", to: "/award-result", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
   { label: "采购申请", to: "/procurement-requests", roles: [...hotelBuyerRoles] },
-  { label: "订单履约", to: "/order-fulfillment", roles: [...groupManagerRoles, ...hotelBuyerRoles, ...supplierRoles] },
+  { label: "订单履约", to: "/order-fulfillment", roles: [...procurementExecutorRoles, ...hotelBuyerRoles, ...supplierRoles] },
   { label: "结算材料", to: "/settlement-materials", roles: [...supplierRoles] },
   { label: "结算与发票", to: "/settlement-materials", roles: [...financeRoles] },
   { label: "资金/付款状态", to: "/payment-status", roles: [...financeRoles] },
-  { label: "结算与监督", to: "/archive-audit", roles: [...groupManagerRoles] },
-  { label: "项目档案", to: "/archive-audit", roles: ["auditor"] },
-  { label: "日志与监督", to: "/audit", roles: ["auditor"] },
+  { label: "项目归档", to: "/archive-audit", roles: [...procurementExecutorRoles] },
+  { label: "需求监督", to: "/procurement-requests", roles: [...auditRoles] },
+  { label: "定标监督", to: "/award-result", roles: [...auditRoles] },
+  { label: "供应商监督", to: "/suppliers", roles: [...auditRoles] },
+  { label: "项目档案", to: "/archive-audit", roles: [...auditRoles] },
+  { label: "日志与监督", to: "/audit", roles: [...auditRoles] },
   { label: "系统配置", to: "/permissions", roles: ["admin"] }
 ];
 
 const routeTitles: Record<string, string> = {
-  "/": "工作台",
+  "/": "首页",
   "/procurement-requests": "采购需求",
-  "/project-initiation": "项目立项",
-  "/project-workbench": "项目工作台",
+  "/project-initiation": "需求转项目",
+  "/project-workbench": "项目执行",
   "/procurement-documents": "采购文件",
   "/announcements-invitations": "公告与邀请",
   "/supplier-registration": "报名资料",
   "/bidding": "报价响应",
   "/bid-control": "报价监督",
-  "/expert-review": "专家评审管理",
+  "/expert-review": "专家库与评审管理",
+  "/scoring-templates": "评分模板",
   "/expert-scoring": "专家评审",
   "/award-result": "定标结果",
   "/external-trade": "外部备案",
@@ -85,6 +97,7 @@ const routeTitles: Record<string, string> = {
   "/file-center": "文件中心",
   "/supply-mall": "商品目录",
   "/suppliers": "供应商档案",
+  "/account-security": "账号安全",
   "/order-fulfillment": "订单履约",
   "/contract-performance": "订单履约",
   "/settlement-materials": "结算与发票",
@@ -97,7 +110,7 @@ const routeTitles: Record<string, string> = {
   "/audit": "日志与监督",
   "/approval-rules": "审批规则",
   "/permissions": "系统配置",
-  "/my-tasks": "我的待办",
+  "/my-tasks": "待办中心",
   "/messages": "消息中心",
   "/role-switch": "账号入口"
 };
@@ -126,23 +139,44 @@ const visibleItems = computed(() => {
 });
 
 const currentPageTitle = computed(() => {
+  if (route.path === "/procurement-requests") {
+    if (session.roleId === "group_manager") return "需求审批";
+    if (session.roleId === "buyer" || session.roleId === "platform_operator") return "需求转项目";
+    if (session.roleId === "auditor") return "需求监督";
+    return "采购申请";
+  }
+  if (route.path.startsWith("/procurement-requests/")) {
+    if (session.roleId === "group_manager") return "需求审批详情";
+    if (session.roleId === "buyer" || session.roleId === "platform_operator") return "需求转项目详情";
+    return "采购申请详情";
+  }
   const visible = visibleItems.value.find((item) => item.to === route.path);
   return visible?.label ?? routeTitles[route.path] ?? "采购业务";
 });
 
 const isLoginRoute = computed(() => route.path === "/login");
+const isPublicSupplierRegisterRoute = computed(() => route.path === "/supplier-onboarding-register");
 const isHiddenUtilityRoute = computed(() => route.path === "/role-switch");
+const supplierPasswordChangeRequired = computed(
+  () => session.passwordChangeRequired && ["supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId)
+);
 
 function routeAllowed(path: string) {
   if (path === "/role-switch") return session.mockAuthEnabled;
   if (["/my-tasks", "/messages"].includes(path)) return session.roleId !== "admin";
   if (path === "/approval-rules") return ["group_manager", "buyer", "auditor", "admin"].includes(session.roleId);
+  if (path === "/procurement-requests") return ["group_manager", "buyer", "hotel_buyer", "platform_operator", "auditor"].includes(session.roleId);
+  if (path.startsWith("/procurement-requests/")) return ["group_manager", "buyer", "hotel_buyer", "platform_operator", "auditor"].includes(session.roleId);
   if (path === "/expert-scoring") return session.roleId === "expert";
-  if (path === "/integration-boundary") return ["admin", "group_manager", "auditor"].includes(session.roleId);
-  if (path === "/supply-mall") return ["group_manager", "buyer", "platform_operator", "hotel_buyer", "supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId);
-  if (["/project-workbench", "/procurement-documents", "/announcements-invitations", "/bid-control", "/expert-review", "/award-result", "/external-trade", "/file-center"].includes(path)) {
-    return ["group_manager", "buyer", "hotel_buyer", "platform_operator", "auditor"].includes(session.roleId);
+  if (path === "/scoring-templates") return ["group_manager", "platform_operator", "auditor"].includes(session.roleId);
+  if (path === "/integration-boundary") return ["admin", "auditor"].includes(session.roleId);
+  if (path === "/supply-mall") return ["group_manager", "platform_operator", "hotel_buyer", "supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId);
+  if (path === "/account-security") return session.roleId !== "admin";
+  if (path === "/award-result") return ["group_manager", "buyer", "platform_operator", "auditor", "supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId);
+  if (["/project-workbench", "/procurement-documents", "/announcements-invitations", "/bid-control", "/expert-review", "/external-trade", "/file-center"].includes(path)) {
+    return ["group_manager", "buyer", "platform_operator", "auditor"].includes(session.roleId);
   }
+  if (path === "/project-initiation") return ["buyer", "platform_operator"].includes(session.roleId);
   if (path === "/supplier-registration") return ["supplier", "supplier_admin", "supplier_quotation", "buyer", "platform_operator", "auditor"].includes(session.roleId);
   return visibleItems.value.some((item) => item.to === path);
 }
@@ -152,10 +186,14 @@ function fallbackRoute() {
 }
 
 function enforceCurrentRoute() {
-  if (isLoginRoute.value) return;
+  if (isLoginRoute.value || isPublicSupplierRegisterRoute.value) return;
   if (isHiddenUtilityRoute.value && session.mockAuthEnabled) return;
   if (!session.roleId) {
     void router.replace("/login");
+    return;
+  }
+  if (supplierPasswordChangeRequired.value && route.path !== "/account-security") {
+    void router.replace("/account-security");
     return;
   }
   if (routeAllowed(route.path)) return;
@@ -170,6 +208,10 @@ async function logout() {
 onMounted(async () => {
   try {
     const initialPath = router.currentRoute.value.path;
+    if (initialPath === "/supplier-onboarding-register") {
+      bootstrapped.value = true;
+      return;
+    }
     if (initialPath === "/login" || initialPath === "/role-switch") {
       await session.loadAuthProviders();
     } else {
@@ -188,6 +230,7 @@ watch(
   () => [session.roleId, route.path],
   () => {
     if (!bootstrapped.value || isLoginRoute.value) return;
+    if (isPublicSupplierRegisterRoute.value) return;
     enforceCurrentRoute();
   },
   { immediate: true }
@@ -195,7 +238,7 @@ watch(
 </script>
 
 <template>
-  <div v-if="isLoginRoute || isHiddenUtilityRoute" class="login-shell">
+  <div v-if="isLoginRoute || isHiddenUtilityRoute || isPublicSupplierRegisterRoute" class="login-shell">
     <RouterView />
   </div>
 

@@ -114,7 +114,10 @@ function addPricingReport(runtime: ReturnType<typeof boot>, productId: string, s
 }
 
 async function listProduct(runtime: ReturnType<typeof boot>, productId: string) {
-  const listed = await request(runtime.app).post(`/api/mall/products/${productId}/status`).set("x-mock-user-id", "u2").send({ status: "listed" });
+  const listed = await request(runtime.app)
+    .post(`/api/mall/products/${productId}/status`)
+    .set("x-mock-user-id", "u2")
+    .send({ status: "listed", sourceType: "award_project", sourceProjectId: "p-award" });
   expect(listed.status).toBe(200);
   return listed.body.product;
 }

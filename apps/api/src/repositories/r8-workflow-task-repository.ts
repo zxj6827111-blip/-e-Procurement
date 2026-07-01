@@ -1,5 +1,7 @@
 import type { RuntimeDb } from "../runtime/index.js";
 import type { SeedState } from "../seed/data.js";
+import type { InternalEventBus, InternalBusinessEventCode } from "../services/internal-event-bus.js";
+import type { R8ToProcessAdapter } from "../services/r8-to-process-adapter.js";
 import type {
   ApprovalBusinessType,
   ApprovalInstance,
@@ -133,6 +135,8 @@ function isBusinessProcessorRole(roleId: RoleId) {
 function taskTypeForBusiness(type: ApprovalBusinessType) {
   const labels: Record<ApprovalBusinessType, string> = {
     procurement_request: "approval_procurement_request",
+    procurement_document: "approval_procurement_document",
+    review_award: "review_award_expert_confirmation",
     award_approval: "approval_award",
     archive_supplement: "archive_supplement",
     price_approval: "price_approval",
@@ -165,10 +169,15 @@ function methodTypeMatches(ruleMethodType: string, actualMethodType?: string) {
 }
 
 export class R8WorkflowTaskRepository {
-  constructor(private readonly runtimeDb: RuntimeDb) {}
+  constructor(
+    private readonly runtimeDb: RuntimeDb,
+    private readonly processAdapter?: R8ToProcessAdapter,
+    private readonly eventBus?: InternalEventBus
+  ) {}
 
   syncWorkflowState(state: SeedState) {
     for (const rule of state.approvalRules ?? []) this.upsertApprovalRule(rule);
+    this.ensureExpertConfirmationTasks(state);
     this.ensureExpertScoringTasks(state);
     this.ensureReturnTasks(state);
   }
@@ -258,6 +267,13 @@ export class R8WorkflowTaskRepository {
     const existing = this.getApprovalInstance(instanceId);
     if (existing && !isTerminalStatus(existing.approvalStatus)) {
       const pendingTask = this.listTasksByInstance(instanceId).find((task) => task.status === "pending");
+      this.mirrorApprovalStarted({
+        approvalInstance: existing,
+        task: pendingTask,
+        initiator: args.initiator,
+        sourceJson: { ...(args.sourceJson ?? {}), reusedExistingApprovalInstance: true }
+      });
+      this.emitApprovalStartedEvent(existing, pendingTask, args.initiator, args.sourceJson);
       return { approvalInstance: existing, task: pendingTask, notifications: [] as WorkflowNotification[] };
     }
     const instance: ApprovalInstance = {
@@ -322,7 +338,15 @@ export class R8WorkflowTaskRepository {
         sourceJson: { taskId: task.id, ruleCode: rule.ruleCode }
       })
     ];
-    return { approvalInstance: this.getApprovalInstance(instance.id)!, task, notifications };
+    const result = { approvalInstance: this.getApprovalInstance(instance.id)!, task, notifications };
+    this.mirrorApprovalStarted({
+      approvalInstance: result.approvalInstance,
+      task: result.task,
+      initiator: args.initiator,
+      sourceJson: args.sourceJson
+    });
+    this.emitApprovalStartedEvent(result.approvalInstance, result.task, args.initiator, args.sourceJson);
+    return result;
   }
 
   recordApprovalAction(args: ApprovalActionArgs) {
@@ -358,6 +382,7 @@ export class R8WorkflowTaskRepository {
     const updated = this.getApprovalInstance(instance.id)!;
     this.insertApprovalAction(updated, args.actor, args.action, fromStatus, toStatus, args.opinion, args.sourceJson);
     this.completeApprovalTasks(instance.id, args.actor.id, args.action === "approve" ? "completed" : "cancelled");
+    const mirroredTasks = this.listTasksByInstance(instance.id);
     const notification = this.createNotification({
       eventType: `${instance.businessType}.${toStatus}`,
       businessType: instance.businessType,
@@ -370,12 +395,52 @@ export class R8WorkflowTaskRepository {
       contentSummary: args.opinion ?? `Approval ${toStatus}.`,
       sourceJson: { action: args.action, actorId: args.actor.id, ...(args.sourceJson ?? {}) }
     });
+    this.mirrorApprovalActionRecorded({
+      approvalInstance: updated,
+      tasks: mirroredTasks,
+      actor: args.actor,
+      action: args.action,
+      fromStatus,
+      toStatus,
+      opinion: args.opinion,
+      sourceJson: args.sourceJson
+    });
+    this.emitApprovalActionEvent(updated, args.actor, args.action, fromStatus, toStatus, args.sourceJson);
     return { approvalInstance: updated, notification };
   }
 
   cancelBusinessWorkflow(businessType: ApprovalBusinessType, businessId: string, actor: User, opinion?: string) {
     const instance = this.getApprovalInstanceByBusiness(businessType, businessId);
     if (!instance || isTerminalStatus(instance.approvalStatus)) return undefined;
+    if (instance.startedBy === actor.id) {
+      const fromStatus = instance.approvalStatus;
+      const timestamp = now();
+      run(
+        this.runtimeDb.db.prepare(
+          `update r2_approval_instances
+           set approval_status = 'cancelled', completed_by = ?, completed_at = ?, current_role_id = null,
+               current_user_id = null, updated_at = ?
+           where id = ?`
+        ),
+        [actor.id, timestamp, timestamp, instance.id]
+      );
+      const updated = this.getApprovalInstance(instance.id)!;
+      this.insertApprovalAction(updated, actor, "cancel", fromStatus, "cancelled", opinion, { cancelledByInitiator: true });
+      this.completeApprovalTasks(instance.id, actor.id, "cancelled");
+      const mirroredTasks = this.listTasksByInstance(instance.id);
+      this.mirrorApprovalActionRecorded({
+        approvalInstance: updated,
+        tasks: mirroredTasks,
+        actor,
+        action: "cancel",
+        fromStatus,
+        toStatus: "cancelled",
+        opinion,
+        sourceJson: { cancelledByInitiator: true }
+      });
+      this.emitApprovalActionEvent(updated, actor, "cancel", fromStatus, "cancelled", { cancelledByInitiator: true });
+      return { approvalInstance: updated, notification: undefined };
+    }
     return this.recordApprovalAction({ instanceId: instance.id, actor, action: "cancel", opinion });
   }
 
@@ -523,6 +588,17 @@ export class R8WorkflowTaskRepository {
     );
   }
 
+  completeTaskById(taskId: string, actorId: string, status: WorkflowTaskStatus = "completed") {
+    const timestamp = now();
+    run(this.runtimeDb.db.prepare("update r2_task_items set task_status = ?, completed_by = ?, completed_at = ?, updated_at = ? where id = ? and task_status = 'pending'"), [
+      status,
+      actorId,
+      timestamp,
+      timestamp,
+      taskId
+    ]);
+  }
+
   createNotification(args: NotifyArgs): WorkflowNotification {
     const timestamp = now();
     const recipientKey = args.recipientUserId ?? args.recipientRoleId ?? args.supplierId ?? args.orgId ?? "system";
@@ -583,6 +659,11 @@ export class R8WorkflowTaskRepository {
   listNotifications(user: User, roleId: RoleId): WorkflowNotification[] {
     const rows = this.runtimeDb.db.prepare("select * from r2_notifications order by created_at desc").all() as Row[];
     return rows.map((row) => this.notificationFromRow(row)).filter((message) => this.canReadNotification(user, roleId, message));
+  }
+
+  findNotificationBySource(sourceKey: string, sourceValue: string): WorkflowNotification | undefined {
+    const rows = this.runtimeDb.db.prepare("select * from r2_notifications order by created_at desc").all() as Row[];
+    return rows.map((row) => this.notificationFromRow(row)).find((message) => message.sourceJson?.[sourceKey] === sourceValue);
   }
 
   markNotificationRead(messageId: string, user: User, roleId: RoleId): WorkflowNotification {
@@ -730,6 +811,85 @@ export class R8WorkflowTaskRepository {
 
   private instanceId(businessType: ApprovalBusinessType, businessId: string) {
     return `wf:${businessType}:${businessId}`;
+  }
+
+  private mirrorApprovalStarted(args: Parameters<R8ToProcessAdapter["approvalStarted"]>[0]) {
+    try {
+      this.processAdapter?.approvalStarted(args);
+    } catch {
+      // Process Layer 是 M1 影子记录，镜像失败不能影响 R8 主审批流程。
+    }
+  }
+
+  private mirrorApprovalActionRecorded(args: Parameters<R8ToProcessAdapter["approvalActionRecorded"]>[0]) {
+    try {
+      this.processAdapter?.approvalActionRecorded(args);
+    } catch {
+      // Process Layer 是 M1 影子记录，镜像失败不能影响 R8 主审批流程。
+    }
+  }
+
+  private emitApprovalStartedEvent(approvalInstance: ApprovalInstance, task: WorkflowTask | undefined, initiator: User, sourceJson?: Record<string, unknown>) {
+    const eventCode = startedEventCode(approvalInstance.businessType);
+    if (!eventCode) return;
+    try {
+      this.eventBus?.emit({
+        eventCode,
+        businessType: approvalInstance.businessType,
+        businessId: approvalInstance.businessId,
+        businessTitle: approvalInstance.businessTitle,
+        processInstanceId: `pi:r8_workflow:${approvalInstance.id}`,
+        actor: initiator,
+        orgId: approvalInstance.orgId,
+        supplierId: approvalInstance.supplierId,
+        projectId: approvalInstance.projectId,
+        idempotencyKey: `r8:${approvalInstance.id}:${eventCode}`,
+        payloadJson: {
+          sourceEngine: "r8_workflow",
+          approvalInstanceId: approvalInstance.id,
+          taskId: task?.id,
+          route: sourceJson?.route
+        }
+      });
+    } catch {
+      // 内部事件是 M3 旁路记录，失败不能影响 R8 主审批流程。
+    }
+  }
+
+  private emitApprovalActionEvent(
+    approvalInstance: ApprovalInstance,
+    actor: User,
+    action: ApprovalActionArgs["action"],
+    fromStatus: ApprovalInstanceStatus,
+    toStatus: ApprovalInstanceStatus,
+    sourceJson?: Record<string, unknown>
+  ) {
+    const eventCode = actionEventCode(approvalInstance.businessType, toStatus);
+    if (!eventCode) return;
+    try {
+      this.eventBus?.emit({
+        eventCode,
+        businessType: approvalInstance.businessType,
+        businessId: approvalInstance.businessId,
+        businessTitle: approvalInstance.businessTitle,
+        processInstanceId: `pi:r8_workflow:${approvalInstance.id}`,
+        actor,
+        orgId: approvalInstance.orgId,
+        supplierId: approvalInstance.supplierId,
+        projectId: approvalInstance.projectId,
+        idempotencyKey: `r8:${approvalInstance.id}:${eventCode}`,
+        payloadJson: {
+          sourceEngine: "r8_workflow",
+          approvalInstanceId: approvalInstance.id,
+          sourceAction: action,
+          fromStatus,
+          toStatus,
+          route: sourceJson?.route
+        }
+      });
+    } catch {
+      // 内部事件是 M3 旁路记录，失败不能影响 R8 主审批流程。
+    }
   }
 
   private ruleFromRow(row: Row): ApprovalRule {
@@ -887,6 +1047,42 @@ export class R8WorkflowTaskRepository {
     return userOrgScope(user).includes(orgId);
   }
 
+  private ensureExpertConfirmationTasks(state: SeedState) {
+    for (const assignment of state.expertAssignments ?? []) {
+      if (["confirmed", "submitted_locked", "replaced", "archived"].includes(assignment.status)) continue;
+      const project = (state.projects ?? []).find((item) => item.id === assignment.projectId);
+      if (!project || project.externalTradeFlag) continue;
+      const user = (state.users ?? []).find((item) => item.expertId === assignment.expertId);
+      const task = this.upsertTask({
+        id: `task:expert_confirmation:${assignment.id}`,
+        taskCode: `TASK-EXPERT-CONFIRM-${assignment.id}`,
+        taskType: "review_award_expert_confirmation",
+        businessType: "review_award",
+        businessId: project.id,
+        projectId: project.id,
+        orgId: project.orgId,
+        assigneeRoleId: "expert",
+        assigneeUserId: user?.id,
+        title: `Expert confirmation ${project.code}`,
+        sourceJson: { assignmentId: assignment.id, expertId: assignment.expertId, status: assignment.status }
+      });
+      if (!this.findNotificationBySource("assignmentId", assignment.id)) {
+        this.createNotification({
+          eventType: "review_award.expert_confirmation_required",
+          businessType: "review_award",
+          businessId: project.id,
+          projectId: project.id,
+          orgId: project.orgId,
+          recipientRoleId: "expert",
+          recipientUserId: user?.id,
+          title: `${project.code} 专家评审确认`,
+          contentSummary: "请确认回避、评审纪律和保密承诺后进入评分。",
+          sourceJson: { taskId: task.id, assignmentId: assignment.id, expertId: assignment.expertId }
+        });
+      }
+    }
+  }
+
   private ensureExpertScoringTasks(state: SeedState) {
     for (const sheet of state.scoringSheets ?? []) {
       if (["submitted_locked", "resubmitted_locked", "replaced", "archived"].includes(sheet.status)) continue;
@@ -926,4 +1122,18 @@ export class R8WorkflowTaskRepository {
       });
     }
   }
+}
+
+function startedEventCode(businessType: ApprovalBusinessType): InternalBusinessEventCode | undefined {
+  if (businessType === "procurement_request") return "ProcurementRequestSubmitted";
+  if (businessType === "award_approval") return "AwardApprovalSubmitted";
+  return undefined;
+}
+
+function actionEventCode(businessType: ApprovalBusinessType, toStatus: ApprovalInstanceStatus): InternalBusinessEventCode | undefined {
+  if (businessType === "procurement_request" && toStatus === "approved") return "ProcurementRequestApproved";
+  if (businessType === "procurement_request" && toStatus === "rejected") return "ProcurementRequestRejected";
+  if (businessType === "award_approval" && toStatus === "approved") return "AwardApproved";
+  if (businessType === "award_approval" && toStatus === "rejected") return "AwardRejected";
+  return undefined;
 }
