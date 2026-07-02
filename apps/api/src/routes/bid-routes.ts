@@ -238,7 +238,7 @@ function amountFromLineItems(body: unknown) {
   return total > 0 ? total : Number(input.amount ?? 0);
 }
 
-function parseLineItems(body: unknown) {
+function parseLineItems(body: unknown, bidId?: string) {
   const input = (body ?? {}) as Record<string, unknown>;
   if (!Array.isArray(input.lineItems)) return undefined;
   return input.lineItems.map((item, index) => {
@@ -247,8 +247,9 @@ function parseLineItems(body: unknown) {
     const unitPrice = Number(value.unitPrice ?? 0);
     const taxRate = Number(value.taxRate ?? 0);
     const totalPrice = Number(value.totalPrice ?? quantity * unitPrice);
+    const rawId = String(value.id ?? `line-${index + 1}`);
     return {
-      id: String(value.id ?? `bid-line-${index + 1}`),
+      id: bidId && !rawId.startsWith(`${bidId}:`) ? `${bidId}:${rawId}` : rawId,
       itemName: String(value.itemName ?? `item-${index + 1}`),
       quantity,
       unit: String(value.unit ?? "项"),
@@ -526,10 +527,11 @@ export function bidRoutes(ctx: AppContext) {
       return res.status(400).json({ error: { code: "BID_AMOUNT_INVALID", message: "Bid amount must be a positive number." } });
     }
     const now = new Date().toISOString();
+    const bidId = `bid-${ctx.state.bids.length + 1}`;
     const responseFileMetadata = resolveAttachments(ctx, req.body?.responseFileMetadata, {
-      fallbackPrefix: `bid-${ctx.state.bids.length + 1}`,
+      fallbackPrefix: bidId,
       objectType: "bid",
-      objectId: `bid-${ctx.state.bids.length + 1}`,
+      objectId: bidId,
       attachmentKind: "bid_response_file",
       projectId: project.id,
       supplierId,
@@ -537,14 +539,14 @@ export function bidRoutes(ctx: AppContext) {
     });
     const firstResponseFile = responseFileMetadata[0];
     const bid: Bid = {
-      id: `bid-${ctx.state.bids.length + 1}`,
+      id: bidId,
       projectId: project.id,
       supplierId,
       amount,
       taxRate: req.body?.taxRate === undefined ? undefined : Number(req.body.taxRate),
       taxInclusive: Boolean(req.body?.taxInclusive ?? false),
       taxNote: req.body?.taxNote === undefined ? undefined : String(req.body.taxNote),
-      lineItems: parseLineItems(req.body),
+      lineItems: parseLineItems(req.body, bidId),
       deliveryDays: req.body?.deliveryDays === undefined ? undefined : Number(req.body.deliveryDays),
       responseSummary: req.body?.responseSummary === undefined ? undefined : String(req.body.responseSummary),
       serviceCommitment: req.body?.serviceCommitment === undefined ? undefined : String(req.body.serviceCommitment),
@@ -552,7 +554,7 @@ export function bidRoutes(ctx: AppContext) {
       submittedAt: null,
       quoteDeadlineAt: project.quoteDeadlineAt ?? String(req.body?.quoteDeadlineAt ?? "2099-12-31T17:00:00.000Z"),
       lockedAt: null,
-      fileId: firstResponseFile?.id ?? `file-bid-${ctx.state.bids.length + 1}`,
+      fileId: firstResponseFile?.id ?? `file-${bidId}`,
       fileName: firstResponseFile?.fileName ?? String(req.body?.fileName ?? "response-file.pdf"),
       versionNo: 0,
       withdrawnAt: null,
@@ -660,7 +662,7 @@ export function bidRoutes(ctx: AppContext) {
     bid.taxRate = req.body?.taxRate === undefined ? bid.taxRate : Number(req.body.taxRate);
     bid.taxInclusive = req.body?.taxInclusive === undefined ? bid.taxInclusive : Boolean(req.body.taxInclusive);
     bid.taxNote = req.body?.taxNote === undefined ? bid.taxNote : String(req.body.taxNote);
-    bid.lineItems = req.body?.lineItems === undefined ? bid.lineItems : parseLineItems(req.body);
+    bid.lineItems = req.body?.lineItems === undefined ? bid.lineItems : parseLineItems(req.body, bid.id);
     bid.deliveryDays = req.body?.deliveryDays === undefined ? bid.deliveryDays : Number(req.body.deliveryDays);
     bid.responseSummary = req.body?.responseSummary === undefined ? bid.responseSummary : String(req.body.responseSummary);
     bid.serviceCommitment = req.body?.serviceCommitment === undefined ? bid.serviceCommitment : String(req.body.serviceCommitment);
@@ -773,7 +775,7 @@ export function bidRoutes(ctx: AppContext) {
     bid.taxRate = req.body?.taxRate === undefined ? bid.taxRate : Number(req.body.taxRate);
     bid.taxInclusive = req.body?.taxInclusive === undefined ? bid.taxInclusive : Boolean(req.body.taxInclusive);
     bid.taxNote = req.body?.taxNote === undefined ? bid.taxNote : String(req.body.taxNote);
-    bid.lineItems = req.body?.lineItems === undefined ? bid.lineItems : parseLineItems(req.body);
+    bid.lineItems = req.body?.lineItems === undefined ? bid.lineItems : parseLineItems(req.body, bid.id);
     bid.deliveryDays = req.body?.deliveryDays === undefined ? bid.deliveryDays : Number(req.body.deliveryDays);
     bid.responseSummary = req.body?.responseSummary === undefined ? bid.responseSummary : String(req.body.responseSummary);
     bid.serviceCommitment = req.body?.serviceCommitment === undefined ? bid.serviceCommitment : String(req.body.serviceCommitment);

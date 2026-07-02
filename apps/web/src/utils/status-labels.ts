@@ -68,7 +68,7 @@ export const statusLabelMap: Record<string, string> = {
   permitted: "已允许",
   planned: "已计划",
   project_created: "已发起项目",
-  r8_process_layer: "R8 / Process Layer",
+  r8_process_layer: "流程审批",
   shadow: "影子试点",
   simulation_error: "模拟异常",
   validation_failed: "校验失败",

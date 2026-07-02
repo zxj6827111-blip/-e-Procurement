@@ -1,0 +1,108 @@
+{
+  "system": "e-procurement-enterprise-ui",
+  "version": "1.0.0",
+  "tokenHash": "2380a45c1e2f76065e7b4f30b91b3463944eb764959a97085376a6253b0e0dac",
+  "tokenGroups": [
+    "color",
+    "radius",
+    "spacing",
+    "typography",
+    "border",
+    "zIndex"
+  ],
+  "components": [
+    {
+      "name": "DataTable",
+      "source": "apps/web/src/components/base/DataTable.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    },
+    {
+      "name": "EnterpriseButton",
+      "source": "apps/web/src/components/base/EnterpriseButton.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    },
+    {
+      "name": "EnterpriseDialog",
+      "source": "apps/web/src/components/base/EnterpriseDialog.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    },
+    {
+      "name": "EnterpriseSurface",
+      "source": "apps/web/src/components/base/EnterpriseSurface.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    },
+    {
+      "name": "EnterpriseTabs",
+      "source": "apps/web/src/components/base/EnterpriseTabs.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    },
+    {
+      "name": "FeedbackMessage",
+      "source": "apps/web/src/components/base/FeedbackMessage.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    },
+    {
+      "name": "FilterBar",
+      "source": "apps/web/src/components/base/FilterBar.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    },
+    {
+      "name": "FormSection",
+      "source": "apps/web/src/components/base/FormSection.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    },
+    {
+      "name": "PageHeader",
+      "source": "apps/web/src/components/base/PageHeader.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    },
+    {
+      "name": "PaginationBar",
+      "source": "apps/web/src/components/base/PaginationBar.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    },
+    {
+      "name": "StatusTag",
+      "source": "apps/web/src/components/base/StatusTag.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    },
+    {
+      "name": "SubmitPanel",
+      "source": "apps/web/src/components/base/SubmitPanel.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    },
+    {
+      "name": "SummaryCards",
+      "source": "apps/web/src/components/base/SummaryCards.vue",
+      "tokenNamespace": "ep",
+      "classNamespace": "eds"
+    }
+  ],
+  "spacingSystem": {
+    "xs": 4,
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "xl": 32
+  },
+  "typographySystem": {
+    "fontFamily": "\"Microsoft YaHei\", \"Segoe UI\", Arial, sans-serif",
+    "pageTitle": 22,
+    "sectionTitle": 16,
+    "body": 14,
+    "meta": 12
+  },
+  "sourceOfTruth": "apps/web/src/design-system"
+}

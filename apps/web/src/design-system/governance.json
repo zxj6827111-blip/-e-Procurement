@@ -1,0 +1,11 @@
+{
+  "name": "e-procurement-enterprise-ui",
+  "version": "1.0.0",
+  "approvedRfc": "docs/ui-design-system-rfc-0001.md",
+  "protectedPaths": [
+    "apps/web/src/design-system",
+    "apps/web/src/components/base",
+    "apps/web/src/layouts"
+  ],
+  "changePolicy": "Token, base component, and layout changes require an approved RFC and versioned governance metadata."
+}

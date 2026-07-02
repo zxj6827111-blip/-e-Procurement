@@ -1,9 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
-import { loadWorkflowNotifications, loadWorkflowTasks, summarizeWorkflow, type R8ApprovalBusinessType, type R8WorkflowNotificationView, type R8WorkflowTaskView } from "../api/workflow";
+import {
+  loadWorkflowNotifications,
+  loadWorkflowTasks,
+  summarizeWorkflow,
+  type R8ApprovalBusinessType,
+  type R8WorkflowNotificationView,
+  type R8WorkflowTaskView
+} from "../api/workflow";
 import { useSessionStore } from "../stores/session";
 import { formatDateTime } from "../utils/status-labels";
+import { DataTable, EnterpriseSurface, FeedbackMessage, StatusTag, SummaryCards, type DataTableColumn } from "./base";
 
 const props = withDefaults(
   defineProps<{
@@ -39,6 +47,36 @@ const visibleMessages = computed(() =>
 );
 const summary = computed(() => summarizeWorkflow(visibleTasks.value, visibleMessages.value));
 
+const taskColumns: DataTableColumn[] = [
+  { key: "statusLabel", label: "状态" },
+  { key: "taskTypeLabel", label: "待办类型" },
+  { key: "title", label: "标题" },
+  { key: "createdAt", label: "创建时间" },
+  { key: "actions", label: "操作" }
+];
+
+const messageColumns: DataTableColumn[] = [
+  { key: "readLabel", label: "状态" },
+  { key: "businessTypeLabel", label: "业务类型" },
+  { key: "title", label: "标题" },
+  { key: "createdAt", label: "创建时间" },
+  { key: "actions", label: "操作" }
+];
+
+const taskRows = computed(() =>
+  visibleTasks.value.map((task) => ({
+    ...task,
+    createdAt: formatDateTime(task.createdAt)
+  }))
+);
+
+const messageRows = computed(() =>
+  visibleMessages.value.map((message) => ({
+    ...message,
+    createdAt: formatDateTime(message.createdAt)
+  }))
+);
+
 async function load() {
   if (!session.roleId) return;
   loadError.value = "";
@@ -64,35 +102,40 @@ watch(
 </script>
 
 <template>
-  <section class="workflow-summary" :class="{ compact: props.compact }">
-    <div class="workflow-summary-head">
-      <div>
-        <strong>{{ title }}</strong>
-        <span>{{ summary.pendingTasks }} 个待办 / {{ summary.unreadMessages }} 条未读消息</span>
-      </div>
-      <div class="actions">
-        <RouterLink class="secondary-button link-button" to="/my-tasks">待办中心</RouterLink>
-        <RouterLink class="secondary-button link-button" to="/messages">消息中心</RouterLink>
-      </div>
-    </div>
+  <EnterpriseSurface :title="title" description="按当前角色和业务范围汇总待办任务、未读消息和跳转入口。">
+    <template #actions>
+      <RouterLink class="eds-button eds-button-text" to="/my-tasks">待办中心</RouterLink>
+      <RouterLink class="eds-button eds-button-text" to="/messages">消息中心</RouterLink>
+    </template>
 
-    <p v-if="loadError" class="inline-error">{{ loadError }}</p>
-    <div v-else-if="!visibleTasks.length && !visibleMessages.length" class="notice">当前视角暂无相关待办或消息。</div>
+    <div class="eds-section">
+      <SummaryCards
+        :items="[
+          { label: '待办任务', value: summary.pendingTasks },
+          { label: '未读消息', value: summary.unreadMessages }
+        ]"
+      />
 
-    <div v-if="visibleTasks.length" class="workflow-mini-list">
-      <RouterLink v-for="task in visibleTasks" :key="task.id" :to="task.targetPath">
-        <span class="tag">{{ task.statusLabel }}</span>
-        <strong>{{ task.taskTypeLabel }}</strong>
-        <small>{{ task.title }} / {{ formatDateTime(task.createdAt) }}</small>
-      </RouterLink>
-    </div>
+      <FeedbackMessage v-if="loadError" tone="error">{{ loadError }}</FeedbackMessage>
+      <FeedbackMessage v-else-if="!visibleTasks.length && !visibleMessages.length">当前角色暂无相关待办或消息。</FeedbackMessage>
 
-    <div v-if="visibleMessages.length" class="workflow-mini-list">
-      <RouterLink v-for="message in visibleMessages" :key="message.id" :to="message.targetPath">
-        <span class="tag">{{ message.readLabel }}</span>
-        <strong>{{ message.businessTypeLabel }}</strong>
-        <small>{{ message.title }} / {{ formatDateTime(message.createdAt) }}</small>
-      </RouterLink>
+      <DataTable v-if="visibleTasks.length" :columns="taskColumns" :rows="taskRows" row-key="id">
+        <template #statusLabel="{ value }">
+          <StatusTag :tone="value === '待处理' ? 'warning' : 'default'">{{ value }}</StatusTag>
+        </template>
+        <template #actions="{ row }">
+          <RouterLink class="eds-button eds-button-text" :to="row.targetPath">查看</RouterLink>
+        </template>
+      </DataTable>
+
+      <DataTable v-if="visibleMessages.length" :columns="messageColumns" :rows="messageRows" row-key="id">
+        <template #readLabel="{ value }">
+          <StatusTag :tone="value === '未读' ? 'primary' : 'default'">{{ value }}</StatusTag>
+        </template>
+        <template #actions="{ row }">
+          <RouterLink class="eds-button eds-button-text" :to="row.targetPath">查看</RouterLink>
+        </template>
+      </DataTable>
     </div>
-  </section>
+  </EnterpriseSurface>
 </template>

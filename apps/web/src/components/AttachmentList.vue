@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { apiBlob } from "../api/http";
+import { EnterpriseButton, FeedbackMessage } from "./base";
 import { formalFileName } from "../utils/business-display";
 import { formatDateTime, isImageFile } from "../utils/status-labels";
 
@@ -127,33 +128,44 @@ onBeforeUnmount(() => {
 <template>
   <div
     v-if="normalizedAttachments.length"
-    class="attachment-list"
-    :class="[{ compact, 'image-only': imageOnly }, `attachment-list-${variant ?? (compact ? 'list' : 'document')}`]"
+    class="eds-attachment-list"
+    :class="[
+      {
+        'eds-attachment-list-compact': compact,
+        'eds-attachment-image-only': imageOnly
+      },
+      `eds-attachment-list-${variant ?? (compact ? 'list' : 'document')}`
+    ]"
   >
-    <div v-for="attachment in normalizedAttachments" :key="attachment.key" class="attachment-item" :class="{ 'image-only': imageOnly }">
-      <button
+    <div
+      v-for="attachment in normalizedAttachments"
+      :key="attachment.key"
+      class="eds-attachment-item"
+      :class="{ 'eds-attachment-image-only': imageOnly }"
+    >
+      <EnterpriseButton
         v-if="isImageFile(attachment.fileName, attachment.contentType)"
-        type="button"
-        class="attachment-thumb"
+        type="text"
+        class="eds-attachment-thumb"
         :disabled="!previewUrls[attachmentId(attachment)]"
         @click="openPreview(attachment)"
       >
         <img v-if="previewUrls[attachmentId(attachment)]" :src="previewUrls[attachmentId(attachment)]" :alt="displayName(attachment)" />
         <span v-else>{{ loading[attachmentId(attachment)] ? "加载中" : "图片" }}</span>
-      </button>
-      <div v-else class="attachment-file-icon">{{ fileExtension(attachment) }}</div>
-      <div v-if="metadataVisible || errors[attachmentId(attachment)]" class="attachment-meta">
+      </EnterpriseButton>
+      <div v-else class="eds-attachment-file-icon">{{ fileExtension(attachment) }}</div>
+      <div v-if="metadataVisible || errors[attachmentId(attachment)]" class="eds-attachment-meta">
         <template v-if="metadataVisible">
           <strong>{{ displayName(attachment) }}</strong>
           <small>{{ [formatDateTime(attachment.uploadedAt), humanSize(attachment.sizeBytes)].filter(Boolean).join(" / ") }}</small>
         </template>
-        <small v-if="errors[attachmentId(attachment)]" class="inline-error">{{ errors[attachmentId(attachment)] }}</small>
+        <FeedbackMessage v-if="errors[attachmentId(attachment)]" tone="error">{{ errors[attachmentId(attachment)] }}</FeedbackMessage>
       </div>
-      <button v-if="downloadVisible" type="button" class="secondary-button" :disabled="!attachmentId(attachment)" @click="downloadAttachment(attachment)">下载</button>
-      <button v-if="deletable" type="button" class="secondary-button danger-button" :disabled="!attachmentId(attachment)" @click="emit('delete', attachment)">
+      <EnterpriseButton v-if="downloadVisible" type="text" :disabled="!attachmentId(attachment)" @click="downloadAttachment(attachment)">下载</EnterpriseButton>
+      <EnterpriseButton v-if="deletable" type="text" :disabled="!attachmentId(attachment)" @click="emit('delete', attachment)">
         {{ deleteLabel ?? "删除" }}
-      </button>
+      </EnterpriseButton>
     </div>
   </div>
-  <span v-else class="notice">{{ emptyText ?? "-" }}</span>
+  <FeedbackMessage v-else>{{ emptyText ?? "-" }}</FeedbackMessage>
 </template>

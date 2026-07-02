@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
+import { RouterView, useRoute, useRouter } from "vue-router";
+import AppShell from "./layouts/AppShell.vue";
+import AuthShell from "./layouts/AuthShell.vue";
 import { useSessionStore } from "./stores/session";
 
 const session = useSessionStore();
@@ -40,6 +42,8 @@ const businessRoles: RoleId[] = [...procurementBusinessRoles, ...hotelBuyerRoles
 
 const navItems: NavItem[] = [
   { label: "首页", to: "/", roles: [...businessRoles] },
+  { label: "待办中心", to: "/my-tasks", roles: [...businessRoles] },
+  { label: "审批规则", to: "/approval-rules", roles: [...groupManagerRoles, ...auditRoles, "admin"] },
   { label: "需求审批", to: "/procurement-requests", roles: [...groupManagerRoles] },
   { label: "项目监督", to: "/project-workbench", roles: [...groupManagerRoles] },
   { label: "报价监督", to: "/bid-control", roles: [...groupManagerRoles] },
@@ -48,7 +52,6 @@ const navItems: NavItem[] = [
   { label: "定标审批", to: "/award-result", roles: [...groupManagerRoles] },
   { label: "供应商治理", to: "/suppliers", roles: [...groupManagerRoles] },
   { label: "项目档案", to: "/archive-audit", roles: [...groupManagerRoles] },
-  { label: "待办中心", to: "/my-tasks", roles: [...procurementExecutorRoles] },
   { label: "需求转项目", to: "/procurement-requests", roles: [...procurementExecutorRoles] },
   { label: "项目执行", to: "/project-workbench", roles: [...procurementExecutorRoles] },
   { label: "中标结果", to: "/award-result", roles: [...procurementExecutorRoles] },
@@ -59,8 +62,7 @@ const navItems: NavItem[] = [
   { label: "商品定价", to: "/supply-mall", roles: [...groupManagerRoles, ...platformOperatorRoles] },
   { label: "商品目录", to: "/supply-mall", roles: [...hotelBuyerRoles] },
   { label: "商品维护", to: "/supply-mall", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
-  { label: "供应商档案", to: "/suppliers", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
-  { label: "账号安全", to: "/account-security", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
+  { label: "供应商档案", to: "/supplier-portal", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
   { label: "报名资料", to: "/supplier-registration", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
   { label: "报价响应", to: "/bidding", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
   { label: "中标结果", to: "/award-result", roles: ["supplier", "supplier_admin", "supplier_quotation"] },
@@ -75,7 +77,13 @@ const navItems: NavItem[] = [
   { label: "供应商监督", to: "/suppliers", roles: [...auditRoles] },
   { label: "项目档案", to: "/archive-audit", roles: [...auditRoles] },
   { label: "日志与监督", to: "/audit", roles: [...auditRoles] },
+  { label: "模块总览", to: "/modules", roles: ["admin"] },
   { label: "系统配置", to: "/permissions", roles: ["admin"] }
+];
+
+const utilityItems: NavItem[] = [
+  { label: "消息", to: "/messages", roles: [...businessRoles] },
+  { label: "账号安全", to: "/account-security", roles: [...businessRoles] }
 ];
 
 const routeTitles: Record<string, string> = {
@@ -97,6 +105,9 @@ const routeTitles: Record<string, string> = {
   "/file-center": "文件中心",
   "/supply-mall": "商品目录",
   "/suppliers": "供应商档案",
+  "/suppliers/new": "新增供应商",
+  "/supplier-portal": "我的供应商档案",
+  "/procurement-requests/new": "新建采购申请",
   "/account-security": "账号安全",
   "/order-fulfillment": "订单履约",
   "/contract-performance": "订单履约",
@@ -109,6 +120,7 @@ const routeTitles: Record<string, string> = {
   "/archive-audit": "项目档案",
   "/audit": "日志与监督",
   "/approval-rules": "审批规则",
+  "/modules": "模块总览",
   "/permissions": "系统配置",
   "/my-tasks": "待办中心",
   "/messages": "消息中心",
@@ -138,6 +150,13 @@ const visibleItems = computed(() => {
   return navItems.filter((item) => item.roles.includes(roleId));
 });
 
+const visibleUtilityItems = computed(() => {
+  const roleId = session.roleId as RoleId;
+  return utilityItems.filter((item) => item.roles.includes(roleId));
+});
+
+const appShellUserLabel = computed(() => `${session.user?.name || "未登录"} / ${currentRoleLabel.value}`);
+
 const currentPageTitle = computed(() => {
   if (route.path === "/procurement-requests") {
     if (session.roleId === "group_manager") return "需求审批";
@@ -146,10 +165,18 @@ const currentPageTitle = computed(() => {
     return "采购申请";
   }
   if (route.path.startsWith("/procurement-requests/")) {
+    if (route.path === "/procurement-requests/new") return "新建采购申请";
     if (session.roleId === "group_manager") return "需求审批详情";
     if (session.roleId === "buyer" || session.roleId === "platform_operator") return "需求转项目详情";
     return "采购申请详情";
   }
+  if (route.path.includes("/sourcing")) return "招采执行详情";
+  if (route.path.includes("/fulfillment")) return "履约结算与归档";
+  if (route.path.startsWith("/supply-mall/")) return "商品目录详情";
+  if (route.path.startsWith("/project-workbench/")) return "项目执行详情";
+  if (route.path.startsWith("/award-result/")) return ["supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId) ? "中标结果详情" : "定标结果详情";
+  if (route.path === "/suppliers/new") return "新增供应商";
+  if (route.path.startsWith("/suppliers/")) return "供应商档案详情";
   const visible = visibleItems.value.find((item) => item.to === route.path);
   return visible?.label ?? routeTitles[route.path] ?? "采购业务";
 });
@@ -164,16 +191,22 @@ const supplierPasswordChangeRequired = computed(
 function routeAllowed(path: string) {
   if (path === "/role-switch") return session.mockAuthEnabled;
   if (["/my-tasks", "/messages"].includes(path)) return session.roleId !== "admin";
-  if (path === "/approval-rules") return ["group_manager", "buyer", "auditor", "admin"].includes(session.roleId);
+  if (path === "/modules") return session.roleId === "admin";
+  if (path === "/approval-rules") return ["group_manager", "auditor", "admin"].includes(session.roleId);
+  if (path === "/procurement-requests/new") return session.roleId === "hotel_buyer";
   if (path === "/procurement-requests") return ["group_manager", "buyer", "hotel_buyer", "platform_operator", "auditor"].includes(session.roleId);
   if (path.startsWith("/procurement-requests/")) return ["group_manager", "buyer", "hotel_buyer", "platform_operator", "auditor"].includes(session.roleId);
   if (path === "/expert-scoring") return session.roleId === "expert";
   if (path === "/scoring-templates") return ["group_manager", "platform_operator", "auditor"].includes(session.roleId);
   if (path === "/integration-boundary") return ["admin", "auditor"].includes(session.roleId);
-  if (path === "/supply-mall") return ["group_manager", "platform_operator", "hotel_buyer", "supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId);
+  if (path === "/supply-mall" || path.startsWith("/supply-mall/")) return ["group_manager", "platform_operator", "hotel_buyer", "supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId);
+  if (path === "/suppliers/new") return session.roleId === "group_manager";
+  if (path === "/supplier-portal" || path.startsWith("/supplier-portal/")) return ["supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId);
+  if (path.startsWith("/suppliers/")) return ["group_manager", "auditor"].includes(session.roleId);
   if (path === "/account-security") return session.roleId !== "admin";
-  if (path === "/award-result") return ["group_manager", "buyer", "platform_operator", "auditor", "supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId);
-  if (["/project-workbench", "/procurement-documents", "/announcements-invitations", "/bid-control", "/expert-review", "/external-trade", "/file-center"].includes(path)) {
+  if (path === "/award-result" || path.startsWith("/award-result/")) return ["group_manager", "buyer", "platform_operator", "auditor", "supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId);
+  if (path === "/project-workbench" || path.startsWith("/project-workbench/")) return ["group_manager", "buyer", "platform_operator", "auditor"].includes(session.roleId);
+  if (["/procurement-documents", "/announcements-invitations", "/bid-control", "/expert-review", "/external-trade", "/file-center"].includes(path)) {
     return ["group_manager", "buyer", "platform_operator", "auditor"].includes(session.roleId);
   }
   if (path === "/project-initiation") return ["buyer", "platform_operator"].includes(session.roleId);
@@ -194,6 +227,12 @@ function enforceCurrentRoute() {
   }
   if (supplierPasswordChangeRequired.value && route.path !== "/account-security") {
     void router.replace("/account-security");
+    return;
+  }
+  if (["supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId) && route.path.startsWith("/suppliers/")) {
+    const section = typeof route.params.section === "string" ? route.params.section : "";
+    const target = section ? `/supplier-portal/${encodeURIComponent(section)}` : "/supplier-portal";
+    void router.replace(target);
     return;
   }
   if (routeAllowed(route.path)) return;
@@ -238,48 +277,24 @@ watch(
 </script>
 
 <template>
-  <div v-if="isLoginRoute || isHiddenUtilityRoute || isPublicSupplierRegisterRoute" class="login-shell">
+  <AuthShell v-if="isLoginRoute || isHiddenUtilityRoute || isPublicSupplierRegisterRoute">
     <RouterView />
-  </div>
+  </AuthShell>
 
-  <div v-else-if="bootstrapped && session.user && routeAllowed(route.path)" class="shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <span class="brand-mark">采</span>
-        <div>
-          <strong>酒店供应链采购平台</strong>
-          <small>准入、集采、履约、结算</small>
-        </div>
-      </div>
+  <AppShell
+    v-else-if="bootstrapped && session.user && routeAllowed(route.path)"
+    brand-mark="采"
+    brand-title="酒店供应链采购平台"
+    brand-subtitle="准入、集采、履约、结算"
+    context-label="酒店连锁供应链采购平台"
+    :page-title="currentPageTitle"
+    :user-label="appShellUserLabel"
+    :nav-items="visibleItems"
+    :utility-items="visibleUtilityItems"
+    @logout="logout"
+  >
+    <RouterView />
+  </AppShell>
 
-      <nav class="nav-list">
-        <RouterLink v-for="item in visibleItems" :key="item.to" :to="item.to">{{ item.label }}</RouterLink>
-      </nav>
-    </aside>
-
-    <main>
-      <header class="topbar">
-        <div>
-          <p>酒店连锁供应链采购平台</p>
-          <h1>{{ currentPageTitle }}</h1>
-        </div>
-        <div class="topbar-actions">
-          <span class="user-pill">
-            {{ session.user?.name || "未登录" }} / {{ currentRoleLabel }}
-          </span>
-          <button type="button" class="secondary-button" @click="logout">退出</button>
-        </div>
-      </header>
-      <RouterView />
-    </main>
-  </div>
-
-  <div v-else class="login-shell">
-    <section class="login-card">
-      <div class="login-main">
-        <p class="eyebrow">正在进入</p>
-        <h1>酒店供应链采购平台</h1>
-      </div>
-    </section>
-  </div>
+  <AuthShell v-else title="酒店供应链采购平台" subtitle="正在进入" />
 </template>

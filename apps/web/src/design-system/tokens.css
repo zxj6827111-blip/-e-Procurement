@@ -1,0 +1,32 @@
+:root {
+  --ep-color-primary: #1677FF;
+  --ep-color-success: #52C41A;
+  --ep-color-warning: #FAAD14;
+  --ep-color-error: #FF4D4F;
+  --ep-color-bg: #F5F6F8;
+  --ep-color-surface: #FFFFFF;
+  --ep-color-border: #E5E7EB;
+  --ep-color-text: #1F1F1F;
+  --ep-color-text-secondary: #666666;
+  --ep-color-text-muted: #8C8C8C;
+  --ep-color-primary-bg: #E6F4FF;
+  --ep-color-success-bg: #F6FFED;
+  --ep-color-warning-bg: #FFFBE6;
+  --ep-color-error-bg: #FFF2F0;
+  --ep-radius-sm: 6px;
+  --ep-radius-md: 8px;
+  --ep-radius-lg: 10px;
+  --ep-space-xs: 4px;
+  --ep-space-sm: 8px;
+  --ep-space-md: 16px;
+  --ep-space-lg: 24px;
+  --ep-space-xl: 32px;
+  --ep-font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+  --ep-font-page-title: 22px;
+  --ep-font-section-title: 16px;
+  --ep-font-body: 14px;
+  --ep-font-meta: 12px;
+  --ep-border-base: 1px solid var(--ep-color-border);
+  --ep-z-shell: 10;
+  --ep-z-modal: 50;
+}

@@ -1,0 +1,353 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { chromium } from "playwright";
+
+const apiBaseUrl = process.env.UI_ROLE_FLOW_API_BASE_URL ?? process.env.VITE_API_BASE_URL ?? "http://127.0.0.1:3000";
+const webBaseUrl = process.env.UI_ROLE_FLOW_WEB_BASE_URL ?? process.env.UI_SMOKE_BASE_URL ?? "http://127.0.0.1:5173";
+const outDir = join(process.cwd(), "output", "ui-role-flow");
+
+const actors = {
+  groupManager: { label: "集团审批", userId: "u1" },
+  buyer: { label: "采购经办", userId: "u2" },
+  supplierQuotation: { label: "供应商报价", userId: "u12" },
+  expert: { label: "专家评审", userId: "u4" },
+  hotelBuyer: { label: "酒店采购", userId: "u8" },
+  platformOperator: { label: "平台运营", userId: "u10" },
+  auditor: { label: "监督审计", userId: "u5" }
+};
+
+mkdirSync(outDir, { recursive: true });
+
+function jsonHeaders(userId) {
+  return {
+    "content-type": "application/json",
+    "x-mock-user-id": userId
+  };
+}
+
+async function requestAs(actor, method, path, body, expectedStatus = 200) {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method,
+    headers: jsonHeaders(actor.userId),
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (response.status !== expectedStatus) {
+    throw new Error(`${actor.label} ${method} ${path} expected ${expectedStatus}, got ${response.status}: ${JSON.stringify(payload)}`);
+  }
+  return payload;
+}
+
+function postAs(actor, path, body, expectedStatus = 200) {
+  return requestAs(actor, "POST", path, body, expectedStatus);
+}
+
+function getAs(actor, path, expectedStatus = 200) {
+  return requestAs(actor, "GET", path, undefined, expectedStatus);
+}
+
+async function runApiFlow() {
+  const trace = [];
+  const suffix = Date.now();
+  const requestTitle = `酒店客房布草补采-${suffix}`;
+  const projectName = `酒店布草补采项目-${suffix}`;
+
+  const createdRequest = await postAs(
+    actors.hotelBuyer,
+    "/api/procurement-requests",
+    {
+      title: requestTitle,
+      orgId: "org-hotel",
+      requestDepartment: "客房部",
+      requesterName: "酒店采购",
+      category: "客房布草",
+      budgetAmount: 120000,
+      purpose: "补充客房布草运营库存",
+      expectedArrivalAt: "2026-07-10",
+      receivingLocation: "上海滨江华礼酒店仓库",
+      lineItems: [
+        {
+          itemName: "客房布草套装",
+          category: "客房布草",
+          specification: "标准间套装",
+          quantity: 100,
+          unit: "套",
+          estimatedUnitPrice: 1200,
+          budgetAmount: 120000,
+          requiredByDate: "2026-07-10"
+        }
+      ]
+    },
+    201
+  );
+  const requestId = createdRequest.procurementRequest.id;
+  trace.push("酒店采购:发起采购申请");
+
+  await postAs(actors.hotelBuyer, `/api/procurement-requests/${requestId}/submit`);
+  trace.push("酒店采购:提交审批");
+
+  await postAs(actors.groupManager, `/api/procurement-requests/${requestId}/approve`, { approved: true, opinion: "需求真实，预算合理，同意承接采购。" });
+  trace.push("集团审批:需求审批通过");
+
+  await postAs(actors.buyer, `/api/procurement-requests/${requestId}/method-decision`, { ruleId: "pmr-1" });
+  trace.push("采购经办:判定采购方式");
+
+  const createdProject = await postAs(actors.buyer, "/api/projects", { requestId, name: projectName }, 201);
+  const projectId = createdProject.project.id;
+  trace.push("采购经办:生成采购项目");
+
+  const createdDocument = await postAs(
+    actors.buyer,
+    `/api/projects/${projectId}/procurement-documents`,
+    {
+      title: `${projectName}采购文件`,
+      contentSummary: "供应商资质、报价响应、交付周期和验收要求。"
+    },
+    201
+  );
+  const documentId = createdDocument.procurementDocument.id;
+  trace.push("采购经办:编制采购文件");
+
+  await postAs(actors.buyer, `/api/procurement-documents/${documentId}/publish`);
+  trace.push("采购经办:发布锁定采购文件");
+
+  const createdAnnouncement = await postAs(
+    actors.buyer,
+    `/api/projects/${projectId}/announcements`,
+    {
+      documentId,
+      title: `${projectName}公告`,
+      procurementMethod: "internal_open",
+      scope: "invited_suppliers",
+      registrationDeadlineAt: "2099-12-20T17:00:00.000Z",
+      quoteDeadlineAt: "2099-12-31T17:00:00.000Z"
+    },
+    201
+  );
+  const announcementId = createdAnnouncement.announcement.id;
+  trace.push("采购经办:创建公告");
+
+  await postAs(actors.buyer, `/api/announcements/${announcementId}/publish`, { supplierIds: ["sup-1"] });
+  trace.push("采购经办:发布公告并邀请供应商");
+
+  const registered = await postAs(actors.supplierQuotation, `/api/announcements/${announcementId}/registrations`, { materialMetadata: [] }, 201);
+  const registrationId = registered.registration.id;
+  trace.push("供应商报价:报名应标");
+
+  await postAs(actors.buyer, `/api/registrations/${registrationId}/qualify`, { status: "qualified" });
+  trace.push("采购经办:报名资格审核通过");
+
+  const draftBid = await postAs(
+    actors.supplierQuotation,
+    `/api/projects/${projectId}/bids`,
+    {
+      amount: 118000,
+      deliveryDays: 5,
+      responseSummary: "可按公告要求供货并完成验收配合。",
+      lineItems: [{ itemName: "客房布草套装", quantity: 100, unit: "套", unitPrice: 1180, totalPrice: 118000 }]
+    },
+    201
+  );
+  const bidId = draftBid.bid.id;
+  trace.push("供应商报价:提交报价草稿");
+
+  await postAs(actors.supplierQuotation, `/api/bids/${bidId}/submit`);
+  trace.push("供应商报价:正式提交报价");
+
+  await postAs(actors.buyer, `/api/projects/${projectId}/bids/cutoff`, { action: "manual_cutoff" });
+  await postAs(actors.buyer, `/api/projects/${projectId}/bids/lock`);
+  trace.push("采购经办:截标并锁定报价");
+
+  const assignment = await postAs(actors.buyer, `/api/projects/${projectId}/expert-assignments/appoint`, { expertId: "exp-1", reason: "布草品类评审" }, 201);
+  const assignmentId = assignment.assignment.id;
+  trace.push("采购经办:抽取专家");
+
+  for (const type of ["avoidance", "discipline", "confidentiality"]) {
+    await postAs(actors.expert, `/api/expert-assignments/${assignmentId}/confirm`, { type });
+  }
+  trace.push("专家评审:确认回避纪律保密");
+
+  const mySheets = await getAs(actors.expert, "/api/expert-review/my-scoring-sheets");
+  const sheet = mySheets.scoringSheets.find((item) => item.projectId === projectId && item.supplierId === "sup-1");
+  if (!sheet) throw new Error(`专家评分单未生成: ${projectId}`);
+
+  await postAs(actors.expert, `/api/scoring-sheets/${sheet.id}/submit-lock`, {
+    technical: 45,
+    service: 30,
+    price: 20,
+    opinion: "供应商资质、价格和交付能力满足当前采购要求。"
+  });
+  trace.push("专家评审:评分并锁定");
+
+  await postAs(actors.buyer, `/api/projects/${projectId}/comparison-report`, undefined, 201);
+  await postAs(actors.buyer, `/api/projects/${projectId}/review-report`, { note: "评审结果满足定标条件。" }, 201);
+  await postAs(actors.buyer, `/api/projects/${projectId}/review-report/freeze`);
+  trace.push("采购经办:生成并冻结评审报告");
+
+  const award = await postAs(actors.buyer, `/api/projects/${projectId}/award-approvals`, { selectedSupplierId: "sup-1" }, 201);
+  const awardId = award.approval.id;
+  trace.push("采购经办:创建定标审批");
+
+  const submittedAward = await postAs(actors.buyer, `/api/award-approvals/${awardId}/submit`);
+  const workflowInstanceId = submittedAward.workflow.approvalInstance.id;
+  trace.push("采购经办:提交定标审批");
+
+  await postAs(actors.groupManager, `/api/workflow/approval-instances/${workflowInstanceId}/actions`, {
+    action: "approve",
+    opinion: "定标依据充分，同意。"
+  });
+  trace.push("集团审批:定标审批通过");
+
+  await postAs(actors.buyer, `/api/projects/${projectId}/result-notifications`, { scope: "supplier_self", visibilityConfig: "supplier_self_only" }, 201);
+  trace.push("采购经办:发送中标结果");
+
+  return { requestId, requestTitle, projectId, projectName, awardId, trace };
+}
+
+async function applyUser(page, userId) {
+  await page.goto(`${webBaseUrl}/login`, { waitUntil: "commit", timeout: 15000 });
+  await page.evaluate((nextUserId) => {
+    window.sessionStorage.setItem("demoAuthActive", "true");
+    window.sessionStorage.setItem("demoUserId", nextUserId);
+    window.localStorage.setItem("mockAuthEnabled", "true");
+    window.localStorage.setItem("mockUserId", nextUserId);
+  }, userId);
+}
+
+async function bodyText(page) {
+  await page.waitForFunction(() => (document.body?.innerText.trim().length ?? 0) > 80, undefined, { timeout: 10000 }).catch(() => undefined);
+  return page.locator("body").innerText();
+}
+
+async function checkRoleMenu(browser) {
+  const checks = [];
+  const roles = [
+    {
+      userId: "u2",
+      label: "采购经办",
+      path: "/procurement-requests",
+      navIncludes: ["首页", "待办中心", "需求转项目", "项目执行"],
+      navExcludes: ["审批规则", "消息中心", "账号安全"],
+      utilityIncludes: ["消息", "账号安全"],
+      directForbiddenPath: "/approval-rules"
+    },
+    {
+      userId: "u10",
+      label: "平台运营",
+      path: "/procurement-requests",
+      navIncludes: ["首页", "待办中心", "需求转项目"],
+      navExcludes: ["审批规则", "消息中心", "账号安全"],
+      utilityIncludes: ["消息", "账号安全"],
+      directForbiddenPath: "/approval-rules"
+    },
+    {
+      userId: "u1",
+      label: "集团采购管理",
+      path: "/approval-rules",
+      navIncludes: ["首页", "待办中心", "审批规则"],
+      navExcludes: ["消息中心", "账号安全"],
+      utilityIncludes: ["消息", "账号安全"]
+    }
+  ];
+
+  for (const role of roles) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+    const page = await context.newPage();
+    await applyUser(page, role.userId);
+    await page.goto(`${webBaseUrl}${role.path}`, { waitUntil: "commit", timeout: 15000 });
+    await page.waitForSelector(".enterprise-shell", { timeout: 10000 });
+    const navText = await page.locator(".enterprise-nav").innerText();
+    const utilityText = await page.locator(".enterprise-topbar-actions").innerText();
+    const direct = role.directForbiddenPath ? await checkForbiddenRoute(page, role.directForbiddenPath) : null;
+    const result = {
+      label: role.label,
+      userId: role.userId,
+      navText,
+      utilityText,
+      directForbiddenPath: role.directForbiddenPath ?? "",
+      directForbiddenRedirected: direct?.redirected ?? true,
+      passed:
+        role.navIncludes.every((text) => navText.includes(text)) &&
+        role.navExcludes.every((text) => !navText.includes(text)) &&
+        role.utilityIncludes.every((text) => utilityText.includes(text)) &&
+        (direct?.redirected ?? true)
+    };
+    await page.screenshot({ path: join(outDir, `menu-${role.userId}.png`), fullPage: true });
+    await context.close();
+    checks.push(result);
+  }
+  return checks;
+}
+
+async function checkForbiddenRoute(page, path) {
+  await page.goto(`${webBaseUrl}${path}`, { waitUntil: "commit", timeout: 15000 });
+  await page.waitForTimeout(500);
+  const finalPath = new URL(page.url()).pathname;
+  return { path, finalPath, redirected: finalPath !== path };
+}
+
+async function checkFlowPages(browser, flow) {
+  const pages = [
+    { userId: "u8", label: "酒店采购申请列表", path: "/procurement-requests", requiredText: flow.requestTitle },
+    { userId: "u1", label: "集团需求审批详情", path: `/procurement-requests/${encodeURIComponent(flow.requestId)}`, requiredText: flow.requestTitle },
+    { userId: "u2", label: "采购项目执行详情", path: `/project-workbench/${encodeURIComponent(flow.projectId)}`, requiredText: flow.projectName },
+    { userId: "u2", label: "招采执行详情", path: `/project-workbench/${encodeURIComponent(flow.projectId)}/sourcing`, requiredText: "招采" },
+    { userId: "u12", label: "供应商报名页", path: "/supplier-registration", requiredText: "报名" },
+    { userId: "u12", label: "供应商报价页", path: "/bidding", requiredText: "报价" },
+    { userId: "u4", label: "专家评分页", path: "/expert-scoring", requiredText: "评分" },
+    { userId: "u2", label: "采购经办定标详情", path: `/award-result/${encodeURIComponent(flow.projectId)}`, requiredText: "定标" },
+    { userId: "u12", label: "供应商中标结果", path: `/award-result/${encodeURIComponent(flow.projectId)}`, requiredText: "结果" }
+  ];
+  const checks = [];
+  for (const item of pages) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+    const page = await context.newPage();
+    const consoleErrors = [];
+    const httpErrors = [];
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) consoleErrors.push(message.text());
+    });
+    page.on("response", (response) => {
+      if (response.status() >= 400 && !response.url().endsWith("/favicon.ico")) httpErrors.push(`${response.status()} ${response.url()}`);
+    });
+    await applyUser(page, item.userId);
+    await page.goto(`${webBaseUrl}${item.path}`, { waitUntil: "commit", timeout: 15000 });
+    const text = await bodyText(page);
+    const finalPath = new URL(page.url()).pathname;
+    const blocked = text.includes("请先登录") || text.includes("无权") || text.includes("加载失败");
+    const passed = finalPath === item.path && text.includes(item.requiredText) && !blocked && consoleErrors.length === 0 && httpErrors.length === 0;
+    await page.screenshot({ path: join(outDir, `flow-${item.userId}-${item.label.replace(/[^\u4e00-\u9fa5A-Za-z0-9]+/g, "-")}.png`), fullPage: true });
+    await context.close();
+    checks.push({ ...item, finalPath, passed, blocked, consoleErrors, httpErrors });
+  }
+  return checks;
+}
+
+async function main() {
+  const browser = await chromium.launch({ headless: true });
+  const evidence = {
+    generatedAt: new Date().toISOString(),
+    apiBaseUrl,
+    webBaseUrl,
+    menuChecks: [],
+    flow: null,
+    flowPageChecks: [],
+    passed: false
+  };
+  try {
+    evidence.menuChecks = await checkRoleMenu(browser);
+    evidence.flow = await runApiFlow();
+    evidence.flowPageChecks = await checkFlowPages(browser, evidence.flow);
+    evidence.passed = evidence.menuChecks.every((item) => item.passed) && evidence.flowPageChecks.every((item) => item.passed);
+  } finally {
+    await browser.close();
+  }
+  writeFileSync(join(outDir, "ui-role-flow-regression.json"), JSON.stringify(evidence, null, 2));
+  console.log(JSON.stringify({ passed: evidence.passed, flowTrace: evidence.flow?.trace, menuChecks: evidence.menuChecks, flowPageChecks: evidence.flowPageChecks }, null, 2));
+  if (!evidence.passed) process.exitCode = 1;
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

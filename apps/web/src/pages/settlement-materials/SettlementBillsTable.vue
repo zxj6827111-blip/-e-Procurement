@@ -1,0 +1,41 @@
+<script setup lang="ts">
+import { DataTable, EnterpriseButton, EnterpriseSurface, StatusTag } from "../../components/base";
+import { labelStatus } from "../../utils/status-labels";
+import { billColumns } from "./display";
+import type { SettlementBill } from "./types";
+
+defineProps<{
+  bills: SettlementBill[];
+  canSupplierUpload: boolean;
+  canFinanceReview: boolean;
+  supplierName: (supplierId?: string) => string;
+  money: (value: number | undefined) => string;
+}>();
+
+defineEmits<{
+  submit: [bill: SettlementBill];
+  "create-material": [bill: SettlementBill];
+  review: [bill: SettlementBill, approved: boolean];
+}>();
+</script>
+
+<template>
+  <EnterpriseSurface title="结算单" :description="`${bills.length} 张`">
+    <DataTable :columns="billColumns" :rows="bills" empty-text="当前角色暂无可见结算单。">
+      <template #supplier="{ row }">{{ supplierName(row.supplierId) }}</template>
+      <template #orderAmount="{ row }">{{ money(row.orderAmount) }}</template>
+      <template #deductions="{ row }">{{ money(row.returnAmount + row.serviceFee) }}</template>
+      <template #settlementAmount="{ row }">{{ money(row.settlementAmount) }}</template>
+      <template #status="{ row }"><StatusTag>{{ labelStatus(row.status) }}</StatusTag></template>
+      <template #actions="{ row }">
+        <div class="eds-actions">
+          <EnterpriseButton v-if="canSupplierUpload && row.status === 'draft'" type="primary" @click="$emit('submit', row)">提交审核</EnterpriseButton>
+          <EnterpriseButton v-if="canSupplierUpload" @click="$emit('create-material', row)">补充资料</EnterpriseButton>
+          <EnterpriseButton v-if="canFinanceReview && ['submitted', 'payable'].includes(row.status)" type="primary" @click="$emit('review', row, true)">审核通过</EnterpriseButton>
+          <EnterpriseButton v-if="canFinanceReview && row.status === 'submitted'" @click="$emit('review', row, false)">驳回</EnterpriseButton>
+          <StatusTag v-if="!canSupplierUpload && !canFinanceReview">只读</StatusTag>
+        </div>
+      </template>
+    </DataTable>
+  </EnterpriseSurface>
+</template>

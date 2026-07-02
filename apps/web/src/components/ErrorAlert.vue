@@ -1,11 +1,13 @@
 <script setup lang="ts">
+import { FeedbackMessage } from "./base";
+
 defineProps<{
   message: string;
 }>();
 </script>
 
 <template>
-  <div class="error-alert" role="alert">
+  <FeedbackMessage tone="error" role="alert">
     {{ message }}
-  </div>
+  </FeedbackMessage>
 </template>

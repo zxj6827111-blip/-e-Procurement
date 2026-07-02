@@ -9,8 +9,9 @@ import {
   type ProcessBusinessType,
   type ProcessInstanceView
 } from "../api/process";
-import ErrorAlert from "./ErrorAlert.vue";
 import { formatDateTime } from "../utils/status-labels";
+import ErrorAlert from "./ErrorAlert.vue";
+import { DataTable, EnterpriseSurface, FeedbackMessage, StatusTag, SummaryCards, type DataTableColumn } from "./base";
 
 const props = withDefaults(
   defineProps<{
@@ -41,6 +42,23 @@ const currentRoleLabel = computed(() => {
 const currentNodeLabel = computed(() => processNodeLabel(primaryInstance.value?.currentNodeKey ?? currentTask.value?.nodeKey));
 const currentStatusLabel = computed(() => processStatusLabel(primaryInstance.value?.status));
 
+const eventColumns: DataTableColumn[] = [
+  { key: "eventName", label: "事件" },
+  { key: "nodeLabel", label: "节点" },
+  { key: "statusLabel", label: "状态" },
+  { key: "createdAt", label: "时间" }
+];
+
+const eventRows = computed(() =>
+  events.value.map((event) => ({
+    id: event.id,
+    eventName: event.eventName,
+    nodeLabel: processNodeLabel(event.toNodeKey),
+    statusLabel: processStatusLabel(event.toStatus),
+    createdAt: formatDateTime(event.createdAt)
+  }))
+);
+
 async function load() {
   if (!props.businessId) {
     processData.value = null;
@@ -69,52 +87,31 @@ watch(
 </script>
 
 <template>
-  <section class="process-timeline">
-    <div class="section-title">
-      <div>
-        <p class="eyebrow">Process Layer 只读视图</p>
-        <h3>{{ title }}</h3>
-      </div>
-      <span class="tag">只读</span>
-    </div>
-
-    <div v-if="loading" class="notice">正在加载流程轨迹...</div>
-    <ErrorAlert v-else-if="error" :message="error" />
-    <div v-else-if="!primaryInstance" class="empty">当前业务对象暂无可查看的流程轨迹。</div>
-
-    <template v-else>
-      <div class="process-progress-grid">
-        <div>
-          <span>流程状态</span>
-          <strong>{{ currentStatusLabel }}</strong>
-        </div>
-        <div>
-          <span>当前节点</span>
-          <strong>{{ currentNodeLabel }}</strong>
-        </div>
-        <div>
-          <span>当前处理角色</span>
-          <strong>{{ currentRoleLabel }}</strong>
-        </div>
-        <div>
-          <span>开始时间</span>
-          <strong>{{ formatDateTime(primaryInstance.startedAt) }}</strong>
-        </div>
-        <div>
-          <span>完成时间</span>
-          <strong>{{ formatDateTime(primaryInstance.completedAt) }}</strong>
-        </div>
-      </div>
-
-      <ol class="process-event-list">
-        <li v-for="event in events" :key="event.id">
-          <span class="process-event-dot" aria-hidden="true"></span>
-          <div>
-            <strong>{{ event.eventName }}</strong>
-            <small>{{ formatDateTime(event.createdAt) }} / {{ processNodeLabel(event.toNodeKey) }} / {{ processStatusLabel(event.toStatus) }}</small>
-          </div>
-        </li>
-      </ol>
+  <EnterpriseSurface :title="title" eyebrow="流程轨迹">
+    <template #actions>
+      <StatusTag>只读</StatusTag>
     </template>
-  </section>
+
+    <FeedbackMessage v-if="loading">正在加载流程轨迹...</FeedbackMessage>
+    <ErrorAlert v-else-if="error" :message="error" />
+    <FeedbackMessage v-else-if="!primaryInstance" align="center">当前业务对象暂无可查看的流程轨迹。</FeedbackMessage>
+
+    <div v-else class="eds-section">
+      <SummaryCards
+        :items="[
+          { label: '流程状态', value: currentStatusLabel },
+          { label: '当前节点', value: currentNodeLabel },
+          { label: '当前处理角色', value: currentRoleLabel },
+          { label: '开始时间', value: formatDateTime(primaryInstance.startedAt) },
+          { label: '完成时间', value: formatDateTime(primaryInstance.completedAt) }
+        ]"
+      />
+
+      <DataTable :columns="eventColumns" :rows="eventRows" row-key="id" empty-text="暂无流程事件">
+        <template #statusLabel="{ value }">
+          <StatusTag :tone="value === '已完成' ? 'success' : value === '已驳回' ? 'error' : 'default'">{{ value }}</StatusTag>
+        </template>
+      </DataTable>
+    </div>
+  </EnterpriseSurface>
 </template>

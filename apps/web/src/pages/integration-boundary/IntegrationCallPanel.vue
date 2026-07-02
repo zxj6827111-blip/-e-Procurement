@@ -1,0 +1,70 @@
+<script setup lang="ts">
+import { EnterpriseButton, EnterpriseSurface } from "../../components/base";
+import type { IntegrationAdapter, IntegrationCallForm } from "./types";
+
+defineProps<{
+  adapters: IntegrationAdapter[];
+  selectedAdapter?: IntegrationAdapter;
+  disabled: boolean;
+  modelValue: string;
+  form: IntegrationCallForm;
+}>();
+
+const emit = defineEmits<{
+  "update:modelValue": [value: string];
+  call: [mock: boolean];
+  refresh: [];
+}>();
+</script>
+
+<template>
+  <EnterpriseSurface title="Adapter 调用" description="通过统一 Adapter 边界发起真实联调或模拟联调，保持请求幂等和失败注入能力。">
+    <template #actions>
+      <EnterpriseButton type="text" @click="emit('refresh')">刷新</EnterpriseButton>
+    </template>
+    <div class="eds-form-section">
+      <label>
+        Adapter
+        <select :value="modelValue" @change="emit('update:modelValue', ($event.target as HTMLSelectElement).value)">
+          <option v-for="adapter in adapters" :key="adapter.key" :value="adapter.key">{{ adapter.name }} / {{ adapter.mode }}</option>
+        </select>
+      </label>
+      <label>
+        操作
+        <input v-model="form.operation" />
+      </label>
+      <label>
+        业务类型
+        <input v-model="form.businessType" />
+      </label>
+      <label>
+        业务ID
+        <input v-model="form.businessId" />
+      </label>
+      <label>
+        请求ID
+        <input v-model="form.requestId" />
+      </label>
+      <label>
+        幂等键
+        <input v-model="form.idempotencyKey" />
+      </label>
+      <label>
+        强制失败
+        <select :value="String(form.forceFailure)" @change="form.forceFailure = ($event.target as HTMLSelectElement).value === 'true'">
+          <option value="false">否</option>
+          <option value="true">是</option>
+        </select>
+      </label>
+      <label>
+        Payload JSON
+        <textarea v-model="form.payloadJson" rows="4"></textarea>
+      </label>
+    </div>
+    <div class="eds-submit-panel">
+      <EnterpriseButton :disabled="disabled" type="primary" @click="emit('call', false)">创建联调调用</EnterpriseButton>
+      <EnterpriseButton :disabled="disabled" @click="emit('call', true)">创建模拟调用</EnterpriseButton>
+    </div>
+    <p class="eds-meta">当前 adapter：{{ selectedAdapter?.name || "-" }} / {{ selectedAdapter?.mode || "-" }}。外部 HTTP、凭据托管、回调验签和生产重推均停留在 adapter 边界内处理。</p>
+  </EnterpriseSurface>
+</template>

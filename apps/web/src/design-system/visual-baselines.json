@@ -1,0 +1,160 @@
+{
+  "viewport": {
+    "width": 1440,
+    "height": 960
+  },
+  "captures": [
+    {
+      "route": "/",
+      "sampledPath": "/",
+      "kind": "DASHBOARD_PAGE",
+      "userId": "u2",
+      "finalUrl": "http://127.0.0.1:5173/",
+      "screenshotHash": "0f76bcac61abf71f642ba990679d71fb9aea3344561521caf4a81833f40a5e2f",
+      "screenshotBytes": 85219,
+      "metrics": {
+        "bodyLength": 583,
+        "surfaces": 3,
+        "tables": 2,
+        "forms": 0,
+        "tabs": 0,
+        "pageHeaders": 4,
+        "width": 1440,
+        "height": 1227
+      }
+    },
+    {
+      "route": "/suppliers",
+      "sampledPath": "/suppliers",
+      "kind": "LIST_PAGE",
+      "userId": "u1",
+      "finalUrl": "http://127.0.0.1:5173/suppliers",
+      "screenshotHash": "aa5d3f939ba9f5ebb069d083cd2a02ff96afe65acca1b94cd9ee18d19902100f",
+      "screenshotBytes": 81795,
+      "metrics": {
+        "bodyLength": 573,
+        "surfaces": 3,
+        "tables": 1,
+        "forms": 0,
+        "tabs": 0,
+        "pageHeaders": 3,
+        "width": 1440,
+        "height": 960
+      }
+    },
+    {
+      "route": "/suppliers/:supplierId",
+      "sampledPath": "/suppliers/sup-1",
+      "kind": "DETAIL_PAGE",
+      "userId": "u1",
+      "finalUrl": "http://127.0.0.1:5173/suppliers/sup-1",
+      "screenshotHash": "b2aa72ee28a1a6b59f17476dcd498fc8ae70a9457c912a913896039715a2f2ac",
+      "screenshotBytes": 155374,
+      "metrics": {
+        "bodyLength": 1066,
+        "surfaces": 6,
+        "tables": 2,
+        "forms": 0,
+        "tabs": 1,
+        "pageHeaders": 5,
+        "width": 1440,
+        "height": 1987
+      }
+    },
+    {
+      "route": "/procurement-requests",
+      "sampledPath": "/procurement-requests",
+      "kind": "LIST_PAGE",
+      "userId": "u2",
+      "finalUrl": "http://127.0.0.1:5173/procurement-requests",
+      "screenshotHash": "1cfd9555ff53d79a0bbfabc91a4da4edae459b656abb3ef80711034a0c51a51e",
+      "screenshotBytes": 98240,
+      "metrics": {
+        "bodyLength": 682,
+        "surfaces": 3,
+        "tables": 1,
+        "forms": 0,
+        "tabs": 0,
+        "pageHeaders": 3,
+        "width": 1440,
+        "height": 1081
+      }
+    },
+    {
+      "route": "/procurement-requests/:requestId",
+      "sampledPath": "/procurement-requests/req-award",
+      "kind": "DETAIL_PAGE",
+      "userId": "u2",
+      "finalUrl": "http://127.0.0.1:5173/procurement-requests/req-award",
+      "screenshotHash": "c08256c22dc6e1cf578019d8f4b5297545d23f9d795d0b6615d9222c84638d96",
+      "screenshotBytes": 126079,
+      "metrics": {
+        "bodyLength": 736,
+        "surfaces": 8,
+        "tables": 1,
+        "forms": 0,
+        "tabs": 1,
+        "pageHeaders": 9,
+        "width": 1440,
+        "height": 1862
+      }
+    },
+    {
+      "route": "/expert-scoring",
+      "sampledPath": "/expert-scoring",
+      "kind": "FORM_PAGE",
+      "userId": "u4",
+      "finalUrl": "http://127.0.0.1:5173/expert-scoring",
+      "screenshotHash": "5bbcf0f7f7ed6756a564f44d5b23b4a6fd3d433cd5036c1be525a3c04147b23d",
+      "screenshotBytes": 209813,
+      "metrics": {
+        "bodyLength": 1155,
+        "surfaces": 7,
+        "tables": 2,
+        "forms": 2,
+        "tabs": 0,
+        "pageHeaders": 8,
+        "width": 1440,
+        "height": 4240
+      }
+    },
+    {
+      "route": "/supply-mall",
+      "sampledPath": "/supply-mall",
+      "kind": "LIST_PAGE",
+      "userId": "u8",
+      "finalUrl": "http://127.0.0.1:5173/supply-mall",
+      "screenshotHash": "9d28210fd83b38ed2bc409d7189b7254ff908f5ab6f3b55af2aca966c8f6d5dd",
+      "screenshotBytes": 106203,
+      "metrics": {
+        "bodyLength": 964,
+        "surfaces": 5,
+        "tables": 1,
+        "forms": 0,
+        "tabs": 1,
+        "pageHeaders": 3,
+        "width": 1440,
+        "height": 1207
+      }
+    },
+    {
+      "route": "/audit",
+      "sampledPath": "/audit",
+      "kind": "LIST_PAGE",
+      "userId": "u5",
+      "finalUrl": "http://127.0.0.1:5173/audit",
+      "screenshotHash": "3d9c757a51207f16a4cf8cbf66b96c34dc77b5290263c2de88586cb662c49395",
+      "screenshotBytes": 60596,
+      "metrics": {
+        "bodyLength": 447,
+        "surfaces": 2,
+        "tables": 1,
+        "forms": 0,
+        "tabs": 0,
+        "pageHeaders": 2,
+        "width": 1440,
+        "height": 960
+      }
+    }
+  ]
+}

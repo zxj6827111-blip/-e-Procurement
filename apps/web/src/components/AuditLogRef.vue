@@ -5,5 +5,5 @@ defineProps<{
 </script>
 
 <template>
-  <span v-if="auditLogId" class="audit-ref">审计日志号：{{ auditLogId }}</span>
+  <span v-if="auditLogId" class="eds-audit-ref">审计日志号：{{ auditLogId }}</span>
 </template>
