@@ -23,7 +23,7 @@ export function useIntegrationBoundaryPage() {
   const selectedAdapter = computed(() => adapters.value.find((item) => item.key === selectedAdapterKey.value));
   const summaryItems = computed(() => [
     { label: "Adapter", value: adapters.value.length, meta: "外部系统边界" },
-    { label: "任务", value: jobs.value.length, meta: "联调队列" },
+    { label: "任务", value: jobs.value.length, meta: "集成队列" },
     { label: "待处理", value: jobs.value.filter((job) => ["queued", "pending", "retrying"].includes(job.status)).length, meta: "队列中" },
     { label: "失败", value: jobs.value.filter((job) => job.status === "failed").length, meta: "需复核" }
   ]);
@@ -40,7 +40,7 @@ export function useIntegrationBoundaryPage() {
       jobs.value = jobData.jobs;
       selectedAdapterKey.value ||= adapters.value[0]?.key ?? "";
     } catch (err) {
-      error.value = err instanceof Error ? err.message : "外部联调边界数据加载失败";
+      error.value = err instanceof Error ? err.message : "外部集成边界数据加载失败";
     } finally {
       loading.value = false;
     }
@@ -80,13 +80,13 @@ export function useIntegrationBoundaryPage() {
           forceFailure: callForm.value.forceFailure,
           payload
         }),
-      mock ? "已创建模拟联调调用" : "已创建联调调用"
+      mock ? "已创建本地验证调用" : "已创建集成调用"
     );
   }
 
   function operateJob(job: IntegrationLog, action: IntegrationJobAction) {
     const adapterKey = job.key ?? selectedAdapterKey.value;
-    return run(() => apiPost(`/api/integration-adapters/${adapterKey}/jobs/${jobId(job)}/${action}`, {}), "联调任务状态已更新");
+    return run(() => apiPost(`/api/integration-adapters/${adapterKey}/jobs/${jobId(job)}/${action}`, {}), "集成任务状态已更新");
   }
 
   onMounted(load);

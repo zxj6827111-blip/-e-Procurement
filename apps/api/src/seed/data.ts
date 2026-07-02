@@ -3237,7 +3237,7 @@ export const mallSettlementInvoices: MallSettlementInvoice[] = [
     "uploadedAt": "2026-06-24T16:10:00.000Z",
     "taxRate": 0.13,
     "taxAmount": 1187.26,
-    "verificationAdapterBoundary": "本地演示发票校验：仅展示发票上传和待审核状态，未连接真实税务系统。"
+    "verificationAdapterBoundary": "本地验证发票校验：仅展示发票上传和待审核状态，未连接真实税务系统。"
   }
 ];
 
@@ -3341,7 +3341,7 @@ export const mallFundAccounts: MallFundAccount[] = [
         "status": "simulated",
         "createdBy": "system",
         "createdAt": "2026-06-20T00:00:00.000Z",
-        "note": "本地演示资金账户期初余额。"
+        "note": "本地验证资金账户期初余额。"
       },
       {
         "id": "mfl-org-hotel-reserve-1",
@@ -3378,7 +3378,7 @@ export const mallFundAccounts: MallFundAccount[] = [
         "status": "simulated",
         "createdBy": "system",
         "createdAt": "2026-06-20T00:00:00.000Z",
-        "note": "本地演示区域公司资金账户期初余额。"
+        "note": "本地验证区域公司资金账户期初余额。"
       }
     ],
     "adapterBoundary": "本地模拟资金账户台账：完成余额、充值、授信、支付占用、退款/冲正留痕；未连接真实支付、银行、授信或财务系统。",

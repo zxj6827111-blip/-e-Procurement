@@ -84,7 +84,7 @@ export function useSupplierManagementPage() {
   const isSupplierPortal = computed(() => supplierPortalRoles.has(session.roleId) && !canMaintainSupplier.value);
   const canEditOwnSupplier = computed(() => supplierSelfMaintainerRoles.has(session.roleId) || canMaintainSupplier.value);
   const showEmbeddedSupplierList = computed(() => isSupplierPortal.value);
-  const pageTitle = computed(() => (isSupplierPortal.value ? "我的供应商档案" : canMaintainSupplier.value ? "供应商治理中心" : "供应商档案中心"));
+  const pageTitle = computed(() => (isSupplierPortal.value ? "我的供应商档案" : canMaintainSupplier.value ? "供应商管理中心" : "供应商档案中心"));
 
   const statusOptions = computed(() => [
     "全部",
@@ -406,7 +406,7 @@ export function useSupplierManagementPage() {
     await run(() =>
       apiPost(`/api/suppliers/${supplierId}/status`, {
         admissionStatus: "admitted",
-        reason: "集团供应商治理重新启用"
+        reason: "集团供应商管理重新启用"
       })
     );
     if (error.value) return;

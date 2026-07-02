@@ -21,7 +21,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="账号入口" description="隐藏入口仅用于本地和演示环境的角色切换；正式业务导航不展示。">
+  <EnterpriseSurface title="账号入口" description="隐藏入口仅用于本地验证环境的角色切换；正式业务导航不展示。">
     <p v-if="enabled" class="eds-meta">该页面仅保留为隐藏入口。</p>
     <p v-else class="eds-meta">当前环境已禁用账号入口。</p>
     <div v-if="enabled" class="eds-form-section">

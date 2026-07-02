@@ -17,15 +17,15 @@ const roles = [
     label: "集团采购管理",
     userId: "u1",
     expectedRole: "集团采购管理人",
-    routes: ["/", "/procurement-requests", "/my-tasks", "/integration-boundary"],
-    forbiddenRoutes: ["/permissions"]
+    routes: ["/", "/procurement-requests", "/my-tasks", "/archive-audit"],
+    forbiddenRoutes: ["/permissions", "/integration-boundary"]
   },
   {
     label: "采购经办",
     userId: "u2",
     expectedRole: "采购经办人",
-    routes: ["/", "/procurement-requests", "/suppliers", "/my-tasks"],
-    forbiddenRoutes: ["/permissions"]
+    routes: ["/", "/procurement-requests", "/project-workbench", "/my-tasks"],
+    forbiddenRoutes: ["/permissions", "/suppliers"]
   },
   {
     label: "酒店采购",
@@ -38,7 +38,7 @@ const roles = [
     label: "供应商管理员",
     userId: "u11",
     expectedRole: "供应商管理员",
-    routes: ["/", "/suppliers", "/supplier-registration", "/order-fulfillment", "/my-tasks"],
+    routes: ["/", "/supplier-portal", "/supplier-registration", "/order-fulfillment", "/my-tasks"],
     forbiddenRoutes: ["/procurement-requests", "/permissions"]
   },
   {

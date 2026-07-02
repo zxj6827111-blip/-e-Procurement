@@ -89,7 +89,7 @@ async function createSupplier() {
 
 <template>
   <section class="eds-section">
-    <PageHeader title="新增供应商" eyebrow="供应商建档" description="集团供应商治理人员录入供应商基础档案，系统同步开通供应商登录账号。">
+    <PageHeader title="新增供应商" eyebrow="供应商建档" description="集团供应商管理人员录入供应商基础档案，系统同步开通供应商登录账号。">
       <template #actions>
         <RouterLink class="eds-button" to="/suppliers">返回列表</RouterLink>
       </template>

@@ -18,7 +18,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="Adapter 调用" description="通过统一 Adapter 边界发起真实联调或模拟联调，保持请求幂等和失败注入能力。">
+  <EnterpriseSurface title="Adapter 调用" description="通过统一 Adapter 边界发起外部系统调用或本地验证调用，保持请求幂等和失败注入能力。">
     <template #actions>
       <EnterpriseButton type="text" @click="emit('refresh')">刷新</EnterpriseButton>
     </template>
@@ -62,8 +62,8 @@ const emit = defineEmits<{
       </label>
     </div>
     <div class="eds-submit-panel">
-      <EnterpriseButton :disabled="disabled" type="primary" @click="emit('call', false)">创建联调调用</EnterpriseButton>
-      <EnterpriseButton :disabled="disabled" @click="emit('call', true)">创建模拟调用</EnterpriseButton>
+      <EnterpriseButton :disabled="disabled" type="primary" @click="emit('call', false)">创建集成调用</EnterpriseButton>
+      <EnterpriseButton :disabled="disabled" @click="emit('call', true)">创建本地验证调用</EnterpriseButton>
     </div>
     <p class="eds-meta">当前 adapter：{{ selectedAdapter?.name || "-" }} / {{ selectedAdapter?.mode || "-" }}。外部 HTTP、凭据托管、回调验签和生产重推均停留在 adapter 边界内处理。</p>
   </EnterpriseSurface>

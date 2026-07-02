@@ -22,8 +22,8 @@ const columns = [
 </script>
 
 <template>
-  <EnterpriseSurface title="演示账号" description="用于本地演示和业务流验证；正式环境应使用账号密码或统一身份入口。">
-    <DataTable :columns="columns" :rows="rows" row-key="id" empty-text="暂无演示账号">
+  <EnterpriseSurface title="试用账号" description="用于本地验证和业务流检查；正式环境应使用账号密码或统一身份入口。">
+    <DataTable :columns="columns" :rows="rows" row-key="id" empty-text="暂无试用账号">
       <template #role="{ row }">
         <span>{{ row.role }}</span>
         <StatusTag v-if="row.id === selectedUserId" tone="primary">当前选择</StatusTag>

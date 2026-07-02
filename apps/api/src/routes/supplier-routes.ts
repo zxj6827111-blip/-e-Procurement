@@ -610,13 +610,13 @@ export function supplierRoutes(ctx: AppContext) {
       return res.status(400).json({ error: { code: "SUPPLIER_AGREEMENT_REQUIRED", message: "Supplier entry agreement must be accepted before registration." } });
     }
     if (captchaCode !== "123456") {
-      return res.status(400).json({ error: { code: "SUPPLIER_CAPTCHA_INVALID", message: "Local mock captcha code is invalid." } });
+      return res.status(400).json({ error: { code: "SUPPLIER_CAPTCHA_INVALID", message: "验证码不正确。" } });
     }
     if (!/^[0-9A-Z]{15,18}$/.test(socialCreditCode) || legalRepresentative.length < 2 || name.length < 2) {
       return res.status(400).json({
         error: {
           code: "SUPPLIER_REAL_NAME_MOCK_FAILED",
-          message: "本地模拟实名校验未通过：公司全称和法定代表人至少 2 个字，统一社会信用代码需为 15-18 位大写字母或数字。"
+          message: "企业实名校验未通过：公司全称和法定代表人至少 2 个字，统一社会信用代码需为 15-18 位大写字母或数字。"
         }
       });
     }
@@ -728,10 +728,10 @@ export function supplierRoutes(ctx: AppContext) {
       return res.status(400).json({ error: { code: "SUPPLIER_AGREEMENT_REQUIRED", message: "Supplier entry agreement must be accepted before registration." } });
     }
     if (captchaCode !== "123456") {
-      return res.status(400).json({ error: { code: "SUPPLIER_CAPTCHA_INVALID", message: "Local mock captcha code is invalid." } });
+      return res.status(400).json({ error: { code: "SUPPLIER_CAPTCHA_INVALID", message: "验证码不正确。" } });
     }
     if (!/^[0-9A-Z]{15,18}$/.test(socialCreditCode) || legalRepresentative.length < 2 || name.length < 2) {
-      return res.status(400).json({ error: { code: "SUPPLIER_REAL_NAME_MOCK_FAILED", message: "Local mock real-name check failed." } });
+      return res.status(400).json({ error: { code: "SUPPLIER_REAL_NAME_MOCK_FAILED", message: "企业实名校验未通过。" } });
     }
     if (ctx.state.suppliers.some((item) => item.socialCreditCode === socialCreditCode)) {
       return res.status(409).json({ error: { code: "SUPPLIER_REGISTER_DUPLICATE", message: "Supplier social credit code already exists." } });

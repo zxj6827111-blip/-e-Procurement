@@ -27,7 +27,7 @@ export function integrationRoutes(ctx: AppContext) {
     const contracts = Object.values(ctx.adapters).map((adapter) => adapter.contract());
     return res.json({
       contracts,
-      boundary: "M6-B exposes adapter contracts and configured endpoint status only. verifiedIntegration=false means no real customer-system联调证据 has been attached."
+      boundary: "M6-B exposes adapter contracts and configured endpoint status only. verifiedIntegration=false means no real customer-system集成验证证据 has been attached."
     });
   });
 

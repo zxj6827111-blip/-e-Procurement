@@ -38,7 +38,7 @@ describe("supplier self-service onboarding registration", () => {
     expect(registered.status).toBe(400);
     expect(registered.body.error).toMatchObject({
       code: "SUPPLIER_REAL_NAME_MOCK_FAILED",
-      message: expect.stringContaining("本地模拟实名校验未通过")
+      message: expect.stringContaining("企业实名校验未通过")
     });
   });
 

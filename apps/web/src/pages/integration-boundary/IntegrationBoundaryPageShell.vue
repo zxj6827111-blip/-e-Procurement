@@ -11,21 +11,21 @@ const state = useIntegrationBoundaryPage();
 
 <template>
   <PageHeader
-    title="OA / 财务 / 支付联调边界"
+    title="OA / 财务 / 支付集成边界"
     eyebrow="INTEGRATION BOUNDARY"
-    description="以 Adapter、任务队列和治理日志组织外部系统联调，不把外部系统细节泄漏到业务页面。"
+    description="以 Adapter、任务队列和管理日志组织外部系统集成，不把外部系统细节泄漏到业务页面。"
   />
   <SummaryCards :items="state.summaryItems.value" />
   <FilterBar>
     <label>
-      联调范围
+      集成范围
       <select value="all" disabled>
         <option value="all">全部 Adapter 与任务</option>
       </select>
     </label>
   </FilterBar>
   <p v-if="state.message.value" class="eds-meta">{{ state.message.value }}</p>
-  <p v-if="state.loading.value" class="eds-meta">正在加载外部联调边界...</p>
+  <p v-if="state.loading.value" class="eds-meta">正在加载外部集成边界...</p>
   <ErrorAlert v-if="state.error.value" :message="state.error.value" />
   <IntegrationCallPanel
     v-model="state.selectedAdapterKey.value"

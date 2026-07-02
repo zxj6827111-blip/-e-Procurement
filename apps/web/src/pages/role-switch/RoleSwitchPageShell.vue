@@ -7,7 +7,7 @@ const state = useRoleSwitchPage();
 </script>
 
 <template>
-  <PageHeader title="账号入口" eyebrow="DEMO ACCESS" description="用于本地演示和角色隔离验证的隐藏入口。" />
+  <PageHeader title="账号入口" eyebrow="LOCAL ACCESS" description="用于本地验证和角色隔离检查的隐藏入口。" />
   <RoleSwitchPanel
     v-model="state.nextUserId.value"
     :audit-log-id="state.auditLogId.value"

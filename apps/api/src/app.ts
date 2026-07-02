@@ -120,7 +120,7 @@ export function createApp(ctx: AppContext = createAppContext()) {
 
   app.use("/api", api);
 
-  app.use((_req, _res, next) => next(new NotFoundError("接口不存在或未在 P0 白名单内。")));
+  app.use((_req, _res, next) => next(new NotFoundError("接口不存在或未开放访问。")));
   app.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (res.headersSent) return next(error);
     if (error instanceof PolicyError) {

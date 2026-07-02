@@ -139,7 +139,7 @@ onMounted(async () => {
 
 <template>
   <section class="eds-section">
-    <PageHeader :title="isSupplierPortal ? '我的供应商档案' : '供应商档案'" eyebrow="供应商治理" description="按准入状态、主营品类、服务区域和资料完整性查看供应商档案。">
+    <PageHeader :title="isSupplierPortal ? '我的供应商档案' : '供应商档案'" eyebrow="供应商管理" description="按准入状态、主营品类、服务区域和资料完整性查看供应商档案。">
       <template #actions>
         <RouterLink v-if="canMaintainSupplier" class="eds-button eds-button-primary" to="/suppliers/new">新增供应商</RouterLink>
       </template>

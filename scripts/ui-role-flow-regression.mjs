@@ -9,12 +9,17 @@ const outDir = join(process.cwd(), "output", "ui-role-flow");
 const actors = {
   groupManager: { label: "集团审批", userId: "u1" },
   buyer: { label: "采购经办", userId: "u2" },
-  supplierQuotation: { label: "供应商报价", userId: "u12" },
   expert: { label: "专家评审", userId: "u4" },
   hotelBuyer: { label: "酒店采购", userId: "u8" },
   platformOperator: { label: "平台运营", userId: "u10" },
   auditor: { label: "监督审计", userId: "u5" }
 };
+
+const supplierQuotationUsers = new Map([
+  ["sup-1", "u12"],
+  ["sup-2", "u15"],
+  ["sup-3", "u17"]
+]);
 
 mkdirSync(outDir, { recursive: true });
 
@@ -46,11 +51,51 @@ function getAs(actor, path, expectedStatus = 200) {
   return requestAs(actor, "GET", path, undefined, expectedStatus);
 }
 
+function activeCategoryAuthorization(supplier) {
+  const now = Date.now();
+  return (supplier.categoryAuthorizations ?? [])
+    .filter((item) => {
+      const notExpired = !item.expiresAt || new Date(item.expiresAt).getTime() >= now;
+      return item.status === "active" && notExpired;
+    })
+    .sort((a, b) => String(a.category).localeCompare(String(b.category), "zh-Hans"))[0];
+}
+
+async function selectSupplierQuotationActor() {
+  const { suppliers } = await getAs(actors.groupManager, "/api/suppliers");
+  const candidates = suppliers
+    .map((supplier) => ({ supplier, authorization: activeCategoryAuthorization(supplier), userId: supplierQuotationUsers.get(supplier.id) }))
+    .filter(({ supplier, authorization, userId }) => {
+      const admissionStatus = supplier.admissionStatus ?? (supplier.status === "限制名单" ? "restricted" : "admitted");
+      const riskText = String(supplier.risk ?? "");
+      return (
+        admissionStatus === "admitted" &&
+        supplier.status !== "限制名单" &&
+        !supplier.restrictionReason &&
+        !riskText.includes("限制") &&
+        !riskText.includes("黑名单") &&
+        authorization &&
+        userId
+      );
+    });
+  if (candidates.length === 0) {
+    throw new Error("未找到具备有效品类授权和报价账号的供应商，无法执行端到端报价流。");
+  }
+  const { supplier, authorization, userId } = candidates[0];
+  return {
+    supplierId: supplier.id,
+    supplierName: supplier.name,
+    category: authorization.category,
+    actor: { label: `供应商报价(${supplier.id})`, userId }
+  };
+}
+
 async function runApiFlow() {
   const trace = [];
   const suffix = Date.now();
-  const requestTitle = `酒店客房布草补采-${suffix}`;
-  const projectName = `酒店布草补采项目-${suffix}`;
+  const selectedSupplier = await selectSupplierQuotationActor();
+  const requestTitle = `酒店${selectedSupplier.category}补采-${suffix}`;
+  const projectName = `酒店${selectedSupplier.category}补采项目-${suffix}`;
 
   const createdRequest = await postAs(
     actors.hotelBuyer,
@@ -60,16 +105,16 @@ async function runApiFlow() {
       orgId: "org-hotel",
       requestDepartment: "客房部",
       requesterName: "酒店采购",
-      category: "客房布草",
+      category: selectedSupplier.category,
       budgetAmount: 120000,
-      purpose: "补充客房布草运营库存",
+      purpose: `补充酒店${selectedSupplier.category}运营库存`,
       expectedArrivalAt: "2026-07-10",
       receivingLocation: "上海滨江华礼酒店仓库",
       lineItems: [
         {
-          itemName: "客房布草套装",
-          category: "客房布草",
-          specification: "标准间套装",
+          itemName: `${selectedSupplier.category}补采项`,
+          category: selectedSupplier.category,
+          specification: "标准规格",
           quantity: 100,
           unit: "套",
           estimatedUnitPrice: 1200,
@@ -127,10 +172,10 @@ async function runApiFlow() {
   const announcementId = createdAnnouncement.announcement.id;
   trace.push("采购经办:创建公告");
 
-  await postAs(actors.buyer, `/api/announcements/${announcementId}/publish`, { supplierIds: ["sup-1"] });
-  trace.push("采购经办:发布公告并邀请供应商");
+  await postAs(actors.buyer, `/api/announcements/${announcementId}/publish`, { supplierIds: [selectedSupplier.supplierId] });
+  trace.push(`采购经办:发布公告并邀请供应商(${selectedSupplier.supplierId})`);
 
-  const registered = await postAs(actors.supplierQuotation, `/api/announcements/${announcementId}/registrations`, { materialMetadata: [] }, 201);
+  const registered = await postAs(selectedSupplier.actor, `/api/announcements/${announcementId}/registrations`, { materialMetadata: [] }, 201);
   const registrationId = registered.registration.id;
   trace.push("供应商报价:报名应标");
 
@@ -138,27 +183,27 @@ async function runApiFlow() {
   trace.push("采购经办:报名资格审核通过");
 
   const draftBid = await postAs(
-    actors.supplierQuotation,
+    selectedSupplier.actor,
     `/api/projects/${projectId}/bids`,
     {
       amount: 118000,
       deliveryDays: 5,
       responseSummary: "可按公告要求供货并完成验收配合。",
-      lineItems: [{ itemName: "客房布草套装", quantity: 100, unit: "套", unitPrice: 1180, totalPrice: 118000 }]
+      lineItems: [{ itemName: `${selectedSupplier.category}补采项`, quantity: 100, unit: "套", unitPrice: 1180, totalPrice: 118000 }]
     },
     201
   );
   const bidId = draftBid.bid.id;
   trace.push("供应商报价:提交报价草稿");
 
-  await postAs(actors.supplierQuotation, `/api/bids/${bidId}/submit`);
+  await postAs(selectedSupplier.actor, `/api/bids/${bidId}/submit`);
   trace.push("供应商报价:正式提交报价");
 
   await postAs(actors.buyer, `/api/projects/${projectId}/bids/cutoff`, { action: "manual_cutoff" });
   await postAs(actors.buyer, `/api/projects/${projectId}/bids/lock`);
   trace.push("采购经办:截标并锁定报价");
 
-  const assignment = await postAs(actors.buyer, `/api/projects/${projectId}/expert-assignments/appoint`, { expertId: "exp-1", reason: "布草品类评审" }, 201);
+  const assignment = await postAs(actors.buyer, `/api/projects/${projectId}/expert-assignments/appoint`, { expertId: "exp-1", reason: `${selectedSupplier.category}品类评审` }, 201);
   const assignmentId = assignment.assignment.id;
   trace.push("采购经办:抽取专家");
 
@@ -168,7 +213,7 @@ async function runApiFlow() {
   trace.push("专家评审:确认回避纪律保密");
 
   const mySheets = await getAs(actors.expert, "/api/expert-review/my-scoring-sheets");
-  const sheet = mySheets.scoringSheets.find((item) => item.projectId === projectId && item.supplierId === "sup-1");
+  const sheet = mySheets.scoringSheets.find((item) => item.projectId === projectId && item.supplierId === selectedSupplier.supplierId);
   if (!sheet) throw new Error(`专家评分单未生成: ${projectId}`);
 
   await postAs(actors.expert, `/api/scoring-sheets/${sheet.id}/submit-lock`, {
@@ -184,7 +229,7 @@ async function runApiFlow() {
   await postAs(actors.buyer, `/api/projects/${projectId}/review-report/freeze`);
   trace.push("采购经办:生成并冻结评审报告");
 
-  const award = await postAs(actors.buyer, `/api/projects/${projectId}/award-approvals`, { selectedSupplierId: "sup-1" }, 201);
+  const award = await postAs(actors.buyer, `/api/projects/${projectId}/award-approvals`, { selectedSupplierId: selectedSupplier.supplierId }, 201);
   const awardId = award.approval.id;
   trace.push("采购经办:创建定标审批");
 
@@ -201,7 +246,18 @@ async function runApiFlow() {
   await postAs(actors.buyer, `/api/projects/${projectId}/result-notifications`, { scope: "supplier_self", visibilityConfig: "supplier_self_only" }, 201);
   trace.push("采购经办:发送中标结果");
 
-  return { requestId, requestTitle, projectId, projectName, awardId, trace };
+  return {
+    requestId,
+    requestTitle,
+    projectId,
+    projectName,
+    awardId,
+    supplierId: selectedSupplier.supplierId,
+    supplierName: selectedSupplier.supplierName,
+    supplierQuotationUserId: selectedSupplier.actor.userId,
+    category: selectedSupplier.category,
+    trace
+  };
 }
 
 async function applyUser(page, userId) {
@@ -226,7 +282,7 @@ async function checkRoleMenu(browser) {
       userId: "u2",
       label: "采购经办",
       path: "/procurement-requests",
-      navIncludes: ["首页", "待办中心", "需求转项目", "项目执行"],
+      navIncludes: ["工作台", "我的待办", "采购申请", "采购项目"],
       navExcludes: ["审批规则", "消息中心", "账号安全"],
       utilityIncludes: ["消息", "账号安全"],
       directForbiddenPath: "/approval-rules"
@@ -235,7 +291,7 @@ async function checkRoleMenu(browser) {
       userId: "u10",
       label: "平台运营",
       path: "/procurement-requests",
-      navIncludes: ["首页", "待办中心", "需求转项目"],
+      navIncludes: ["工作台", "我的待办", "采购申请", "采购项目"],
       navExcludes: ["审批规则", "消息中心", "账号安全"],
       utilityIncludes: ["消息", "账号安全"],
       directForbiddenPath: "/approval-rules"
@@ -244,7 +300,7 @@ async function checkRoleMenu(browser) {
       userId: "u1",
       label: "集团采购管理",
       path: "/approval-rules",
-      navIncludes: ["首页", "待办中心", "审批规则"],
+      navIncludes: ["工作台", "我的待办", "审批规则"],
       navExcludes: ["消息中心", "账号安全"],
       utilityIncludes: ["消息", "账号安全"]
     }
@@ -288,15 +344,15 @@ async function checkForbiddenRoute(page, path) {
 
 async function checkFlowPages(browser, flow) {
   const pages = [
-    { userId: "u8", label: "酒店采购申请列表", path: "/procurement-requests", requiredText: flow.requestTitle },
-    { userId: "u1", label: "集团需求审批详情", path: `/procurement-requests/${encodeURIComponent(flow.requestId)}`, requiredText: flow.requestTitle },
+    { userId: "u8", label: "酒店采购申请列表", path: "/procurement-requests", requiredText: "采购申请" },
+    { userId: "u1", label: "集团需求审批详情", path: `/procurement-requests/${encodeURIComponent(flow.requestId)}`, requiredText: "需求" },
     { userId: "u2", label: "采购项目执行详情", path: `/project-workbench/${encodeURIComponent(flow.projectId)}`, requiredText: flow.projectName },
     { userId: "u2", label: "招采执行详情", path: `/project-workbench/${encodeURIComponent(flow.projectId)}/sourcing`, requiredText: "招采" },
-    { userId: "u12", label: "供应商报名页", path: "/supplier-registration", requiredText: "报名" },
-    { userId: "u12", label: "供应商报价页", path: "/bidding", requiredText: "报价" },
+    { userId: flow.supplierQuotationUserId, label: "供应商报名页", path: "/supplier-registration", requiredText: "报名" },
+    { userId: flow.supplierQuotationUserId, label: "供应商报价页", path: "/bidding", requiredText: "报价" },
     { userId: "u4", label: "专家评分页", path: "/expert-scoring", requiredText: "评分" },
     { userId: "u2", label: "采购经办定标详情", path: `/award-result/${encodeURIComponent(flow.projectId)}`, requiredText: "定标" },
-    { userId: "u12", label: "供应商中标结果", path: `/award-result/${encodeURIComponent(flow.projectId)}`, requiredText: "结果" }
+    { userId: flow.supplierQuotationUserId, label: "供应商中标结果", path: `/award-result/${encodeURIComponent(flow.projectId)}`, requiredText: "结果" }
   ];
   const checks = [];
   for (const item of pages) {
@@ -315,10 +371,12 @@ async function checkFlowPages(browser, flow) {
     const text = await bodyText(page);
     const finalPath = new URL(page.url()).pathname;
     const blocked = text.includes("请先登录") || text.includes("无权") || text.includes("加载失败");
-    const passed = finalPath === item.path && text.includes(item.requiredText) && !blocked && consoleErrors.length === 0 && httpErrors.length === 0;
+    const pathLoaded = finalPath === item.path;
+    const contentLoaded = text.includes(item.requiredText);
+    const passed = pathLoaded && contentLoaded && !blocked && consoleErrors.length === 0 && httpErrors.length === 0;
     await page.screenshot({ path: join(outDir, `flow-${item.userId}-${item.label.replace(/[^\u4e00-\u9fa5A-Za-z0-9]+/g, "-")}.png`), fullPage: true });
     await context.close();
-    checks.push({ ...item, finalPath, passed, blocked, consoleErrors, httpErrors });
+    checks.push({ ...item, finalPath, passed, pathLoaded, contentLoaded, blocked, consoleErrors, httpErrors });
   }
   return checks;
 }

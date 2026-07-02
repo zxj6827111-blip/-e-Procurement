@@ -42,7 +42,7 @@ export function usePermissionsPage() {
     { label: "菜单范围", value: menus.value.length, meta: "当前角色可见" },
     { label: "动作权限", value: actions.value.length, meta: "接口授权动作" },
     { label: "审批规则", value: approvalRules.value.length, meta: "规则库" },
-    { label: "BPMN 试点", value: bpmnHealthSummary.value.pilotCount, meta: "灰度治理" },
+    { label: "BPMN 试点", value: bpmnHealthSummary.value.pilotCount, meta: "灰度管理" },
     { label: "兼容率", value: bpmnHealthSummary.value.compatibleRate === null ? "-" : `${Math.round(bpmnHealthSummary.value.compatibleRate * 100)}%`, meta: "试点运行" },
     { label: "需关注", value: bpmnHealthSummary.value.attentionCount, meta: "回退或失败" }
   ]);

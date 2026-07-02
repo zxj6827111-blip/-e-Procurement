@@ -59,7 +59,7 @@ export function authRoutes(ctx: AppContext) {
 
   router.post("/auth/sso/mock-callback", (req, res) => {
     if (ctx.config.appEnv === "production") {
-      return res.status(403).json({ error: { code: "MOCK_SSO_DISABLED", message: "Mock SSO callback is not allowed in production." } });
+      return res.status(403).json({ error: { code: "MOCK_SSO_DISABLED", message: "本地身份回调不允许在生产环境使用。" } });
     }
     try {
       const identity = ctx.ssoAdapter.mapIdentity({
@@ -184,12 +184,12 @@ export function authRoutes(ctx: AppContext) {
 
   router.post("/auth/mock-login", (req, res) => {
     if (!ctx.config.mockAuthEnabled) {
-      return res.status(403).json({ error: { code: "MOCK_LOGIN_DISABLED", message: "Mock login is only allowed in local/test environments." } });
+      return res.status(403).json({ error: { code: "MOCK_LOGIN_DISABLED", message: "本地验证登录仅允许在 local/test 环境使用。" } });
     }
     const userId = String(req.body?.userId ?? "u2");
     const user = ctx.state.users.find((item) => item.id === userId && (item.status ?? "active") === "active");
     if (!user || user.roleId === "system") {
-      return res.status(404).json({ error: { code: "MOCK_USER_NOT_FOUND", message: "Demo account was not found or is inactive." } });
+      return res.status(404).json({ error: { code: "MOCK_USER_NOT_FOUND", message: "试用账号不存在或已停用。" } });
     }
     const auth = buildAuthContext(ctx, userId);
     const session = ctx.authStore.createSession(auth.user.id, ctx.config.sessionTtlMs);
@@ -209,7 +209,7 @@ export function authRoutes(ctx: AppContext) {
 
   router.get("/auth/mock-users", (_req, res) => {
     if (!ctx.config.mockAuthEnabled) {
-      return res.status(403).json({ error: { code: "MOCK_USERS_DISABLED", message: "Mock account directory is only allowed in local/test environments." } });
+      return res.status(403).json({ error: { code: "MOCK_USERS_DISABLED", message: "本地验证账号目录仅允许在 local/test 环境使用。" } });
     }
     const users = ctx.state.users
       .filter((user) => user.roleId !== "system" && (user.status ?? "active") === "active")
@@ -241,13 +241,13 @@ export function authRoutes(ctx: AppContext) {
 
   router.post("/me/mock-role-switch", (req, res) => {
     if (!ctx.config.mockAuthEnabled) {
-      return res.status(403).json({ error: { code: "MOCK_ROLE_SWITCH_DISABLED", message: "Mock role switching is only allowed in local/test environments." } });
+      return res.status(403).json({ error: { code: "MOCK_ROLE_SWITCH_DISABLED", message: "本地角色切换仅允许在 local/test 环境使用。" } });
     }
     const userId = req.body?.userId === undefined ? "" : String(req.body.userId);
     const roleId = req.body?.roleId === undefined ? "" : String(req.body.roleId);
     const user = userId ? ctx.state.users.find((item) => item.id === userId) : ctx.state.users.find((item) => item.roleId === roleId);
     if (!user) {
-      return res.status(404).json({ error: { code: "MOCK_USER_NOT_FOUND", message: "Mock user or role was not found." } });
+      return res.status(404).json({ error: { code: "MOCK_USER_NOT_FOUND", message: "账号或角色不存在。" } });
     }
     const auth = buildAuthContext(ctx, user.id);
     if (req.sessionId) ctx.authStore.deleteSession(req.sessionId);
