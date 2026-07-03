@@ -3,7 +3,16 @@ import { RouterLink } from "vue-router";
 import AuditLogRef from "../../components/AuditLogRef.vue";
 import ErrorAlert from "../../components/ErrorAlert.vue";
 import ProcessTimeline from "../../components/ProcessTimeline.vue";
-import { EnterpriseButton, EnterpriseSurface, EnterpriseTabs, PageHeader, SummaryCards, type SummaryCardItem } from "../../components/base";
+import {
+  EnterpriseButton,
+  EnterpriseSurface,
+  EnterpriseTabs,
+  PageHeader,
+  RiskAlertPanel,
+  SplitDetailLayout,
+  SummaryCards,
+  type SummaryCardItem
+} from "../../components/base";
 
 const detailTabs = [
   { key: "details", label: "详情" },
@@ -46,15 +55,27 @@ defineEmits<{
     <template v-if="requestId">
       <EnterpriseTabs :tabs="detailTabs" active-key="details" />
 
-      <EnterpriseSurface title="申请摘要">
-        <SummaryCards :items="summaryItems" />
-      </EnterpriseSurface>
+      <SplitDetailLayout>
+        <EnterpriseSurface title="申请摘要">
+          <SummaryCards :items="summaryItems" />
+        </EnterpriseSurface>
 
-      <slot />
+        <slot />
 
-      <EnterpriseSurface title="流程进度">
-        <ProcessTimeline business-type="procurement_request" :business-id="requestId" title="采购需求流程进度" :refresh-key="processRefreshKey" />
-      </EnterpriseSurface>
+        <template #aside>
+          <RiskAlertPanel title="处理提示" description="采购申请在审批、方式判定和项目生成之间需要保持责任链清晰。">
+            <ul class="eds-meta-list">
+              <li>审批通过后再进入采购方式判定。</li>
+              <li>生成项目前确认预算、品类和附件材料。</li>
+              <li>所有关键动作会进入审计记录。</li>
+            </ul>
+          </RiskAlertPanel>
+
+          <EnterpriseSurface title="流程进度">
+            <ProcessTimeline business-type="procurement_request" :business-id="requestId" title="采购需求流程进度" :refresh-key="processRefreshKey" />
+          </EnterpriseSurface>
+        </template>
+      </SplitDetailLayout>
     </template>
   </section>
 </template>

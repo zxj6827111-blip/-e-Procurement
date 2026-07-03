@@ -1,6 +1,6 @@
 # Sprint 1 UI Copy Scan
 
-- Generated at: 2026-07-03T03:08:44.921Z
+- Generated at: 2026-07-03T15:12:05.459Z
 - Scope: apps/web/src visible Vue copy and apps/api/src user-facing string literals.
 - Result: PASS
 - Blockers: 0

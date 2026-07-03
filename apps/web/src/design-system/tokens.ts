@@ -1,26 +1,63 @@
 export const enterpriseTokens = {
   "color": {
-    "primary": "#1677FF",
-    "success": "#52C41A",
-    "warning": "#FAAD14",
-    "error": "#FF4D4F",
-    "bg": "#F5F6F8",
+    "primary": "#123B5D",
+    "primaryHover": "#0F4C75",
+    "primaryActive": "#0B2E47",
+    "primarySoft": "#E6EEF5",
+    "primarySubtle": "#F0F5F9",
+    "accent": "#B7791F",
+    "accentHover": "#9A6419",
+    "accentSoft": "#FFF4D6",
+    "success": "#16794C",
+    "successSoft": "#EAF7F0",
+    "warning": "#B7791F",
+    "warningSoft": "#FFF4D6",
+    "error": "#B42318",
+    "errorSoft": "#FDECEC",
+    "info": "#2563EB",
+    "infoSoft": "#EAF0FF",
+    "locked": "#334155",
+    "lockedSoft": "#EEF2F6",
+    "bg": "#F4F6F8",
+    "bgSubtle": "#F8FAFC",
     "surface": "#FFFFFF",
-    "border": "#E5E7EB",
-    "text": "#1F1F1F",
-    "textSecondary": "#666666",
-    "textMuted": "#8C8C8C",
-    "primaryBg": "#E6F4FF",
-    "successBg": "#F6FFED",
-    "warningBg": "#FFFBE6",
-    "errorBg": "#FFF2F0"
+    "surfaceElevated": "#FFFFFF",
+    "panel": "#FAFBFC",
+    "sidebar": "#0B2236",
+    "sidebarElevated": "#123B5D",
+    "sidebarMuted": "#9FB4C8",
+    "border": "#D8DEE8",
+    "borderSubtle": "#E8EDF3",
+    "borderStrong": "#B8C4D3",
+    "text": "#111827",
+    "textSecondary": "#475569",
+    "textMuted": "#64748B",
+    "textInverse": "#FFFFFF",
+    "primaryBg": "var(--ep-color-primary-soft)",
+    "successBg": "var(--ep-color-success-soft)",
+    "warningBg": "var(--ep-color-warning-soft)",
+    "errorBg": "var(--ep-color-error-soft)"
   },
   "radius": {
+    "xs": 4,
     "sm": 6,
     "md": 8,
-    "lg": 10
+    "lg": 12,
+    "xl": 16
   },
   "spacing": {
+    "2": 2,
+    "4": 4,
+    "6": 6,
+    "8": 8,
+    "10": 10,
+    "12": 12,
+    "14": 14,
+    "16": 16,
+    "20": 20,
+    "24": 24,
+    "32": 32,
+    "40": 40,
     "xs": 4,
     "sm": 8,
     "md": 16,
@@ -28,14 +65,46 @@ export const enterpriseTokens = {
     "xl": 32
   },
   "typography": {
-    "fontFamily": "\"Microsoft YaHei\", \"Segoe UI\", Arial, sans-serif",
-    "pageTitle": 22,
+    "fontFamily": "\"Inter\", \"Microsoft YaHei\", \"PingFang SC\", \"Segoe UI\", Arial, sans-serif",
+    "pageTitle": 24,
     "sectionTitle": 16,
     "body": 14,
-    "meta": 12
+    "meta": 12,
+    "lineHeightBody": 1.6,
+    "lineHeightTight": 1.35,
+    "weightRegular": 400,
+    "weightMedium": 500,
+    "weightSemibold": 600,
+    "weightBold": 700
   },
   "border": {
-    "base": "1px solid var(--ep-color-border)"
+    "base": "1px solid var(--ep-color-border)",
+    "subtle": "1px solid var(--ep-color-border-subtle)",
+    "strong": "1px solid var(--ep-color-border-strong)"
+  },
+  "shadow": {
+    "xs": "0 1px 1px rgba(15, 23, 42, 0.04)",
+    "sm": "0 1px 2px rgba(15, 23, 42, 0.06)",
+    "md": "0 8px 24px rgba(15, 23, 42, 0.08)",
+    "lg": "0 18px 48px rgba(15, 23, 42, 0.10)"
+  },
+  "layout": {
+    "contentMax": 1440,
+    "contentWide": 1680,
+    "sidebarWidth": 276,
+    "topbarHeight": 68,
+    "tableMinWidth": 920
+  },
+  "focus": {
+    "ring": "0 0 0 3px rgba(18, 59, 93, 0.22)",
+    "outline": "2px solid var(--ep-color-primary)"
+  },
+  "density": {
+    "controlHeight": 36,
+    "controlHeightSm": 32,
+    "tableRowHeight": 48,
+    "surfacePadding": 20,
+    "pageGap": 20
   },
   "zIndex": {
     "shell": 10,

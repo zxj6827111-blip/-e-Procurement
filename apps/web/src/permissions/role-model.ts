@@ -17,6 +17,10 @@ export interface NavItem {
   to: string;
   roles: RoleId[];
   menuKey: string;
+  group?: "工作" | "采购" | "供应商" | "履约结算" | "审计与配置";
+  icon?: string;
+  description?: string;
+  priority?: number;
 }
 
 export const allRoleIds: RoleId[] = [
@@ -59,35 +63,35 @@ export const auditRoles: RoleId[] = ["auditor"];
 export const businessRoles: RoleId[] = [...procurementBusinessRoles, ...hotelBuyerRoles, ...supplierRoles, ...financeRoles, ...auditRoles, "expert"];
 
 export const navItems: NavItem[] = [
-  { label: "工作台", to: "/", roles: [...businessRoles], menuKey: "dashboard" },
-  { label: "我的待办", to: "/my-tasks", roles: [...businessRoles], menuKey: "myTasks" },
-  { label: "审批规则", to: "/approval-rules", roles: [...groupManagerRoles, ...auditRoles, "admin"], menuKey: "admin" },
-  { label: "需求审批", to: "/procurement-requests", roles: [...groupManagerRoles], menuKey: "needs" },
-  { label: "采购项目", to: "/project-workbench", roles: [...groupManagerRoles, ...procurementExecutorRoles], menuKey: "projects" },
-  { label: "报价进度", to: "/bid-control", roles: [...groupManagerRoles], menuKey: "bidSecrecy" },
-  { label: "评审定标", to: "/expert-review", roles: [...groupManagerRoles, ...procurementExecutorRoles], menuKey: "expertReview" },
-  { label: "评分模板", to: "/scoring-templates", roles: [...groupManagerRoles, "platform_operator"], menuKey: "expertReview" },
-  { label: "定标审批", to: "/award-result", roles: [...groupManagerRoles, ...procurementExecutorRoles], menuKey: "award" },
-  { label: "供应商", to: "/suppliers", roles: [...groupManagerRoles], menuKey: "suppliers" },
-  { label: "采购申请", to: "/procurement-requests", roles: [...procurementExecutorRoles, ...hotelBuyerRoles], menuKey: "needs" },
-  { label: "商品目录", to: "/supply-mall", roles: [...groupManagerRoles, ...procurementExecutorRoles, ...hotelBuyerRoles], menuKey: "projects" },
-  { label: "商品维护", to: "/supply-mall", roles: [...supplierRoles], menuKey: "projects" },
-  { label: "供应商档案", to: "/supplier-portal", roles: [...supplierRoles], menuKey: "suppliers" },
-  { label: "报名资料", to: "/supplier-registration", roles: [...supplierRoles], menuKey: "supplierRegistration" },
-  { label: "报价响应", to: "/bidding", roles: [...supplierRoles], menuKey: "bidding" },
-  { label: "中标结果", to: "/award-result", roles: [...supplierRoles], menuKey: "contracts" },
-  { label: "订单履约", to: "/order-fulfillment", roles: [...procurementExecutorRoles, ...hotelBuyerRoles, ...supplierRoles], menuKey: "contracts" },
-  { label: "结算材料", to: "/settlement-materials", roles: [...supplierRoles], menuKey: "contracts" },
-  { label: "结算付款", to: "/settlement-materials", roles: [...financeRoles], menuKey: "contracts" },
-  { label: "付款进度", to: "/payment-status", roles: [...financeRoles], menuKey: "contracts" },
-  { label: "档案审计", to: "/archive-audit", roles: [...groupManagerRoles, ...procurementExecutorRoles, ...auditRoles], menuKey: "archives" },
-  { label: "采购监督", to: "/procurement-requests", roles: [...auditRoles], menuKey: "needs" },
-  { label: "定标监督", to: "/award-result", roles: [...auditRoles], menuKey: "award" },
-  { label: "供应商监督", to: "/suppliers", roles: [...auditRoles], menuKey: "suppliers" },
-  { label: "操作日志", to: "/audit", roles: [...auditRoles], menuKey: "audit" },
-  { label: "集成配置", to: "/integration-boundary", roles: ["auditor"], menuKey: "externalTrade" },
-  { label: "系统管理", to: "/modules", roles: ["admin"], menuKey: "admin" },
-  { label: "系统设置", to: "/permissions", roles: ["admin"], menuKey: "admin" }
+  { label: "工作台", to: "/", roles: [...businessRoles], menuKey: "dashboard", group: "工作", icon: "台", description: "今日事项", priority: 10 },
+  { label: "我的待办", to: "/my-tasks", roles: [...businessRoles], menuKey: "myTasks", group: "工作", icon: "办", description: "流程任务", priority: 20 },
+  { label: "审批规则", to: "/approval-rules", roles: [...groupManagerRoles, ...auditRoles, "admin"], menuKey: "admin", group: "审计与配置", icon: "规", description: "规则配置", priority: 80 },
+  { label: "需求审批", to: "/procurement-requests", roles: [...groupManagerRoles], menuKey: "needs", group: "采购", icon: "需", description: "需求准入", priority: 20 },
+  { label: "采购项目", to: "/project-workbench", roles: [...groupManagerRoles, ...procurementExecutorRoles], menuKey: "projects", group: "采购", icon: "项", description: "执行进度", priority: 30 },
+  { label: "报价进度", to: "/bid-control", roles: [...groupManagerRoles], menuKey: "bidSecrecy", group: "采购", icon: "价", description: "截止与保密", priority: 42 },
+  { label: "评审定标", to: "/expert-review", roles: [...groupManagerRoles, ...procurementExecutorRoles], menuKey: "expertReview", group: "采购", icon: "评", description: "专家与评审", priority: 50 },
+  { label: "评分模板", to: "/scoring-templates", roles: [...groupManagerRoles, "platform_operator"], menuKey: "expertReview", group: "采购", icon: "模", description: "评分规则", priority: 58 },
+  { label: "定标审批", to: "/award-result", roles: [...groupManagerRoles, ...procurementExecutorRoles], menuKey: "award", group: "采购", icon: "定", description: "结果审批", priority: 60 },
+  { label: "供应商", to: "/suppliers", roles: [...groupManagerRoles], menuKey: "suppliers", group: "供应商", icon: "供", description: "准入档案", priority: 20 },
+  { label: "采购申请", to: "/procurement-requests", roles: [...procurementExecutorRoles, ...hotelBuyerRoles], menuKey: "needs", group: "采购", icon: "申", description: "需求发起", priority: 20 },
+  { label: "商品目录", to: "/supply-mall", roles: [...groupManagerRoles, ...procurementExecutorRoles, ...hotelBuyerRoles], menuKey: "projects", group: "采购", icon: "品", description: "集采商品", priority: 40 },
+  { label: "商品维护", to: "/supply-mall", roles: [...supplierRoles], menuKey: "projects", group: "供应商", icon: "品", description: "商品与价格", priority: 40 },
+  { label: "供应商档案", to: "/supplier-portal", roles: [...supplierRoles], menuKey: "suppliers", group: "供应商", icon: "档", description: "企业资料", priority: 20 },
+  { label: "报名资料", to: "/supplier-registration", roles: [...supplierRoles], menuKey: "supplierRegistration", group: "供应商", icon: "报", description: "项目报名", priority: 30 },
+  { label: "报价响应", to: "/bidding", roles: [...supplierRoles], menuKey: "bidding", group: "供应商", icon: "价", description: "报价提交", priority: 35 },
+  { label: "中标结果", to: "/award-result", roles: [...supplierRoles], menuKey: "contracts", group: "履约结算", icon: "中", description: "结果通知", priority: 38 },
+  { label: "订单履约", to: "/order-fulfillment", roles: [...procurementExecutorRoles, ...hotelBuyerRoles, ...supplierRoles], menuKey: "contracts", group: "履约结算", icon: "履", description: "发货验收", priority: 50 },
+  { label: "结算材料", to: "/settlement-materials", roles: [...supplierRoles], menuKey: "contracts", group: "履约结算", icon: "结", description: "材料提交", priority: 60 },
+  { label: "结算付款", to: "/settlement-materials", roles: [...financeRoles], menuKey: "contracts", group: "履约结算", icon: "结", description: "审核付款", priority: 60 },
+  { label: "付款进度", to: "/payment-status", roles: [...financeRoles], menuKey: "contracts", group: "履约结算", icon: "款", description: "资金状态", priority: 62 },
+  { label: "档案审计", to: "/archive-audit", roles: [...groupManagerRoles, ...procurementExecutorRoles, ...auditRoles], menuKey: "archives", group: "审计与配置", icon: "档", description: "归档追溯", priority: 70 },
+  { label: "采购监督", to: "/procurement-requests", roles: [...auditRoles], menuKey: "needs", group: "审计与配置", icon: "监", description: "需求核查", priority: 20 },
+  { label: "定标监督", to: "/award-result", roles: [...auditRoles], menuKey: "award", group: "审计与配置", icon: "定", description: "结果核查", priority: 30 },
+  { label: "供应商监督", to: "/suppliers", roles: [...auditRoles], menuKey: "suppliers", group: "审计与配置", icon: "供", description: "准入核查", priority: 40 },
+  { label: "操作日志", to: "/audit", roles: [...auditRoles], menuKey: "audit", group: "审计与配置", icon: "志", description: "行为追溯", priority: 80 },
+  { label: "集成配置", to: "/integration-boundary", roles: ["auditor"], menuKey: "externalTrade", group: "审计与配置", icon: "集", description: "接口边界", priority: 90 },
+  { label: "系统管理", to: "/modules", roles: ["admin"], menuKey: "admin", group: "审计与配置", icon: "管", description: "模块入口", priority: 10 },
+  { label: "系统设置", to: "/permissions", roles: ["admin"], menuKey: "admin", group: "审计与配置", icon: "设", description: "权限配置", priority: 20 }
 ];
 
 export const utilityItems: NavItem[] = [

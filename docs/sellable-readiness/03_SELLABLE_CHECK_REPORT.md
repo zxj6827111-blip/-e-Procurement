@@ -1,6 +1,6 @@
 # Sprint 3 Sellable Check Report
 
-- Generated at: 2026-07-03T03:11:02.249Z
+- Generated at: 2026-07-03T15:14:29.436Z
 - Overall status: CONDITIONAL_GO
 - Blocking/failed commands: 0
 - Fail-closed production gates: 1
@@ -13,6 +13,7 @@
 | npm run ui:scan:test | PASS | 0 | - |
 | npm run ui:scan | PASS | 0 | - |
 | npm run ui:copy-scan | PASS | 0 | - |
+| npm run ui:commercial-check | PASS | 0 | - |
 | npm run ui:smoke | PASS | 0 | - |
 | npm run ui:role-flow | PASS | 0 | - |
 | npm run role:menu-snapshot | PASS | 0 | - |
@@ -67,11 +68,7 @@
 ```
 
 > e-procurement-mvp@0.1.0 test
-> npm --workspace @eprocurement/api run test
-
-
-> @eprocurement/api@0.1.0 test
-> vitest run
+> npm --workspace @eprocurement/api exec -- vitest run --maxWorkers=4
 
 
  RUN  v4.1.9 E:/Software Development/‌e-Procurement/apps/api
@@ -79,8 +76,8 @@
 
  Test Files  49 passed (49)
       Tests  306 passed (306)
-   Start at  11:05:55
-   Duration  162.50s (transform 32.53s, setup 0ms, import 88.51s, tests 1963.79s, environment 9ms)
+   Start at  23:06:55
+   Duration  301.32s (transform 7.48s, setup 0ms, import 41.02s, tests 1131.30s, environment 8ms)
 
 
 ```
@@ -88,65 +85,65 @@
 - stderr tail:
 
 ```
- and might change at any time
+nd might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:55568) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:6200) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:31580) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:47444) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:12300) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:58532) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:42212) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:52796) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:10228) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:44432) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:55280) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:53180) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:48576) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:57584) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:48080) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:50120) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:8900) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:37108) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:40284) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:12264) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:24860) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:55140) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:46356) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:56344) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:42788) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:39096) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:8040) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:40088) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:23320) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:50452) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:54284) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:55680) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:4072) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:52256) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:43072) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:51156) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:51644) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:51672) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:27952) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:54028) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:53196) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:59716) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:26488) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:25088) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:51140) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:34124) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:46516) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:44584) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:57152) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:26152) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:49604) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:56240) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:33808) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:49660) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:52028) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:53296) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:55396) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:41068) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 
 ```
@@ -240,13 +237,38 @@ UI compliance scan passed.
 (empty)
 ```
 
+### npm run ui:commercial-check
+
+- Status: PASS
+- stdout tail:
+
+```
+
+> e-procurement-mvp@0.1.0 ui:commercial-check
+> node scripts/ui-commercial-check.mjs
+
+{
+  "status": "PASS",
+  "failures": 0,
+  "todos": 0,
+  "report": "docs/sellable-readiness/05_UI_COMMERCIAL_CHECK_REPORT.md"
+}
+
+```
+
+- stderr tail:
+
+```
+(empty)
+```
+
 ### npm run ui:smoke
 
 - Status: PASS
 - stdout tail:
 
 ```
-ds-form-section": 2,
+form-section": 2,
         ".eds-submit-panel": 3
       },
       "passed": true
@@ -258,7 +280,7 @@ ds-form-section": 2,
       "userId": "u2",
       "finalUrl": "http://127.0.0.1:5174/award-result",
       "redirected": false,
-      "bodyLength": 2268,
+      "bodyLength": 2678,
       "counts": {
         ".eds-page-header": 3,
         ".eds-filter-bar": 1,
@@ -274,7 +296,7 @@ ds-form-section": 2,
       "userId": "u2",
       "finalUrl": "http://127.0.0.1:5174/award-result/p-award",
       "redirected": false,
-      "bodyLength": 3135,
+      "bodyLength": 3411,
       "counts": {
         ".eds-page-header": 14,
         ".eds-summary-grid": 2,
@@ -289,7 +311,7 @@ ds-form-section": 2,
       "userId": "u2",
       "finalUrl": "http://127.0.0.1:5174/external-trade",
       "redirected": false,
-      "bodyLength": 887,
+      "bodyLength": 998,
       "counts": {
         ".eds-page-header": 7,
         ".eds-summary-grid": 1,
@@ -304,7 +326,7 @@ ds-form-section": 2,
       "userId": "u5",
       "finalUrl": "http://127.0.0.1:5174/integration-boundary",
       "redirected": false,
-      "bodyLength": 7125,
+      "bodyLength": 8988,
       "counts": {
         ".eds-page-header": 4,
         ".eds-filter-bar": 1,
@@ -320,7 +342,7 @@ ds-form-section": 2,
       "userId": "u2",
       "finalUrl": "http://127.0.0.1:5174/file-center",
       "redirected": false,
-      "bodyLength": 8411,
+      "bodyLength": 8684,
       "counts": {
         ".eds-page-header": 4,
         ".eds-filter-bar": 1,
@@ -336,7 +358,7 @@ ds-form-section": 2,
       "userId": "u8",
       "finalUrl": "http://127.0.0.1:5174/supply-mall",
       "redirected": false,
-      "bodyLength": 965,
+      "bodyLength": 1036,
       "counts": {
         ".eds-page-header": 3,
         ".eds-filter-bar": 1,
@@ -352,7 +374,7 @@ ds-form-section": 2,
       "userId": "u8",
       "finalUrl": "http://127.0.0.1:5174/supply-mall/orders",
       "redirected": false,
-      "bodyLength": 566,
+      "bodyLength": 639,
       "counts": {
         ".eds-page-header": 5,
         ".eds-summary-grid": 1,
@@ -367,7 +389,7 @@ ds-form-section": 2,
       "userId": "u2",
       "finalUrl": "http://127.0.0.1:5174/order-fulfillment",
       "redirected": false,
-      "bodyLength": 791,
+      "bodyLength": 1473,
       "counts": {
         ".eds-page-header": 6,
         ".eds-filter-bar": 1,
@@ -383,9 +405,9 @@ ds-form-section": 2,
       "userId": "u13",
       "finalUrl": "http://127.0.0.1:5174/settlement-materials",
       "redirected": false,
-      "bodyLength": 1813,
+      "bodyLength": 1966,
       "counts": {
-        ".eds-page-header": 8,
+        ".eds-page-header": 12,
         ".eds-filter-bar": 1,
         ".eds-table": 4,
         ".eds-pagination": 1
@@ -399,7 +421,7 @@ ds-form-section": 2,
       "userId": "u13",
       "finalUrl": "http://127.0.0.1:5174/payment-status",
       "redirected": false,
-      "bodyLength": 928,
+      "bodyLength": 987,
       "counts": {
         ".eds-page-header": 7,
         ".eds-filter-bar": 1,
@@ -415,7 +437,7 @@ ds-form-section": 2,
       "userId": "u2",
       "finalUrl": "http://127.0.0.1:5174/archive-audit",
       "redirected": false,
-      "bodyLength": 1297,
+      "bodyLength": 5741,
       "counts": {
         ".eds-page-header": 10,
         ".eds-filter-bar": 1,
@@ -431,7 +453,7 @@ ds-form-section": 2,
       "userId": "u5",
       "finalUrl": "http://127.0.0.1:5174/audit",
       "redirected": false,
-      "bodyLength": 462,
+      "bodyLength": 557,
       "counts": {
         ".eds-page-header": 2,
         ".eds-filter-bar": 1,
@@ -493,8 +515,8 @@ ds-form-section": 2,
     {
       "label": "采购经办",
       "userId": "u2",
-      "navText": "工作台\n我的待办\n采购项目\n评审定标\n定标审批\n采购申请\n商品目录\n订单履约\n档案审计",
-      "utilityText": "消息\n账号安全\n刘明 / 采购经办人\n退出",
+      "navText": "工作\n\n台\n工作台\n今日事项\n办\n我的待办\n流程任务\n\n采购\n\n申\n采购申请\n需求发起\n项\n采购项目\n执行进度\n品\n商品目录\n集采商品\n评\n评审定标\n专家与评审\n定\n定标审批\n结果审批\n\n履约结算\n\n履\n订单履约\n发货验收\n\n审计与配置\n\n档\n档案审计\n归档追溯",
+      "utilityText": "消息\n账号安全\n采购经办人\n刘明 / 采购经办人\n退出",
       "directForbiddenPath": "/approval-rules",
       "directForbiddenRedirected": true,
       "passed": true
@@ -502,8 +524,8 @@ ds-form-section": 2,
     {
       "label": "平台运营",
       "userId": "u10",
-      "navText": "工作台\n我的待办\n采购项目\n评审定标\n评分模板\n定标审批\n采购申请\n商品目录\n订单履约\n档案审计",
-      "utilityText": "消息\n账号安全\n平台运营 / 运营维护\n退出",
+      "navText": "工作\n\n台\n工作台\n今日事项\n办\n我的待办\n流程任务\n\n采购\n\n申\n采购申请\n需求发起\n项\n采购项目\n执行进度\n品\n商品目录\n集采商品\n评\n评审定标\n专家与评审\n模\n评分模板\n评分规则\n定\n定标审批\n结果审批\n\n履约结算\n\n履\n订单履约\n发货验收\n\n审计与配置\n\n档\n档案审计\n归档追溯",
+      "utilityText": "消息\n账号安全\n运营维护\n平台运营 / 运营维护\n退出",
       "directForbiddenPath": "/approval-rules",
       "directForbiddenRedirected": true,
       "passed": true
@@ -511,8 +533,8 @@ ds-form-section": 2,
     {
       "label": "集团采购管理",
       "userId": "u1",
-      "navText": "工作台\n我的待办\n审批规则\n需求审批\n采购项目\n报价进度\n评审定标\n评分模板\n定标审批\n供应商\n商品目录\n档案审计",
-      "utilityText": "消息\n账号安全\n陈静 / 集团采购管理人\n退出",
+      "navText": "工作\n\n台\n工作台\n今日事项\n办\n我的待办\n流程任务\n\n采购\n\n需\n需求审批\n需求准入\n项\n采购项目\n执行进度\n品\n商品目录\n集采商品\n价\n报价进度\n截止与保密\n评\n评审定标\n专家与评审\n模\n评分模板\n评分规则\n定\n定标审批\n结果审批\n\n供应商\n\n供\n供应商\n准入档案\n\n审计与配置\n\n档\n档案审计\n归档追溯\n规\n审批规则\n规则配置",
+      "utilityText": "消息\n账号安全\n集团采购管理人\n陈静 / 集团采购管理人\n退出",
       "directForbiddenPath": "",
       "directForbiddenRedirected": true,
       "passed": true
@@ -535,9 +557,9 @@ ds-form-section": 2,
     {
       "userId": "u1",
       "label": "集团需求审批详情",
-      "path": "/procurement-requests/req-32",
+      "path": "/procurement-requests/req-35",
       "requiredText": "需求",
-      "finalPath": "/procurement-requests/req-32",
+      "finalPath": "/procurement-requests/req-35",
       "passed": true,
       "pathLoaded": true,
       "contentLoaded": true,
@@ -548,9 +570,9 @@ ds-form-section": 2,
     {
       "userId": "u2",
       "label": "采购项目执行详情",
-      "path": "/project-workbench/p-new-24",
-      "requiredText": "酒店食材供应补采项目-1783048152977",
-      "finalPath": "/project-workbench/p-new-24",
+      "path": "/project-workbench/p-new-27",
+      "requiredText": "酒店食材供应补采项目-1783091557772",
+      "finalPath": "/project-workbench/p-new-27",
       "passed": true,
       "pathLoaded": true,
       "contentLoaded": true,
@@ -561,9 +583,9 @@ ds-form-section": 2,
     {
       "userId": "u2",
       "label": "招采执行详情",
-      "path": "/project-workbench/p-new-24/sourcing",
+      "path": "/project-workbench/p-new-27/sourcing",
       "requiredText": "招采",
-      "finalPath": "/project-workbench/p-new-24/sourcing",
+      "finalPath": "/project-workbench/p-new-27/sourcing",
       "passed": true,
       "pathLoaded": true,
       "contentLoaded": true,
@@ -613,9 +635,9 @@ ds-form-section": 2,
     {
       "userId": "u2",
       "label": "采购经办定标详情",
-      "path": "/award-result/p-new-24",
+      "path": "/award-result/p-new-27",
       "requiredText": "定标",
-      "finalPath": "/award-result/p-new-24",
+      "finalPath": "/award-result/p-new-27",
       "passed": true,
       "pathLoaded": true,
       "contentLoaded": true,
@@ -626,9 +648,9 @@ ds-form-section": 2,
     {
       "userId": "u17",
       "label": "供应商中标结果",
-      "path": "/award-result/p-new-24",
+      "path": "/award-result/p-new-27",
       "requiredText": "结果",
-      "finalPath": "/award-result/p-new-24",
+      "finalPath": "/award-result/p-new-27",
       "passed": true,
       "pathLoaded": true,
       "contentLoaded": true,
@@ -782,7 +804,7 @@ ds-form-section": 2,
 > node scripts/r10-backup-restore-drill.mjs
 
 {
-  "generatedAt": "2026-07-03T03:09:31.417Z",
+  "generatedAt": "2026-07-03T15:12:55.458Z",
   "scope": "M6-B local/UAT backup restore drill",
   "source": {
     "dataRoot": "E:\\Software Development\\‌e-Procurement\\output\\stage5-uat-data",
@@ -790,18 +812,18 @@ ds-form-section": 2,
     "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\stage5-uat-data\\files"
   },
   "backup": {
-    "backupRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-03T03-09-31-408Z",
-    "sqliteFile": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-03T03-09-31-408Z\\runtime.sqlite",
-    "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-03T03-09-31-408Z\\files",
+    "backupRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-03T15-12-55-455Z",
+    "sqliteFile": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-03T15-12-55-455Z\\runtime.sqlite",
+    "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-03T15-12-55-455Z\\files",
     "copiedCompanionFiles": [
       "runtime.sqlite-wal",
       "runtime.sqlite-shm"
     ]
   },
   "restore": {
-    "restoreRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-03T03-09-31-408Z",
-    "sqliteFile": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-03T03-09-31-408Z\\runtime.sqlite",
-    "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-03T03-09-31-408Z\\files"
+    "restoreRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-03T15-12-55-455Z",
+    "sqliteFile": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-03T15-12-55-455Z\\runtime.sqlite",
+    "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-03T15-12-55-455Z\\files"
   },
   "checks": {
     "sourceSqliteExists": true,
@@ -860,7 +882,7 @@ ds-form-section": 2,
 - stderr tail:
 
 ```
-(node:24280) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:18572) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 
 ```
@@ -884,7 +906,7 @@ ds-form-section": 2,
 > vite --host 127.0.0.1 --port 5276
 
 [web] 
-  [32m[1mVITE[22m v6.4.3[39m  [2mready in [0m[1m897[22m[2m[0m ms[22m
+  [32m[1mVITE[22m v6.4.3[39m  [2mready in [0m[1m855[22m[2m[0m ms[22m
 
 [web]   [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5276[22m/[39m
 [api] e-procurement API listening on http://127.0.0.1:3216
@@ -944,7 +966,7 @@ ds-form-section": 2,
 - stderr tail:
 
 ```
-[api] (node:46004) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+[api] (node:52992) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 
 ```
@@ -969,13 +991,13 @@ ds-form-section": 2,
 
 [36mvite v6.4.3 [32mbuilding for production...[36m[39m
 transforming...
-[32m✓[39m 639 modules transformed.
+[32m✓[39m 664 modules transformed.
 rendering chunks...
 computing gzip size...
 [2mdist/[22m[32mindex.html                 [39m[1m[2m  0.48 kB[22m[1m[22m[2m │ gzip:   0.34 kB[22m
-[2mdist/[22m[35massets/index-D33EuJ9t.css  [39m[1m[2m 13.73 kB[22m[1m[22m[2m │ gzip:   2.58 kB[22m
-[2mdist/[22m[36massets/index-Fo0MLyUe.js   [39m[1m[33m812.69 kB[39m[22m[2m │ gzip: 221.78 kB[22m
-[32m✓ built in 4.20s[39m
+[2mdist/[22m[35massets/index-DObb9j0g.css  [39m[1m[2m 24.97 kB[22m[1m[22m[2m │ gzip:   4.27 kB[22m
+[2mdist/[22m[36massets/index-qoSmc8MW.js   [39m[1m[33m821.68 kB[39m[22m[2m │ gzip: 224.65 kB[22m
+[32m✓ built in 4.82s[39m
 
 ```
 

@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
 import ErrorAlert from "../../components/ErrorAlert.vue";
-import { EnterpriseSurface, EnterpriseTabs, FeedbackMessage, PageHeader, StatusTag, SummaryCards, type SummaryCardItem } from "../../components/base";
+import {
+  EnterpriseSurface,
+  EnterpriseTabs,
+  FeedbackMessage,
+  PageHeader,
+  RiskAlertPanel,
+  SplitDetailLayout,
+  StatusTag,
+  SummaryCards,
+  type SummaryCardItem
+} from "../../components/base";
 
 const detailTabs = [
   { key: "details", label: "详情" },
@@ -36,8 +46,20 @@ defineProps<{
   <template v-if="hasWorkbench">
     <EnterpriseTabs :tabs="detailTabs" active-key="details" />
 
-    <EnterpriseSurface title="招采推进情况" eyebrow="项目执行">
-      <SummaryCards :items="summaryItems" />
-    </EnterpriseSurface>
+    <SplitDetailLayout>
+      <EnterpriseSurface title="招采推进情况" eyebrow="项目执行">
+        <SummaryCards :items="summaryItems" />
+      </EnterpriseSurface>
+
+      <template #aside>
+        <RiskAlertPanel title="招采控制点" description="报价、开标和评审节点需要同时满足时限、保密和审批要求。">
+          <ul class="eds-meta-list">
+            <li>报价截止前不得暴露供应商报价明细。</li>
+            <li>评审材料和专家评分需按项目留痕。</li>
+            <li>定标依据应与评审记录和审批记录一致。</li>
+          </ul>
+        </RiskAlertPanel>
+      </template>
+    </SplitDetailLayout>
   </template>
 </template>

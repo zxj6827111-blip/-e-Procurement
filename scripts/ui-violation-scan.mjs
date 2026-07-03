@@ -17,10 +17,23 @@ const tokenFiles = new Set([
 ]);
 
 const allowedPrimitiveFiles = new Set([
+  normalize("apps/web/src/components/base/ActionCard.vue"),
+  normalize("apps/web/src/components/base/AuditRail.vue"),
+  normalize("apps/web/src/components/base/BusinessTimeline.vue"),
   normalize("apps/web/src/components/base/DataTable.vue"),
+  normalize("apps/web/src/components/base/EmptyState.vue"),
+  normalize("apps/web/src/components/base/EnvironmentBadge.vue"),
   normalize("apps/web/src/components/base/EnterpriseButton.vue"),
   normalize("apps/web/src/components/base/EnterpriseDialog.vue"),
-  normalize("apps/web/src/components/base/EnterpriseTabs.vue")
+  normalize("apps/web/src/components/base/EnterpriseTabs.vue"),
+  normalize("apps/web/src/components/base/ErrorState.vue"),
+  normalize("apps/web/src/components/base/KpiCard.vue"),
+  normalize("apps/web/src/components/base/PageSection.vue"),
+  normalize("apps/web/src/components/base/PermissionState.vue"),
+  normalize("apps/web/src/components/base/ProcessStepBar.vue"),
+  normalize("apps/web/src/components/base/RiskAlertPanel.vue"),
+  normalize("apps/web/src/components/base/RoleBadge.vue"),
+  normalize("apps/web/src/components/base/SplitDetailLayout.vue")
 ]);
 
 const forbiddenLegacyClasses = [

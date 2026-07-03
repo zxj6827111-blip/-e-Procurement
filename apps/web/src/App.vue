@@ -33,6 +33,13 @@ const currentPageTitle = computed(() => {
   return pageTitle(route.path, session.roleId);
 });
 
+const environmentLabel = computed(() => {
+  if (session.mode === "production") return "";
+  if (session.mode === "uat") return "UAT 环境";
+  if (session.mockAuthEnabled) return "本地验证环境";
+  return "试用环境";
+});
+
 const isLoginRoute = computed(() => route.path === "/login");
 const isPublicSupplierRegisterRoute = computed(() => route.path === "/supplier-onboarding-register");
 const isHiddenUtilityRoute = computed(() => route.path === "/role-switch");
@@ -107,7 +114,7 @@ watch(
 </script>
 
 <template>
-  <AuthShell v-if="isLoginRoute || isHiddenUtilityRoute || isPublicSupplierRegisterRoute">
+  <AuthShell v-if="isLoginRoute || isHiddenUtilityRoute || isPublicSupplierRegisterRoute" :commercial="isLoginRoute">
     <RouterView />
   </AuthShell>
 
@@ -121,6 +128,8 @@ watch(
     :user-label="appShellUserLabel"
     :nav-items="visibleItems"
     :utility-items="visibleUtilityItems"
+    :environment-label="environmentLabel"
+    :role-label="currentRoleLabel"
     @logout="logout"
   >
     <RouterView />

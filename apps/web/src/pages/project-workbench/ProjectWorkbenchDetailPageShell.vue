@@ -4,6 +4,8 @@ import ErrorAlert from "../../components/ErrorAlert.vue";
 import EnterpriseTabs from "../../components/base/EnterpriseTabs.vue";
 import PageHeader from "../../components/base/PageHeader.vue";
 import FeedbackMessage from "../../components/base/FeedbackMessage.vue";
+import RiskAlertPanel from "../../components/base/RiskAlertPanel.vue";
+import SplitDetailLayout from "../../components/base/SplitDetailLayout.vue";
 import StatusTag from "../../components/base/StatusTag.vue";
 import DemandSummaryPanel from "./DemandSummaryPanel.vue";
 import ProjectExecutionMap from "./ProjectExecutionMap.vue";
@@ -73,31 +75,43 @@ const detailTabs = [
     <template v-else>
       <EnterpriseTabs :tabs="detailTabs" active-key="details" />
 
-      <WorkbenchFocusPanel :project-id="workbench.project.id" :next-action="nextAction" />
+      <SplitDetailLayout>
+        <WorkbenchFocusPanel :project-id="workbench.project.id" :next-action="nextAction" />
 
-      <ProjectExecutionMap
-        :title="isExternalTradeProject ? '外部采购备案链路' : '采购执行步骤'"
-        :project-status-text="projectStatusText"
-        :progress-overview="progressOverview"
-        :completed-operation-count="completedOperationCount"
-        :total-operation-count="totalOperationCount"
-        :project-operation-links="projectOperationLinks"
-        :operation-state-label="operationStateLabel"
-      />
+        <ProjectExecutionMap
+          :title="isExternalTradeProject ? '外部采购备案链路' : '采购执行步骤'"
+          :project-status-text="projectStatusText"
+          :progress-overview="progressOverview"
+          :completed-operation-count="completedOperationCount"
+          :total-operation-count="totalOperationCount"
+          :project-operation-links="projectOperationLinks"
+          :operation-state-label="operationStateLabel"
+        />
 
-      <DemandSummaryPanel
-        :procurement-request="workbench.procurementRequest"
-        :demand-summary="demandSummary"
-        :line-item-summary="lineItemSummary"
-        :currency="currency"
-      />
+        <DemandSummaryPanel
+          :procurement-request="workbench.procurementRequest"
+          :demand-summary="demandSummary"
+          :line-item-summary="lineItemSummary"
+          :currency="currency"
+        />
 
-      <WorkbenchSubpageEntrypoints
-        :workbench="workbench"
-        :show-sourcing-details="showSourcingDetails"
-        :sourcing-metrics="sourcingMetrics"
-        :fulfillment-metrics="fulfillmentMetrics"
-      />
+        <template #aside>
+          <RiskAlertPanel title="下一步关注" description="优先处理当前项目的下一节点、截止时间和责任人。">
+            <ul class="eds-meta-list">
+              <li>优先确认公告、报价截止和评审安排。</li>
+              <li>涉及外部采购备案时保留完整审批依据。</li>
+              <li>项目状态变化必须与流程记录一致。</li>
+            </ul>
+          </RiskAlertPanel>
+
+          <WorkbenchSubpageEntrypoints
+            :workbench="workbench"
+            :show-sourcing-details="showSourcingDetails"
+            :sourcing-metrics="sourcingMetrics"
+            :fulfillment-metrics="fulfillmentMetrics"
+          />
+        </template>
+      </SplitDetailLayout>
 
     </template>
   </section>

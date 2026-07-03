@@ -614,6 +614,7 @@ async function sellableCheck() {
     "npm run ui:scan:test",
     "npm run ui:scan",
     "npm run ui:copy-scan",
+    "npm run ui:commercial-check",
     "npm run ui:smoke",
     "npm run ui:role-flow",
     "npm run role:menu-snapshot",

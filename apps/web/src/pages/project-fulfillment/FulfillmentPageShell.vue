@@ -1,7 +1,16 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
 import ErrorAlert from "../../components/ErrorAlert.vue";
-import { EnterpriseSurface, EnterpriseTabs, PageHeader, StatusTag, SummaryCards, type SummaryCardItem } from "../../components/base";
+import {
+  EnterpriseSurface,
+  EnterpriseTabs,
+  PageHeader,
+  RiskAlertPanel,
+  SplitDetailLayout,
+  StatusTag,
+  SummaryCards,
+  type SummaryCardItem
+} from "../../components/base";
 import type { StatusTone } from "./types";
 
 const detailTabs = [
@@ -39,8 +48,20 @@ defineProps<{
   <template v-if="hasWorkbench">
     <EnterpriseTabs :tabs="detailTabs" active-key="details" />
 
-    <EnterpriseSurface title="履约概览">
-      <SummaryCards :items="summaryItems" />
-    </EnterpriseSurface>
+    <SplitDetailLayout>
+      <EnterpriseSurface title="履约概览">
+        <SummaryCards :items="summaryItems" />
+      </EnterpriseSurface>
+
+      <template #aside>
+        <RiskAlertPanel title="履约与结算关注" description="收货、验收、结算和归档需要形成连续证据链。">
+          <ul class="eds-meta-list">
+            <li>收货数量、验收结果和异常处理需要一致。</li>
+            <li>结算资料应关联订单、发票和验收记录。</li>
+            <li>归档前确认关键附件和审计日志完整。</li>
+          </ul>
+        </RiskAlertPanel>
+      </template>
+    </SplitDetailLayout>
   </template>
 </template>

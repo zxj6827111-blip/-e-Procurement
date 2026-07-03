@@ -49,6 +49,13 @@ export function useLoginPage() {
   const auditLogId = ref("");
   const loading = ref(false);
   const selectedUser = computed(() => demoUsers.find((item) => item.id === selectedUserId.value) ?? demoUsers[0]);
+  const environmentLabel = computed(() => {
+    if (session.mode === "production") return "生产环境";
+    if (session.mode === "uat") return "UAT 环境";
+    if (session.mockAuthEnabled) return "本地验证环境";
+    return "试用环境";
+  });
+  const showLocalAccess = computed(() => session.mode !== "production" && session.mockAuthEnabled);
 
   function selectDemoUser(userId: string) {
     selectedUserId.value = userId;
@@ -97,6 +104,7 @@ export function useLoginPage() {
     auditLogId,
     demoUsers,
     enterDemo,
+    environmentLabel,
     error,
     loading,
     login,
@@ -105,6 +113,7 @@ export function useLoginPage() {
     selectedUser,
     selectedUserId,
     session,
+    showLocalAccess,
     username
   };
 }
