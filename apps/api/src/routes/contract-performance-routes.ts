@@ -390,6 +390,22 @@ export function contractPerformanceRoutes(ctx: AppContext) {
     if (recordType !== "acceptance" && recordType !== "payment") {
       return denyResponse(ctx, req, res, 400, "ACCEPTANCE_PAYMENT_TYPE_INVALID", "Acceptance/payment record type is invalid.", "acceptance_payment.type.denied", "contract_ledger", contract.id, project.id);
     }
+    const hasPerformanceNode = ctx.state.performanceNodes.some((node) => node.contractId === contract.id && node.projectId === project.id);
+    if (contract.status === "cancelled" || !["performing", "completed"].includes(contract.status) || !hasPerformanceNode) {
+      return denyResponse(
+        ctx,
+        req,
+        res,
+        400,
+        "ACCEPTANCE_PERFORMANCE_NOT_READY",
+        "Acceptance/payment records require an active contract performance node.",
+        "acceptance_payment.performance.denied",
+        "contract_ledger",
+        contract.id,
+        project.id,
+        `contractStatus=${contract.status};hasPerformanceNode=${hasPerformanceNode}`
+      );
+    }
     const now = new Date().toISOString();
     const record: AcceptancePaymentRecord = {
       id: `apr-${ctx.state.acceptancePaymentRecords.length + 1}`,

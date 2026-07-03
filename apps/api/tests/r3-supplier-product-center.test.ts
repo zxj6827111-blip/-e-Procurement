@@ -30,6 +30,15 @@ function tinyPngBase64() {
   return "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 }
 
+async function passSupplierQualification(runtime: ReturnType<typeof boot>, supplierId: string) {
+  const review = await request(runtime.app)
+    .post(`/api/suppliers/${supplierId}/reviews`)
+    .set("x-mock-user-id", "u1")
+    .send({ reviewType: "qualification_initial_review", status: "passed", score: 90, opinion: "R3 资质附件完整，初审通过。" });
+  expect(review.status).toBe(201);
+  return review;
+}
+
 async function createR3ListedProduct(runtime: ReturnType<typeof boot>) {
   const image = await request(runtime.app)
     .post("/api/files/upload")
@@ -140,6 +149,7 @@ describe("R3 supplier and product center master source", () => {
       });
     expect(supplier.status).toBe(201);
     const supplierId = supplier.body.supplier.id as string;
+    await passSupplierQualification(runtime1, supplierId);
 
     const review = await request(runtime1.app)
       .post(`/api/suppliers/${supplierId}/reviews`)

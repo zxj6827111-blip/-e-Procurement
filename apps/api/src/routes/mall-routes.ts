@@ -849,7 +849,7 @@ export function mallRoutes(ctx: AppContext) {
         amount: order.totalAmount,
         lineItems: order.lineItems,
         status: "adapter_contract_ready",
-        adapterBoundary: "合同查看已完成本地摘要、下载审计入口和合同系统 adapter 边界；未声明真实合同系统集成完成。"
+        adapterBoundary: "合同查看已完成本地摘要、下载审计入口和合同系统 adapter 边界；真实合同系统验收资料尚未提供。"
       }
     });
   });

@@ -131,7 +131,7 @@ describe("R2 data model governance baseline", () => {
 
     const created = await request(runtime1.app)
       .post("/api/procurement-requests")
-      .set("x-mock-user-id", "u2")
+      .set("x-mock-user-id", "u8")
       .send({
         title: "R2 持久化采购申请",
         orgId: "org-hotel",

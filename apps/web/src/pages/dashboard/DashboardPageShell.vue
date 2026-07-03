@@ -8,6 +8,7 @@ import StatusTag from "../../components/base/StatusTag.vue";
 import type { DataTableColumn, SummaryCardItem } from "../../components/base";
 import DashboardActivitySection from "./DashboardActivitySection.vue";
 import DashboardMetricsSection from "./DashboardMetricsSection.vue";
+import DashboardRoleWorkbenchSection from "./DashboardRoleWorkbenchSection.vue";
 import DashboardTodoSection from "./DashboardTodoSection.vue";
 import {
   auditActivityTarget,
@@ -28,6 +29,7 @@ import {
 } from "./display";
 import type { AuditRow, DashboardTodoItem, OrderRow, ProductRow, ProjectRow, SupplierRow, SummaryCard, WorkbenchPayload } from "./types";
 import { taskKey } from "./types";
+import { getRoleWorkbench } from "./role-workbench";
 import { useSessionStore } from "../../stores/session";
 import { formatDateTime, labelAuditAction, labelObjectType, labelStatus } from "../../utils/status-labels";
 import { loadWorkflowNotifications, loadWorkflowTasks, type R8WorkflowNotificationView, type R8WorkflowTaskView } from "../../api/workflow";
@@ -51,6 +53,8 @@ function supplierName(supplierId: string) {
 const roleTitle = computed(() => {
   return resolveRoleTitle(session.roleId);
 });
+
+const roleWorkbench = computed(() => getRoleWorkbench(session.roleId));
 
 const pendingProcurementRequestCount = computed(() => {
   const seen = new Set<string>();
@@ -322,17 +326,21 @@ watch(
 
     <DashboardMetricsSection :items="summaryItems" />
 
+    <DashboardRoleWorkbenchSection :workbench="roleWorkbench" />
+
     <DashboardTodoSection
       :items="todoItems"
       :columns="todoColumns"
       :entry-link="todoEntryLink"
       :show-entry="session.roleId !== 'admin'"
+      :empty-text="roleWorkbench.emptyTodoText"
     />
 
     <DashboardActivitySection
       :rows="recentActivities"
       :columns="activityColumns"
       :activity-link="activityLink"
+      :empty-text="roleWorkbench.emptyActivityText"
     />
   </section>
 </template>

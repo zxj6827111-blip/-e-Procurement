@@ -143,6 +143,17 @@ async function createLockedDocumentAndAnnouncement(runtime: ReturnType<typeof bo
   return published.body.announcement as { id: string };
 }
 
+async function submitAndQualifyRegistration(runtime: ReturnType<typeof boot>, announcementId: string, supplierUserId = "u3") {
+  const registration = await request(runtime.app).post(`/api/announcements/${announcementId}/registrations`).set("x-mock-user-id", supplierUserId).send({ materialMetadata: [] });
+  expect(registration.status).toBe(201);
+  const qualified = await request(runtime.app)
+    .post(`/api/registrations/${registration.body.registration.id}/qualify`)
+    .set("x-mock-user-id", "u2")
+    .send({ status: "qualified", reason: "R4 test registration materials passed." });
+  expect(qualified.status).toBe(200);
+  return qualified.body.registration as { id: string; status: string };
+}
+
 describe("R4 sourcing procurement master-source migration", () => {
   it("writes procurement requests, sourcing projects, invitations and participations into R2/R4 formal tables", async () => {
     const runtime = boot();
@@ -163,19 +174,23 @@ describe("R4 sourcing procurement master-source migration", () => {
     const auditorMutation = await request(runtime.app).post("/api/procurement-requests").set("x-mock-user-id", "u5").send({ title: "审计不应新增" });
     expectDenied(auditorMutation, "PHASE1_BUSINESS_ACTION_DENIED");
 
-    const announcement = await createLockedDocumentAndAnnouncement(runtime, projectId, ["sup-1", "sup-4"]);
+    const blockedAnnouncement = await createLockedDocumentAndAnnouncement(runtime, projectId, ["sup-1"]);
+    const restrictedInvite = await request(runtime.app)
+      .post(`/api/announcements/${blockedAnnouncement.id}/invitations`)
+      .set("x-mock-user-id", "u2")
+      .send({ supplierIds: ["sup-4"] });
+    expectDenied(restrictedInvite, "SUPPLIER_INVITATION_NOT_ELIGIBLE");
     expect(all<{ supplier_id: string }>(runtime, "select supplier_id from r2_supplier_invitations where project_id = ? order by supplier_id", projectId)).toEqual([
-      { supplier_id: "sup-1" },
-      { supplier_id: "sup-4" }
+      { supplier_id: "sup-1" }
     ]);
 
     runtime.ctx.state.users.push({ id: "u-r4-restricted-supplier", name: "R4 Restricted Supplier", roleId: "supplier", orgId: "org-hotel", supplierId: "sup-4" });
     runtime.ctx.authStore.seedAccounts(runtime.ctx.state.users, true);
-    const restricted = await request(runtime.app).post(`/api/announcements/${announcement.id}/registrations`).set("x-mock-user-id", "u-r4-restricted-supplier").send({ materialMetadata: [] });
+    const restricted = await request(runtime.app).post(`/api/announcements/${blockedAnnouncement.id}/registrations`).set("x-mock-user-id", "u-r4-restricted-supplier").send({ materialMetadata: [] });
     expectDenied(restricted, "SUPPLIER_RESTRICTED");
 
     const registration = await request(runtime.app)
-      .post(`/api/announcements/${announcement.id}/registrations`)
+      .post(`/api/announcements/${blockedAnnouncement.id}/registrations`)
       .set("x-mock-user-id", "u3")
       .send({ materialMetadata: [{ fileName: "r4-registration.pdf", sizeBytes: 256 }] });
     expect(registration.status).toBe(201);
@@ -197,8 +212,7 @@ describe("R4 sourcing procurement master-source migration", () => {
     const runtime = boot();
     const { projectId } = await createRequestProject(runtime);
     const announcement = await createLockedDocumentAndAnnouncement(runtime, projectId, ["sup-1"]);
-    const registration = await request(runtime.app).post(`/api/announcements/${announcement.id}/registrations`).set("x-mock-user-id", "u3").send({ materialMetadata: [] });
-    expect(registration.status).toBe(201);
+    await submitAndQualifyRegistration(runtime, announcement.id);
 
     const question = await request(runtime.app)
       .post(`/api/projects/${projectId}/clarifications`)
@@ -299,8 +313,7 @@ describe("R4 sourcing procurement master-source migration", () => {
     const runtime1 = boot(dataRoot);
     const { requestId, projectId } = await createRequestProject(runtime1);
     const announcement = await createLockedDocumentAndAnnouncement(runtime1, projectId, ["sup-1"]);
-    const registration = await request(runtime1.app).post(`/api/announcements/${announcement.id}/registrations`).set("x-mock-user-id", "u3").send({ materialMetadata: [] });
-    expect(registration.status).toBe(201);
+    const registration = await submitAndQualifyRegistration(runtime1, announcement.id);
     const clarification = await request(runtime1.app)
       .post(`/api/projects/${projectId}/clarifications`)
       .set("x-mock-user-id", "u3")
@@ -328,8 +341,8 @@ describe("R4 sourcing procurement master-source migration", () => {
     expect(single<{ participation_status: string }>(
       runtime2,
       "select participation_status from r2_supplier_participations where id = ?",
-      registration.body.registration.id
-    )?.participation_status).toBe("submitted");
+      registration.id
+    )?.participation_status).toBe("qualified");
     expect(single<{ bid_status: string }>(runtime2, "select bid_status from r2_bids where id = ?", bid.body.bid.id)?.bid_status).toBe("submitted");
     expect(single<{ question: string }>(runtime2, "select question from r2_clarifications where id = ?", clarification.body.clarification.id)?.question).toBe("R4 重启留存提问？");
 

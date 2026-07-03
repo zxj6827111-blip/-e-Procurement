@@ -55,6 +55,12 @@ describe("Stage 2 supplier admission, procurement request and project initiation
     expect(createdSupplier.status).toBe(201);
     const supplierId = createdSupplier.body.supplier.id as string;
 
+    const qualificationReview = await request(runtime1.app)
+      .post(`/api/suppliers/${supplierId}/reviews`)
+      .set("x-mock-user-id", "u1")
+      .send({ reviewType: "qualification_initial_review", status: "passed", score: 90, opinion: "Stage2 资质初审通过" });
+    expect(qualificationReview.status).toBe(201);
+
     const review = await request(runtime1.app)
       .post(`/api/suppliers/${supplierId}/reviews`)
       .set("x-mock-user-id", "u1")

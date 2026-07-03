@@ -85,7 +85,7 @@ export const navItems: NavItem[] = [
   { label: "定标监督", to: "/award-result", roles: [...auditRoles], menuKey: "award" },
   { label: "供应商监督", to: "/suppliers", roles: [...auditRoles], menuKey: "suppliers" },
   { label: "操作日志", to: "/audit", roles: [...auditRoles], menuKey: "audit" },
-  { label: "集成配置", to: "/integration-boundary", roles: ["auditor", "admin"], menuKey: "externalTrade" },
+  { label: "集成配置", to: "/integration-boundary", roles: ["auditor"], menuKey: "externalTrade" },
   { label: "系统管理", to: "/modules", roles: ["admin"], menuKey: "admin" },
   { label: "系统设置", to: "/permissions", roles: ["admin"], menuKey: "admin" }
 ];
@@ -146,7 +146,7 @@ const routeAccessRules: Array<{ test: (path: string) => boolean; roles: RoleId[]
   { test: (path) => path === "/procurement-requests" || path.startsWith("/procurement-requests/"), roles: ["group_manager", "buyer", "hotel_buyer", "platform_operator", "auditor"] },
   { test: (path) => path === "/expert-scoring", roles: ["expert"] },
   { test: (path) => path === "/scoring-templates", roles: ["group_manager", "platform_operator", "auditor"] },
-  { test: (path) => path === "/integration-boundary", roles: ["admin", "auditor"] },
+  { test: (path) => path === "/integration-boundary", roles: ["auditor"] },
   { test: (path) => path === "/supply-mall" || path.startsWith("/supply-mall/"), roles: ["group_manager", "buyer", "platform_operator", "hotel_buyer", "supplier", "supplier_admin", "supplier_quotation"] },
   { test: (path) => path === "/suppliers/new", roles: ["group_manager"] },
   { test: (path) => path === "/supplier-portal" || path.startsWith("/supplier-portal/"), roles: ["supplier", "supplier_admin", "supplier_quotation"] },

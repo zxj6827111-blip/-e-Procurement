@@ -62,7 +62,7 @@ function procurementRequestBpmnXml(nodeName = "Method decision") {
 </definitions>`;
 }
 
-async function createReadyRequest(runtime: ReturnType<typeof boot>, title: string, userId = "u2", orgId = "org-east") {
+async function createReadyRequest(runtime: ReturnType<typeof boot>, title: string, userId = "u8", orgId = "org-hotel") {
   const created = await request(runtime.app)
     .post("/api/procurement-requests")
     .set("x-mock-user-id", userId)
@@ -107,7 +107,7 @@ async function createPilot(runtime: ReturnType<typeof boot>, definitionId: strin
       businessType: "procurement_request",
       status: "enabled",
       scope: {
-        orgIds: ["org-east"],
+        orgIds: ["org-hotel"],
         businessIds: [requestId],
         environments
       }
@@ -130,19 +130,19 @@ describe("M5-C BPMN pilot governance", () => {
     const definition = await createEnabledDefinition(runtime, "m5c_scope_procurement_request", 1);
     const pilot = await createPilot(runtime, definition.id, scopedRequest.id);
 
-    expect(pilot.scope).toEqual({ orgIds: ["org-east"], businessIdCount: 1, environments: ["test"] });
+    expect(pilot.scope).toEqual({ orgIds: ["org-hotel"], businessIdCount: 1, environments: ["test"] });
     expect(JSON.stringify(pilot)).not.toContain(scopedRequest.id);
 
     const changed = await request(runtime.app)
       .post(`/api/bpmn/pilots/${pilot.id}/scope`)
       .set("x-mock-user-id", "u6")
-      .send({ scope: { orgIds: ["org-east"], businessIds: [otherRequest.id], environments: ["test"] } });
+      .send({ scope: { orgIds: ["org-hotel"], businessIds: [otherRequest.id], environments: ["test"] } });
     expect(changed.status).toBe(200);
-    expect(changed.body.bpmnPilot.scope).toEqual({ orgIds: ["org-east"], businessIdCount: 1, environments: ["test"] });
+    expect(changed.body.bpmnPilot.scope).toEqual({ orgIds: ["org-hotel"], businessIdCount: 1, environments: ["test"] });
     expect(JSON.stringify(changed.body)).not.toContain(otherRequest.id);
 
-    await request(runtime.app).post(`/api/procurement-requests/${scopedRequest.id}/submit`).set("x-mock-user-id", "u2").expect(200);
-    await request(runtime.app).post(`/api/procurement-requests/${otherRequest.id}/submit`).set("x-mock-user-id", "u2").expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${scopedRequest.id}/submit`).set("x-mock-user-id", "u8").expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${otherRequest.id}/submit`).set("x-mock-user-id", "u8").expect(200);
 
     expect(one(runtime, "select count(*) as count from bpmn_pilot_runs where business_id = ?", scopedRequest.id)).toEqual({ count: 0 });
     expect(one(runtime, "select count(*) as count from bpmn_pilot_runs where business_id = ?", otherRequest.id)).toEqual({ count: 1 });
@@ -170,7 +170,7 @@ describe("M5-C BPMN pilot governance", () => {
     expect(switched.status).toBe(200);
     expect(switched.body.bpmnPilot).toEqual(expect.objectContaining({ definitionId: v2.id, previousDefinitionId: v1.id, status: "enabled" }));
 
-    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u2").expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u8").expect(200);
     expect(one(runtime, "select definition_id from bpmn_pilot_runs where business_id = ? order by created_at desc limit 1", procurementRequest.id)).toEqual({ definition_id: v2.id });
 
     const rollback = await request(runtime.app)
@@ -198,7 +198,7 @@ describe("M5-C BPMN pilot governance", () => {
     expect(rollback.status).toBe(200);
     expect(rollback.body.bpmnPilot).toEqual(expect.objectContaining({ status: "disabled", definitionId: definition.id, lastRollbackReason: "M5-C stop pilot" }));
 
-    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u2").expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u8").expect(200);
     expect(one(runtime, "select count(*) as count from bpmn_pilot_runs where business_id = ?", procurementRequest.id)).toEqual({ count: 0 });
     expect(one(runtime, "select process_status from process_instances where business_type = 'procurement_request' and business_id = ?", procurementRequest.id)).toEqual({ process_status: "running" });
   });
@@ -212,7 +212,7 @@ describe("M5-C BPMN pilot governance", () => {
     const auditorScope = await request(runtime.app)
       .post(`/api/bpmn/pilots/${pilot.id}/scope`)
       .set("x-mock-user-id", "u5")
-      .send({ scope: { orgIds: ["org-east"], businessIds: [procurementRequest.id], environments: ["test"] } });
+      .send({ scope: { orgIds: ["org-hotel"], businessIds: [procurementRequest.id], environments: ["test"] } });
     expect(auditorScope.status).toBe(403);
     expect(auditorScope.body.error.code).toBe("BPMN_DEFINITION_MAINTAIN_DENIED");
 
@@ -247,7 +247,7 @@ describe("M5-C BPMN pilot governance", () => {
     const definition = await createEnabledDefinition(runtime, "m5c_environment_procurement_request", 1);
     await createPilot(runtime, definition.id, procurementRequest.id, ["production"]);
 
-    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u2").expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u8").expect(200);
     expect(one(runtime, "select count(*) as count from bpmn_pilot_runs where business_id = ?", procurementRequest.id)).toEqual({ count: 0 });
     expect(one(runtime, "select process_status from process_instances where business_type = 'procurement_request' and business_id = ?", procurementRequest.id)).toEqual({ process_status: "running" });
   });

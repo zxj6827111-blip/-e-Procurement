@@ -76,6 +76,99 @@ describe("sellable readiness critical boundaries", () => {
     expectDenied(response, "ARCHIVE_ITEM_SEALED");
   });
 
+  it("blocks result publication for approvals that did not enter formal workflow", async () => {
+    const runtime = boot();
+    const approval = runtime.ctx.state.awardApprovals.find((item) => item.id === "aa-award-1");
+    expect(approval).toBeTruthy();
+    approval!.submittedAt = null;
+    approval!.approvedAt = new Date().toISOString();
+    approval!.approvalStatus = "approved";
+    runtime.ctx.r5ReviewAwardRepository.upsertAwardApproval(approval!);
+    runtime.ctx.runtimeDb.db.prepare("delete from r2_approval_instances where business_type = 'award_approval' and business_id = ?").run(approval!.id);
+
+    const response = await request(runtime.app)
+      .post("/api/projects/p-award/result-notifications")
+      .set("x-mock-user-id", "u2")
+      .send({ visibilityConfig: "supplier_self_only" });
+
+    expectDenied(response, "AWARD_APPROVAL_WORKFLOW_REQUIRED");
+  });
+
+  it("blocks archive sealing before fulfillment closeout evidence exists", async () => {
+    const runtime = boot();
+    const project = runtime.ctx.state.projects.find((item) => item.id === "p-award");
+    expect(project).toBeTruthy();
+    project!.status = "performing";
+    const snapshot = await request(runtime.app).post("/api/projects/p-award/archive-snapshot").set("x-mock-user-id", "u2");
+    expect(snapshot.status).toBe(201);
+    runtime.ctx.state.receiptRecords.push({
+      id: "rrc-sellable-not-ready",
+      purchaseOrderId: "po-award-1",
+      projectId: "p-award",
+      supplierId: "sup-1",
+      receiptType: "full",
+      status: "recorded",
+      acceptanceResult: "accepted",
+      handlingStatus: "none",
+      receivedItems:
+        runtime.ctx.state.purchaseOrders.find((entry) => entry.id === "po-award-1")?.lineItems.map((item) => ({
+          itemName: item.itemName,
+          receivedQuantity: item.quantity,
+          unit: item.unit,
+          accepted: true
+        })) ?? [],
+      summary: "sellable closeout evidence without final project status",
+      receiptAt: "2026-07-02T09:00:00.000Z",
+      operatorId: "u2",
+      attachmentMetadata: [],
+      createdBy: "u2",
+      createdAt: "2026-07-02T09:00:00.000Z"
+    });
+    runtime.ctx.state.supplierEvaluations.push({
+      id: "se-sellable-not-ready",
+      supplierId: "sup-1",
+      projectId: "p-award",
+      contractId: "cl-award-1",
+      dimensions: { quality: 90, delivery: 90, service: 90, cooperation: 90, priceReasonableness: 90 },
+      score: 90,
+      status: "submitted_locked",
+      versionNo: 1,
+      description: "sellable closeout evidence without final project status",
+      lockedAt: "2026-07-02T09:05:00.000Z",
+      createdBy: "u2",
+      createdAt: "2026-07-02T09:05:00.000Z"
+    });
+    runtime.ctx.state.settlementMaterials = runtime.ctx.state.settlementMaterials.map((entry) =>
+      entry.projectId === "p-award" ? { ...entry, status: "verified", verificationOpinion: "sellable closeout evidence" } : entry
+    );
+    runtime.ctx.state.auditLogs.push({
+      id: "audit-sellable-not-ready",
+      actorId: "u2",
+      roleId: "buyer",
+      orgId: "org-east",
+      projectId: "p-award",
+      action: "sellable.archive.prepare",
+      objectType: "project",
+      objectId: "p-award",
+      result: "recorded",
+      createdAt: "2026-07-02T09:10:00.000Z"
+    });
+
+    const response = await request(runtime.app).post("/api/projects/p-award/archive-seal").set("x-mock-user-id", "u2");
+
+    expectDenied(response, "ARCHIVE_CLOSEOUT_NOT_READY");
+  });
+
+  it("blocks contract acceptance records before performance is active", async () => {
+    const runtime = boot();
+    const response = await request(runtime.app)
+      .post("/api/contracts/cl-award-1/acceptance-payments")
+      .set("x-mock-user-id", "u2")
+      .send({ recordType: "acceptance", summary: "should require active performance" });
+
+    expectDenied(response, "ACCEPTANCE_PERFORMANCE_NOT_READY");
+  });
+
   it("keeps system administrators outside business workbench data", async () => {
     const runtime = boot();
 

@@ -13,6 +13,14 @@ function expectDenied(response: request.Response, code: string) {
   expect(response.body.error.code).toBe(code);
 }
 
+function qualificationAttachment(fileName: string) {
+  return {
+    fileName,
+    contentType: "text/plain",
+    contentBase64: Buffer.from(fileName, "utf8").toString("base64")
+  };
+}
+
 describe("Phase 1 supplier, procurement request and project initiation", () => {
   let runtime: ReturnType<typeof boot>;
 
@@ -40,7 +48,7 @@ describe("Phase 1 supplier, procurement request and project initiation", () => {
     const admission = await request(runtime.app)
       .post("/api/suppliers/admissions")
       .set("x-mock-user-id", "u1")
-      .send({ name: "Phase 1 Test Supplier", category: "linen", qualification: "pending_review" });
+      .send({ name: "Phase 1 Test Supplier", category: "linen", qualification: "pending_review", qualificationAttachments: [qualificationAttachment("phase1-license.txt")] });
 
     expect(admission.status).toBe(201);
     expect(admission.body.supplier.admissionStatus).toBe("pending");
@@ -57,6 +65,12 @@ describe("Phase 1 supplier, procurement request and project initiation", () => {
     expect(authorize.body.supplier.categoryAuth).toContain("amenities");
     expect(authorize.body.supplier.categoryAuthorizations.every((item: { status: string }) => item.status === "suspended")).toBe(true);
     expect(authorize.body.auditLogId).toMatch(/^audit-/);
+
+    const qualificationReview = await request(runtime.app)
+      .post(`/api/suppliers/${supplierId}/reviews`)
+      .set("x-mock-user-id", "u1")
+      .send({ reviewType: "qualification_initial_review", status: "passed", score: 88, opinion: "资质附件完整，初审通过。" });
+    expect(qualificationReview.status).toBe(201);
 
     const review = await request(runtime.app)
       .post(`/api/suppliers/${supplierId}/reviews`)
@@ -462,6 +476,12 @@ describe("Phase 1 supplier, procurement request and project initiation", () => {
       .send({ contactEmail: "supplier-admin@example.com" });
     expect(adminProfilePatch.status).toBe(200);
     expect(adminProfilePatch.body.supplier.contactEmail).toBe("supplier-admin@example.com");
+
+    const qualificationReview = await request(runtime.app)
+      .post(`/api/suppliers/${supplierId}/reviews`)
+      .set("x-mock-user-id", "u1")
+      .send({ reviewType: "qualification_initial_review", status: "passed", score: 90, opinion: "注册资料与资质附件齐备。" });
+    expect(qualificationReview.status).toBe(201);
 
     const review = await request(runtime.app)
       .post(`/api/suppliers/${supplierId}/reviews`)

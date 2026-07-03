@@ -60,6 +60,25 @@ describe("Phase 8 archive closeout and audit supervision", () => {
     runtime.ctx.state.settlementMaterials = runtime.ctx.state.settlementMaterials.map((entry) =>
       entry.projectId === "p-award" ? { ...entry, status: "verified", verificationOpinion: "phase8 seal baseline" } : entry
     );
+    runtime.ctx.state.supplierEvaluations.push({
+      id: "se-phase8-award",
+      supplierId: "sup-1",
+      projectId: "p-award",
+      contractId: "cl-award-1",
+      dimensions: { quality: 90, delivery: 90, service: 90, cooperation: 90, priceReasonableness: 90 },
+      score: 90,
+      status: "submitted_locked",
+      versionNo: 1,
+      description: "phase8 seal baseline",
+      lockedAt: "2026-07-02T09:03:00.000Z",
+      createdBy: "u2",
+      createdAt: "2026-07-02T09:03:00.000Z"
+    });
+    const project = runtime.ctx.state.projects.find((item) => item.id === "p-award");
+    if (project) {
+      project.status = "evaluated";
+      project.displayStatus = "supplier evaluated";
+    }
 
     await request(runtime.app).post("/api/projects/p-award/archive-snapshot").set("x-mock-user-id", "u2");
     runtime.ctx.state.auditLogs.push({

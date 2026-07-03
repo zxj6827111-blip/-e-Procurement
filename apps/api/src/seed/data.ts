@@ -313,6 +313,8 @@ export const rolePermissions: Array<{ roleId: string; menus: string[]; actions: 
     "menus": [
       "dashboard",
       "myTasks",
+      "admin",
+      "needs",
       "projects",
       "suppliers",
       "procurementDocuments",
@@ -424,8 +426,11 @@ export const rolePermissions: Array<{ roleId: string; menus: string[]; actions: 
     "menus": [
       "dashboard",
       "myTasks",
+      "needs",
       "suppliers",
       "projects",
+      "expertReview",
+      "award",
       "contracts",
       "archives",
       "audit"
@@ -463,6 +468,7 @@ export const rolePermissions: Array<{ roleId: string; menus: string[]; actions: 
       "dashboard",
       "myTasks",
       "projects",
+      "suppliers",
       "supplierRegistration",
       "bidding",
       "contracts"
@@ -508,6 +514,7 @@ export const rolePermissions: Array<{ roleId: string; menus: string[]; actions: 
     "menus": [
       "dashboard",
       "myTasks",
+      "admin",
       "needs",
       "projects",
       "suppliers",

@@ -200,6 +200,25 @@ describe("P0 permission and audit controls", () => {
     runtime.ctx.state.settlementMaterials = runtime.ctx.state.settlementMaterials.map((entry) =>
       entry.projectId === "p-award" ? { ...entry, status: "verified", verificationOpinion: "p0 archive coverage baseline" } : entry
     );
+    runtime.ctx.state.supplierEvaluations.push({
+      id: "se-p0-award",
+      supplierId: "sup-1",
+      projectId: "p-award",
+      contractId: "cl-award-1",
+      dimensions: { quality: 90, delivery: 90, service: 90, cooperation: 90, priceReasonableness: 90 },
+      score: 90,
+      status: "submitted_locked",
+      versionNo: 1,
+      description: "p0 archive coverage baseline",
+      lockedAt: "2026-07-02T10:03:00.000Z",
+      createdBy: "u2",
+      createdAt: "2026-07-02T10:03:00.000Z"
+    });
+    const project = runtime.ctx.state.projects.find((item) => item.id === "p-award");
+    if (project) {
+      project.status = "evaluated";
+      project.displayStatus = "supplier evaluated";
+    }
 
     const snapshot = await request(runtime.app).post("/api/projects/p-award/archive-snapshot").set("x-mock-user-id", "u2");
     expect(snapshot.status).toBe(201);

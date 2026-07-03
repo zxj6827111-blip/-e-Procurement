@@ -1,10 +1,11 @@
 # Sprint 1 UI Copy Scan
 
-- Generated at: 2026-07-02T16:53:16.835Z
+- Generated at: 2026-07-03T03:08:44.921Z
 - Scope: apps/web/src visible Vue copy and apps/api/src user-facing string literals.
 - Result: PASS
 - Blockers: 0
 - Warnings: 14
+- Informational findings: 42
 
 | Severity | Term | Location | Text |
 | --- | --- | --- | --- |
@@ -39,9 +40,9 @@
 | INFO | DEMO | apps/api/src/runtime/config.ts:264 | Demo seed data is disabled for production or only enabled outside production. |
 | INFO | R8/Process/BPMN display | apps/api/src/runtime/health.ts:127 | R8 Workflow remains the primary execution source; Process Layer and BPMN are not production execution engines in M6-A. |
 | INFO | 本地模拟 | apps/api/src/seed/data.ts:129 | 审核结算、发票和模拟付款台账。 |
-| INFO | 本地模拟 | apps/api/src/seed/data.ts:3357 | 商城订单提交后占用本地模拟额度。 |
-| INFO | 本地模拟 | apps/api/src/seed/data.ts:3360 | 本地模拟资金账户台账：完成余额、充值、授信、支付占用、退款/冲正留痕；未连接真实支付、银行、授信或财务系统。 |
-| INFO | 本地模拟 | apps/api/src/seed/data.ts:3384 | 本地模拟资金账户台账：完成余额、充值、授信、支付占用、退款/冲正留痕；未连接真实支付、银行、授信或财务系统。 |
+| INFO | 本地模拟 | apps/api/src/seed/data.ts:3364 | 商城订单提交后占用本地模拟额度。 |
+| INFO | 本地模拟 | apps/api/src/seed/data.ts:3367 | 本地模拟资金账户台账：完成余额、充值、授信、支付占用、退款/冲正留痕；未连接真实支付、银行、授信或财务系统。 |
+| INFO | 本地模拟 | apps/api/src/seed/data.ts:3391 | 本地模拟资金账户台账：完成余额、充值、授信、支付占用、退款/冲正留痕；未连接真实支付、银行、授信或财务系统。 |
 | INFO | R8/Process/BPMN display | apps/api/src/services/bpmn-pilot-service.ts:261 | BPMN_PILOT_VALIDATION_FAILED |
 | INFO | R8/Process/BPMN display | apps/api/src/services/bpmn-pilot-service.ts:297 | BPMN_PILOT_SIMULATION_FAILED |
 | WARN | 治理 | apps/web/src/pages/approval-rules/ApprovalRulesPageShell.vue:18 | 系统治理 |

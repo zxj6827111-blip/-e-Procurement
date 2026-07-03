@@ -1,22 +1,40 @@
 # Sprint 3 Status Write Inventory
 
-- Generated at: 2026-07-02T16:54:02.603Z
+- Generated at: 2026-07-03T03:09:27.276Z
 - Scope: apps/api/src/routes only.
 - Repository SQL persistence and runtime table sync are intentionally excluded.
-- Direct route-level status writes found: 327
+- Direct route-level status writes found: 333
+
+## Critical Action Status Write Summary
+
+| Critical action | Route status writes counted | Decision | Sprint 3 convergence |
+| --- | --- | --- | --- |
+| supplier.submit_bid | apps/api/src/routes/bid-routes.ts (28) | PASS | Existing guard chain retained; no production execution source was changed. |
+| bid.lock_or_close | apps/api/src/routes/bid-routes.ts (28) | PASS | Existing cutoff/lock guards retained; downstream expert review still requires locked bidding state. |
+| expert.submit_score | apps/api/src/routes/expert-review-routes.ts (34) | PASS | Reevaluation request/approval roles were split from general review management so group approvers can approve without broadening all review actions. |
+| award.submit_approval | apps/api/src/routes/award-routes.ts (28) | PASS | Existing R8 approval submission path retained. |
+| award.publish_result | apps/api/src/routes/award-routes.ts (28) | PASS | Hardened with formal workflow/submitted approval check before result notifications can be sent. |
+| archive.seal_project | apps/api/src/routes/archive-routes.ts (12)<br>apps/api/src/routes/project-workbench-routes.ts (36) | PASS | Hardened with fulfillment/evaluation closeout precondition before archive seal. |
+| order.confirm_or_receive | apps/api/src/routes/mall-routes.ts (29)<br>apps/api/src/routes/project-workbench-routes.ts (36) | PASS | Existing mall/project-workbench order state guards retained. |
+| settlement.submit_or_approve | apps/api/src/routes/settlement-finance-routes.ts (1) | PASS | Existing repository state preconditions retained; route-level audit and workflow hooks remain. |
+| fulfillment.acceptance_confirm | apps/api/src/routes/contract-performance-routes.ts (19) | PASS | Hardened to reject acceptance/payment records before active contract performance exists. |
+
+## Raw Route-Level Status Writes
 
 | File | Line | Field | Value | Snippet |
 | --- | --- | --- | --- | --- |
-| apps/api/src/routes/archive-routes.ts | 52 | status | missing.length > 0 ? "incomplete" : "complete" | const status = missing.length > 0 ? "incomplete" : "complete"; |
-| apps/api/src/routes/archive-routes.ts | 54 | entry.status | status | if (!entry.sealed) entry.status = status; |
-| apps/api/src/routes/archive-routes.ts | 159 | entry.status | "sealed" | entry.status = "sealed"; |
-| apps/api/src/routes/archive-routes.ts | 162 | project.status | project.externalTradeFlag ? "external_archived" : "archived" | project.status = project.externalTradeFlag ? "external_archived" : "archived"; |
-| apps/api/src/routes/archive-routes.ts | 163 | project.displayStatus | "档案已封存" | project.displayStatus = "档案已封存"; |
-| apps/api/src/routes/archive-routes.ts | 192 | item.status | item.collectedFlag ? "complete" : "collecting" | item.status = item.collectedFlag ? "complete" : "collecting"; |
-| apps/api/src/routes/archive-routes.ts | 216 | item.status | "supplement_requested" | item.status = "supplement_requested"; |
-| apps/api/src/routes/archive-routes.ts | 243 | supplementRequest.approvalStatus | approved ? "approved" : "rejected" | supplementRequest.approvalStatus = approved ? "approved" : "rejected"; |
-| apps/api/src/routes/archive-routes.ts | 247 | item.status | approved ? "supplement_approved" : "supplement_rejected" | item.status = approved ? "supplement_approved" : "supplement_rejected"; |
-| apps/api/src/routes/archive-routes.ts | 291 | item.status | "supplemented" | item.status = "supplemented"; |
+| apps/api/src/routes/archive-routes.ts | 62 | status | missing.length > 0 ? "incomplete" : "complete" | const status = missing.length > 0 ? "incomplete" : "complete"; |
+| apps/api/src/routes/archive-routes.ts | 64 | entry.status | status | if (!entry.sealed) entry.status = status; |
+| apps/api/src/routes/archive-routes.ts | 72 | entry.status | == "submitted_locked") | const hasEvaluation = ctx.state.supplierEvaluations.some((entry) => entry.projectId === project.id && entry.status === "submitted_locked"); |
+| apps/api/src/routes/archive-routes.ts | 187 | status | ${project.status}` | `status=${project.status}` |
+| apps/api/src/routes/archive-routes.ts | 194 | entry.status | "sealed" | entry.status = "sealed"; |
+| apps/api/src/routes/archive-routes.ts | 197 | project.status | project.externalTradeFlag ? "external_archived" : "archived" | project.status = project.externalTradeFlag ? "external_archived" : "archived"; |
+| apps/api/src/routes/archive-routes.ts | 198 | project.displayStatus | "档案已封存" | project.displayStatus = "档案已封存"; |
+| apps/api/src/routes/archive-routes.ts | 227 | item.status | item.collectedFlag ? "complete" : "collecting" | item.status = item.collectedFlag ? "complete" : "collecting"; |
+| apps/api/src/routes/archive-routes.ts | 251 | item.status | "supplement_requested" | item.status = "supplement_requested"; |
+| apps/api/src/routes/archive-routes.ts | 278 | supplementRequest.approvalStatus | approved ? "approved" : "rejected" | supplementRequest.approvalStatus = approved ? "approved" : "rejected"; |
+| apps/api/src/routes/archive-routes.ts | 282 | item.status | approved ? "supplement_approved" : "supplement_rejected" | item.status = approved ? "supplement_approved" : "supplement_rejected"; |
+| apps/api/src/routes/archive-routes.ts | 326 | item.status | "supplemented" | item.status = "supplemented"; |
 | apps/api/src/routes/auth-routes.ts | 173 | result.status | == "not_found") { | if (result.status === "not_found") { |
 | apps/api/src/routes/auth-routes.ts | 176 | result.status | == "current_password_invalid") { | if (result.status === "current_password_invalid") { |
 | apps/api/src/routes/award-routes.ts | 78 | item.status | == "frozen") | const report = [...ctx.state.reviewReports].reverse().find((item) => item.projectId === projectId && item.status === "frozen"); |
@@ -30,21 +48,23 @@
 | apps/api/src/routes/award-routes.ts | 143 | project.displayStatus | "awarded pending order" | project.displayStatus = "awarded pending order"; |
 | apps/api/src/routes/award-routes.ts | 227 | item.approvalStatus | == "approved") | const approval = ctx.state.awardApprovals.find((item) => item.id === notification.awardApprovalId && item.approvalStatus === "approved"); |
 | apps/api/src/routes/award-routes.ts | 242 | item.approvalStatus | == "approved") | return [...ctx.state.awardApprovals].reverse().find((item) => item.projectId === projectId && item.approvalStatus === "approved"); |
-| apps/api/src/routes/award-routes.ts | 303 | item.status | == "sent") | const supplierSelfSent = ctx.state.resultNotifications.some((item) => item.projectId === project.id && item.awardApprovalId === approval.id && item.scope === "supplier_self" && item.status === "sent"); |
-| apps/api/src/routes/award-routes.ts | 305 | item.status | == "sent") | const hasAnyResultNotification = ctx.state.resultNotifications.some((item) => item.projectId === project.id && item.awardApprovalId === approval.id && item.status === "sent"); |
-| apps/api/src/routes/award-routes.ts | 306 | project.status | == "result_notified" && !hasAnyResultNotification | return project.status === "result_notified" && !hasAnyResultNotification; |
-| apps/api/src/routes/award-routes.ts | 330 | item.status | == "sent") | return ctx.state.resultNotifications.filter((item) => item.projectId === projectId && item.awardApprovalId === approvalId && item.scope === scope && item.status === "sent"); |
-| apps/api/src/routes/award-routes.ts | 370 | price.approvalStatus | == "approved") | const existing = ctx.state.mallPrices.find((price) => price.productId === product.id && price.supplierId === product.supplierId && price.approvalStatus === "approved"); |
-| apps/api/src/routes/award-routes.ts | 394 | price.approvalStatus | "approved" | price.approvalStatus = "approved"; |
-| apps/api/src/routes/award-routes.ts | 451 | product.status | "listed" | product.status = "listed"; |
-| apps/api/src/routes/award-routes.ts | 546 | status | ${approval.approvalStatus}`) | return denyResponse(ctx, req, res, 400, "AWARD_APPROVAL_STATUS_DENIED", "Only draft award approvals can be submitted.", "award_approval.status.denied", "award_approval", approval.id, project.id, `status=${approval.approvalStatus}`); |
-| apps/api/src/routes/award-routes.ts | 565 | approval.approvalStatus | "submitted" | approval.approvalStatus = "submitted"; |
-| apps/api/src/routes/award-routes.ts | 581 | status | ${approval.approvalStatus}`) | return denyResponse(ctx, req, res, 400, "AWARD_APPROVAL_STATUS_DENIED", "Only submitted award approvals can be mock-approved.", "award_approval.status.denied", "award_approval", approval.id, project.id, `status=${approval.approvalStatus}`); |
-| apps/api/src/routes/award-routes.ts | 583 | approval.approvalStatus | Boolean(req.body?.approved ?? true) ? "approved" : "rejected" | approval.approvalStatus = Boolean(req.body?.approved ?? true) ? "approved" : "rejected"; |
-| apps/api/src/routes/award-routes.ts | 586 | approval.approvalStatus | == "approved") { | if (approval.approvalStatus === "approved") { |
-| apps/api/src/routes/award-routes.ts | 594 | approval.approvalStatus | == "approved" ? "approve" : "reject", | action: approval.approvalStatus === "approved" ? "approve" : "reject", |
-| apps/api/src/routes/award-routes.ts | 616 | item.approvalStatus | == "approved") | [...ctx.state.awardApprovals].reverse().find((item) => item.projectId === project.id && item.approvalStatus === "approved"); |
-| apps/api/src/routes/award-routes.ts | 796 | item.status | == "published") | const existing = [...ctx.state.internalPublicityRecords].reverse().find((item) => item.projectId === project.id && item.awardApprovalId === approval.id && item.status === "published"); |
+| apps/api/src/routes/award-routes.ts | 247 | instance.approvalStatus | == "approved" | if (instance) return instance.approvalStatus === "approved"; |
+| apps/api/src/routes/award-routes.ts | 248 | approval.approvalStatus | == "approved") | return Boolean(approval.submittedAt && approval.approvedAt && approval.approvalStatus === "approved"); |
+| apps/api/src/routes/award-routes.ts | 309 | item.status | == "sent") | const supplierSelfSent = ctx.state.resultNotifications.some((item) => item.projectId === project.id && item.awardApprovalId === approval.id && item.scope === "supplier_self" && item.status === "sent"); |
+| apps/api/src/routes/award-routes.ts | 311 | item.status | == "sent") | const hasAnyResultNotification = ctx.state.resultNotifications.some((item) => item.projectId === project.id && item.awardApprovalId === approval.id && item.status === "sent"); |
+| apps/api/src/routes/award-routes.ts | 312 | project.status | == "result_notified" && !hasAnyResultNotification | return project.status === "result_notified" && !hasAnyResultNotification; |
+| apps/api/src/routes/award-routes.ts | 336 | item.status | == "sent") | return ctx.state.resultNotifications.filter((item) => item.projectId === projectId && item.awardApprovalId === approvalId && item.scope === scope && item.status === "sent"); |
+| apps/api/src/routes/award-routes.ts | 376 | price.approvalStatus | == "approved") | const existing = ctx.state.mallPrices.find((price) => price.productId === product.id && price.supplierId === product.supplierId && price.approvalStatus === "approved"); |
+| apps/api/src/routes/award-routes.ts | 400 | price.approvalStatus | "approved" | price.approvalStatus = "approved"; |
+| apps/api/src/routes/award-routes.ts | 457 | product.status | "listed" | product.status = "listed"; |
+| apps/api/src/routes/award-routes.ts | 552 | status | ${approval.approvalStatus}`) | return denyResponse(ctx, req, res, 400, "AWARD_APPROVAL_STATUS_DENIED", "Only draft award approvals can be submitted.", "award_approval.status.denied", "award_approval", approval.id, project.id, `status=${approval.approvalStatus}`); |
+| apps/api/src/routes/award-routes.ts | 571 | approval.approvalStatus | "submitted" | approval.approvalStatus = "submitted"; |
+| apps/api/src/routes/award-routes.ts | 587 | status | ${approval.approvalStatus}`) | return denyResponse(ctx, req, res, 400, "AWARD_APPROVAL_STATUS_DENIED", "Only submitted award approvals can be mock-approved.", "award_approval.status.denied", "award_approval", approval.id, project.id, `status=${approval.approvalStatus}`); |
+| apps/api/src/routes/award-routes.ts | 589 | approval.approvalStatus | Boolean(req.body?.approved ?? true) ? "approved" : "rejected" | approval.approvalStatus = Boolean(req.body?.approved ?? true) ? "approved" : "rejected"; |
+| apps/api/src/routes/award-routes.ts | 592 | approval.approvalStatus | == "approved") { | if (approval.approvalStatus === "approved") { |
+| apps/api/src/routes/award-routes.ts | 600 | approval.approvalStatus | == "approved" ? "approve" : "reject", | action: approval.approvalStatus === "approved" ? "approve" : "reject", |
+| apps/api/src/routes/award-routes.ts | 622 | item.approvalStatus | == "approved") | [...ctx.state.awardApprovals].reverse().find((item) => item.projectId === project.id && item.approvalStatus === "approved"); |
+| apps/api/src/routes/award-routes.ts | 816 | item.status | == "published") | const existing = [...ctx.state.internalPublicityRecords].reverse().find((item) => item.projectId === project.id && item.awardApprovalId === approval.id && item.status === "published"); |
 | apps/api/src/routes/bid-routes.ts | 77 | item.status | == "qualified") | return ctx.state.supplierRegistrations.some((item) => item.projectId === project.id && item.supplierId === supplierId && item.status === "qualified"); |
 | apps/api/src/routes/bid-routes.ts | 84 | admissionStatus | supplier.admissionStatus ?? (supplier.id === "sup-4" ? "restricted" : "admitted") | const admissionStatus = supplier.admissionStatus ?? (supplier.id === "sup-4" ? "restricted" : "admitted"); |
 | apps/api/src/routes/bid-routes.ts | 94 | item.status | == "active" && (item.expiresAt === undefined \|\| new Date(item.expiresAt).getTime() >= now)) | return authorizations.some((item) => item.category === category && item.status === "active" && (item.expiresAt === undefined \|\| new Date(item.expiresAt).getTime() >= now)); |
@@ -95,42 +115,44 @@
 | apps/api/src/routes/contract-performance-routes.ts | 357 | status | String(req.body?.status ?? node.status) | const status = String(req.body?.status ?? node.status); |
 | apps/api/src/routes/contract-performance-routes.ts | 361 | node.status | status as PerformanceNode["status"] | node.status = status as PerformanceNode["status"]; |
 | apps/api/src/routes/contract-performance-routes.ts | 367 | status | ${node.status}`) | const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "performance_node.update", "performance_node", node.id, node.projectId, `status=${node.status}`); |
-| apps/api/src/routes/contract-performance-routes.ts | 458 | project.status | project.externalTradeFlag ? "external_evaluated" : "evaluated" | project.status = project.externalTradeFlag ? "external_evaluated" : "evaluated"; |
-| apps/api/src/routes/contract-performance-routes.ts | 459 | project.displayStatus | "supplier evaluated" | project.displayStatus = "supplier evaluated"; |
-| apps/api/src/routes/expert-review-routes.ts | 113 | user.status | == "disabled" \|\| user.status === "offboarded" | return !user \|\| user.roleId !== "expert" \|\| user.status === "disabled" \|\| user.status === "offboarded"; |
-| apps/api/src/routes/expert-review-routes.ts | 151 | status | String(body.status ?? existing?.status ?? (active ? "可抽取" : "停用")).trim() \|\| (active ? "可抽取" : "停用") | const status = String(body.status ?? existing?.status ?? (active ? "可抽取" : "停用")).trim() \|\| (active ? "可抽取" : "停用"); |
-| apps/api/src/routes/expert-review-routes.ts | 277 | status | ${project.status}`) | denyResponse(ctx, req, res, 400, "BID_NOT_LOCKED", "Expert review is allowed only after bids are locked.", action, "project", objectId, project.id, `status=${project.status}`); |
-| apps/api/src/routes/expert-review-routes.ts | 286 | status | ${project.status}`) | denyResponse(ctx, req, res, 400, "EXPERT_ASSIGNMENT_STAGE_DENIED", "Expert assignment is allowed only before the review report is frozen.", action, "project", project.id, project.id, `status=${project.status}`); |
-| apps/api/src/routes/expert-review-routes.ts | 326 | item.status | == "frozen") \|\| project.status === "review_report_frozen" | const frozen = ctx.state.reviewReports.some((item) => item.projectId === project.id && item.status === "frozen") \|\| project.status === "review_report_frozen"; |
-| apps/api/src/routes/expert-review-routes.ts | 402 | template.status | == "enabled") ?? ctx.state.scoringTemplates[0] ?? null | return ctx.state.scoringTemplates.find((template) => template.id === sheet.templateId) ?? ctx.state.scoringTemplates.find((template) => template.status === "enabled") ?? ctx.state.scoringTemplates[0] ?? null; |
-| apps/api/src/routes/expert-review-routes.ts | 499 | status | statusInput === "enabled" ? "enabled" : statusInput === "disabled" ? "disabled" : "draft" | const status = statusInput === "enabled" ? "enabled" : statusInput === "disabled" ? "disabled" : "draft"; |
-| apps/api/src/routes/expert-review-routes.ts | 517 | template.status | == "enabled") { | if (template.status === "enabled") { |
-| apps/api/src/routes/expert-review-routes.ts | 519 | item.status | == "enabled") { | if (item.id !== template.id && item.status === "enabled") { |
-| apps/api/src/routes/expert-review-routes.ts | 520 | item.status | "disabled" | item.status = "disabled"; |
-| apps/api/src/routes/expert-review-routes.ts | 700 | item.status | == "submitted_locked" \|\| item.status === "resubmitted_locked") | const submittedSheets = sheets.filter((item) => item.status === "submitted_locked" \|\| item.status === "resubmitted_locked"); |
-| apps/api/src/routes/expert-review-routes.ts | 720 | item.status | == "submitted_locked" \|\| item.status === "resubmitted_locked") | const allSubmitted = sheets.length > 0 && sheets.every((item) => item.status === "submitted_locked" \|\| item.status === "resubmitted_locked"); |
-| apps/api/src/routes/expert-review-routes.ts | 745 | item.status | == "submitted_locked" \|\| item.status === "resubmitted_locked") | const submittedSheets = sheets.filter((item) => item.status === "submitted_locked" \|\| item.status === "resubmitted_locked"); |
-| apps/api/src/routes/expert-review-routes.ts | 747 | item.status | == "enabled") ?? null | const template = ctx.state.scoringTemplates.find((item) => item.id === submittedSheets[0]?.templateId) ?? ctx.state.scoringTemplates.find((item) => item.status === "enabled") ?? null; |
-| apps/api/src/routes/expert-review-routes.ts | 815 | project.status | "expert_reviewing" satisfies InternalProjectStatus | project.status = "expert_reviewing" satisfies InternalProjectStatus; |
-| apps/api/src/routes/expert-review-routes.ts | 816 | project.displayStatus | "expert reviewing" | project.displayStatus = "expert reviewing"; |
-| apps/api/src/routes/expert-review-routes.ts | 820 | template.status | == "enabled")?.id ?? ctx.state.scoringTemplates[0]?.id ?? "st-1" | return ctx.state.scoringTemplates.find((template) => template.status === "enabled")?.id ?? ctx.state.scoringTemplates[0]?.id ?? "st-1"; |
-| apps/api/src/routes/expert-review-routes.ts | 992 | template.status | "enabled" | template.status = "enabled"; |
-| apps/api/src/routes/expert-review-routes.ts | 1189 | assignment.status | "replaced" | assignment.status = "replaced"; |
-| apps/api/src/routes/expert-review-routes.ts | 1194 | sheet.status | "replaced" | sheet.status = "replaced"; |
-| apps/api/src/routes/expert-review-routes.ts | 1257 | assignment.status | assignment.avoidanceConfirmed && assignment.disciplineConfirmed && assignment.confidentialityConfirmed ? "confirmed" : "assigned" | assignment.status = assignment.avoidanceConfirmed && assignment.disciplineConfirmed && assignment.confidentialityConfirmed ? "confirmed" : "assigned"; |
-| apps/api/src/routes/expert-review-routes.ts | 1260 | assignment.status | == "confirmed") { | if (assignment.status === "confirmed") { |
-| apps/api/src/routes/expert-review-routes.ts | 1330 | sheet.status | == "submitted_locked" \|\| sheet.status === "resubmitted_locked") { | if (sheet.status === "submitted_locked" \|\| sheet.status === "resubmitted_locked") { |
-| apps/api/src/routes/expert-review-routes.ts | 1336 | sheet.status | "saved" | sheet.status = "saved"; |
-| apps/api/src/routes/expert-review-routes.ts | 1350 | sheet.status | == "submitted_locked" \|\| sheet.status === "resubmitted_locked") { | if (sheet.status === "submitted_locked" \|\| sheet.status === "resubmitted_locked") { |
-| apps/api/src/routes/expert-review-routes.ts | 1357 | sheet.status | sheet.versionNo > 1 ? "resubmitted_locked" : "submitted_locked" | sheet.status = sheet.versionNo > 1 ? "resubmitted_locked" : "submitted_locked"; |
-| apps/api/src/routes/expert-review-routes.ts | 1404 | status | ${sheet.status}`) | return denyResponse(ctx, req, res, 400, "REEVALUATION_SOURCE_NOT_LOCKED", "Reevaluation can only be requested for submitted locked scoring sheets.", "scoring_sheet.reevaluation_request.status.denied", "scoring_sheet", sheet.id, sheet.projectId, `status=${sheet.status}`); |
-| apps/api/src/routes/expert-review-routes.ts | 1410 | sheet.status | "reevaluation_requested" | sheet.status = "reevaluation_requested"; |
-| apps/api/src/routes/expert-review-routes.ts | 1434 | status | ${sheet.status}`) | return denyResponse(ctx, req, res, 400, "REEVALUATION_STATUS_DENIED", "Only requested reevaluations can be approved.", "scoring_sheet.reevaluation_approve.status.denied", "scoring_sheet", sheet.id, sheet.projectId, `status=${sheet.status}`); |
-| apps/api/src/routes/expert-review-routes.ts | 1448 | sheet.status | "reevaluation_approved" | sheet.status = "reevaluation_approved"; |
-| apps/api/src/routes/expert-review-routes.ts | 1554 | item.status | == "generated") | const report = ctx.state.reviewReports.find((item) => item.projectId === project.id && item.status === "generated"); |
-| apps/api/src/routes/expert-review-routes.ts | 1556 | report.status | "frozen" | report.status = "frozen"; |
-| apps/api/src/routes/expert-review-routes.ts | 1558 | project.status | "review_report_frozen" | project.status = "review_report_frozen"; |
-| apps/api/src/routes/expert-review-routes.ts | 1559 | project.displayStatus | "review report frozen" | project.displayStatus = "review report frozen"; |
+| apps/api/src/routes/contract-performance-routes.ts | 394 | contract.status | == "cancelled" \|\| !["performing", "completed"].includes(contract.status) \|\| !hasPerformanceNode) { | if (contract.status === "cancelled" \|\| !["performing", "completed"].includes(contract.status) \|\| !hasPerformanceNode) { |
+| apps/api/src/routes/contract-performance-routes.ts | 406 | contractStatus | ${contract.status} | `contractStatus=${contract.status};hasPerformanceNode=${hasPerformanceNode}` |
+| apps/api/src/routes/contract-performance-routes.ts | 474 | project.status | project.externalTradeFlag ? "external_evaluated" : "evaluated" | project.status = project.externalTradeFlag ? "external_evaluated" : "evaluated"; |
+| apps/api/src/routes/contract-performance-routes.ts | 475 | project.displayStatus | "supplier evaluated" | project.displayStatus = "supplier evaluated"; |
+| apps/api/src/routes/expert-review-routes.ts | 114 | user.status | == "disabled" \|\| user.status === "offboarded" | return !user \|\| user.roleId !== "expert" \|\| user.status === "disabled" \|\| user.status === "offboarded"; |
+| apps/api/src/routes/expert-review-routes.ts | 152 | status | String(body.status ?? existing?.status ?? (active ? "可抽取" : "停用")).trim() \|\| (active ? "可抽取" : "停用") | const status = String(body.status ?? existing?.status ?? (active ? "可抽取" : "停用")).trim() \|\| (active ? "可抽取" : "停用"); |
+| apps/api/src/routes/expert-review-routes.ts | 278 | status | ${project.status}`) | denyResponse(ctx, req, res, 400, "BID_NOT_LOCKED", "Expert review is allowed only after bids are locked.", action, "project", objectId, project.id, `status=${project.status}`); |
+| apps/api/src/routes/expert-review-routes.ts | 300 | status | ${project.status}`) | denyResponse(ctx, req, res, 400, "EXPERT_ASSIGNMENT_STAGE_DENIED", "Expert assignment is allowed only before the review report is frozen.", action, "project", project.id, project.id, `status=${project.status}`); |
+| apps/api/src/routes/expert-review-routes.ts | 340 | item.status | == "frozen") \|\| project.status === "review_report_frozen" | const frozen = ctx.state.reviewReports.some((item) => item.projectId === project.id && item.status === "frozen") \|\| project.status === "review_report_frozen"; |
+| apps/api/src/routes/expert-review-routes.ts | 416 | template.status | == "enabled") ?? ctx.state.scoringTemplates[0] ?? null | return ctx.state.scoringTemplates.find((template) => template.id === sheet.templateId) ?? ctx.state.scoringTemplates.find((template) => template.status === "enabled") ?? ctx.state.scoringTemplates[0] ?? null; |
+| apps/api/src/routes/expert-review-routes.ts | 513 | status | statusInput === "enabled" ? "enabled" : statusInput === "disabled" ? "disabled" : "draft" | const status = statusInput === "enabled" ? "enabled" : statusInput === "disabled" ? "disabled" : "draft"; |
+| apps/api/src/routes/expert-review-routes.ts | 531 | template.status | == "enabled") { | if (template.status === "enabled") { |
+| apps/api/src/routes/expert-review-routes.ts | 533 | item.status | == "enabled") { | if (item.id !== template.id && item.status === "enabled") { |
+| apps/api/src/routes/expert-review-routes.ts | 534 | item.status | "disabled" | item.status = "disabled"; |
+| apps/api/src/routes/expert-review-routes.ts | 714 | item.status | == "submitted_locked" \|\| item.status === "resubmitted_locked") | const submittedSheets = sheets.filter((item) => item.status === "submitted_locked" \|\| item.status === "resubmitted_locked"); |
+| apps/api/src/routes/expert-review-routes.ts | 734 | item.status | == "submitted_locked" \|\| item.status === "resubmitted_locked") | const allSubmitted = sheets.length > 0 && sheets.every((item) => item.status === "submitted_locked" \|\| item.status === "resubmitted_locked"); |
+| apps/api/src/routes/expert-review-routes.ts | 759 | item.status | == "submitted_locked" \|\| item.status === "resubmitted_locked") | const submittedSheets = sheets.filter((item) => item.status === "submitted_locked" \|\| item.status === "resubmitted_locked"); |
+| apps/api/src/routes/expert-review-routes.ts | 761 | item.status | == "enabled") ?? null | const template = ctx.state.scoringTemplates.find((item) => item.id === submittedSheets[0]?.templateId) ?? ctx.state.scoringTemplates.find((item) => item.status === "enabled") ?? null; |
+| apps/api/src/routes/expert-review-routes.ts | 829 | project.status | "expert_reviewing" satisfies InternalProjectStatus | project.status = "expert_reviewing" satisfies InternalProjectStatus; |
+| apps/api/src/routes/expert-review-routes.ts | 830 | project.displayStatus | "expert reviewing" | project.displayStatus = "expert reviewing"; |
+| apps/api/src/routes/expert-review-routes.ts | 834 | template.status | == "enabled")?.id ?? ctx.state.scoringTemplates[0]?.id ?? "st-1" | return ctx.state.scoringTemplates.find((template) => template.status === "enabled")?.id ?? ctx.state.scoringTemplates[0]?.id ?? "st-1"; |
+| apps/api/src/routes/expert-review-routes.ts | 1006 | template.status | "enabled" | template.status = "enabled"; |
+| apps/api/src/routes/expert-review-routes.ts | 1203 | assignment.status | "replaced" | assignment.status = "replaced"; |
+| apps/api/src/routes/expert-review-routes.ts | 1208 | sheet.status | "replaced" | sheet.status = "replaced"; |
+| apps/api/src/routes/expert-review-routes.ts | 1271 | assignment.status | assignment.avoidanceConfirmed && assignment.disciplineConfirmed && assignment.confidentialityConfirmed ? "confirmed" : "assigned" | assignment.status = assignment.avoidanceConfirmed && assignment.disciplineConfirmed && assignment.confidentialityConfirmed ? "confirmed" : "assigned"; |
+| apps/api/src/routes/expert-review-routes.ts | 1274 | assignment.status | == "confirmed") { | if (assignment.status === "confirmed") { |
+| apps/api/src/routes/expert-review-routes.ts | 1344 | sheet.status | == "submitted_locked" \|\| sheet.status === "resubmitted_locked") { | if (sheet.status === "submitted_locked" \|\| sheet.status === "resubmitted_locked") { |
+| apps/api/src/routes/expert-review-routes.ts | 1350 | sheet.status | "saved" | sheet.status = "saved"; |
+| apps/api/src/routes/expert-review-routes.ts | 1364 | sheet.status | == "submitted_locked" \|\| sheet.status === "resubmitted_locked") { | if (sheet.status === "submitted_locked" \|\| sheet.status === "resubmitted_locked") { |
+| apps/api/src/routes/expert-review-routes.ts | 1371 | sheet.status | sheet.versionNo > 1 ? "resubmitted_locked" : "submitted_locked" | sheet.status = sheet.versionNo > 1 ? "resubmitted_locked" : "submitted_locked"; |
+| apps/api/src/routes/expert-review-routes.ts | 1418 | status | ${sheet.status}`) | return denyResponse(ctx, req, res, 400, "REEVALUATION_SOURCE_NOT_LOCKED", "Reevaluation can only be requested for submitted locked scoring sheets.", "scoring_sheet.reevaluation_request.status.denied", "scoring_sheet", sheet.id, sheet.projectId, `status=${sheet.status}`); |
+| apps/api/src/routes/expert-review-routes.ts | 1424 | sheet.status | "reevaluation_requested" | sheet.status = "reevaluation_requested"; |
+| apps/api/src/routes/expert-review-routes.ts | 1448 | status | ${sheet.status}`) | return denyResponse(ctx, req, res, 400, "REEVALUATION_STATUS_DENIED", "Only requested reevaluations can be approved.", "scoring_sheet.reevaluation_approve.status.denied", "scoring_sheet", sheet.id, sheet.projectId, `status=${sheet.status}`); |
+| apps/api/src/routes/expert-review-routes.ts | 1462 | sheet.status | "reevaluation_approved" | sheet.status = "reevaluation_approved"; |
+| apps/api/src/routes/expert-review-routes.ts | 1568 | item.status | == "generated") | const report = ctx.state.reviewReports.find((item) => item.projectId === project.id && item.status === "generated"); |
+| apps/api/src/routes/expert-review-routes.ts | 1570 | report.status | "frozen" | report.status = "frozen"; |
+| apps/api/src/routes/expert-review-routes.ts | 1572 | project.status | "review_report_frozen" | project.status = "review_report_frozen"; |
+| apps/api/src/routes/expert-review-routes.ts | 1573 | project.displayStatus | "review report frozen" | project.displayStatus = "review report frozen"; |
 | apps/api/src/routes/external-trade-routes.ts | 109 | project.status | status | project.status = status; |
 | apps/api/src/routes/external-trade-routes.ts | 110 | project.displayStatus | displayStatus | project.displayStatus = displayStatus; |
 | apps/api/src/routes/external-trade-routes.ts | 111 | record.status | status | record.status = status; |

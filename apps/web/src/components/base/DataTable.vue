@@ -22,7 +22,7 @@ defineProps<{
       </thead>
       <tbody>
         <tr v-if="rows.length === 0">
-          <td :colspan="columns.length">{{ emptyText ?? "暂无数据" }}</td>
+          <td :colspan="columns.length">{{ emptyText ?? "当前没有符合条件的业务记录。" }}</td>
         </tr>
         <tr v-for="(row, index) in rows" v-else :key="String(row[rowKey ?? 'id'] ?? index)">
           <td v-for="column in columns" :key="column.key">

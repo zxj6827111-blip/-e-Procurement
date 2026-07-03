@@ -3,6 +3,7 @@ import type { AppContext } from "../app-context.js";
 import type { Expert, ExpertAssignment, InternalProjectStatus, ProcurementDocumentAttachment, ProcurementProject, ScoringCategory, ScoringDetailValue, ScoringSheet, ScoringTemplate } from "../types.js";
 
 const reviewManagerRoles = new Set(["buyer", "platform_operator"]);
+const reviewApprovalRoles = new Set(["buyer", "platform_operator", "group_manager"]);
 const reviewReaderRoles = new Set(["buyer", "platform_operator", "group_manager", "auditor"]);
 const reviewRecordDetailReaderRoles = new Set(["buyer", "platform_operator", "group_manager", "auditor"]);
 const scoringTemplateReaderRoles = new Set(["buyer", "platform_operator", "group_manager", "auditor"]);
@@ -275,6 +276,19 @@ function assertProjectAllowsExpertReview(ctx: AppContext, req: Request, res: Res
   }
   if (!["bidding_locked", "expert_reviewing", "review_report_frozen", "award_approving", "awarded_pending_order", "result_notified"].includes(project.status)) {
     denyResponse(ctx, req, res, 400, "BID_NOT_LOCKED", "Expert review is allowed only after bids are locked.", action, "project", objectId, project.id, `status=${project.status}`);
+    return false;
+  }
+  return true;
+}
+
+function assertReviewApprover(ctx: AppContext, req: Request, res: Response, project: ProcurementProject, action: string) {
+  ctx.policies.externalTradeBlocking.assertInternalActionAllowed(req.auth, project, "internal_expert_review");
+  if (!reviewApprovalRoles.has(req.auth.roleId)) {
+    denyResponse(ctx, req, res, 403, "EXPERT_REVIEW_APPROVER_REQUIRED", "Only authorized review approvers can approve expert review changes.", action, "project", project.id, project.id);
+    return false;
+  }
+  if (!canReadProject(req, project)) {
+    denyResponse(ctx, req, res, 403, "PROJECT_SCOPE_DENIED", "Current user cannot approve expert review changes for this project.", action, "project", project.id, project.id);
     return false;
   }
   return true;
@@ -1398,7 +1412,7 @@ export function expertReviewRoutes(ctx: AppContext) {
     if (!sheet) return;
     const project = ensureProject(ctx, sheet.projectId, res);
     if (!project) return;
-    if (!assertReviewManager(ctx, req, res, project, "scoring_sheet.reevaluation_request.denied")) return;
+    if (!assertReviewApprover(ctx, req, res, project, "scoring_sheet.reevaluation_request.denied")) return;
     if (!assertReportMutable(ctx, req, res, project, "scoring_sheet.reevaluation_request.denied")) return;
     if (!["submitted_locked", "resubmitted_locked"].includes(sheet.status)) {
       return denyResponse(ctx, req, res, 400, "REEVALUATION_SOURCE_NOT_LOCKED", "Reevaluation can only be requested for submitted locked scoring sheets.", "scoring_sheet.reevaluation_request.status.denied", "scoring_sheet", sheet.id, sheet.projectId, `status=${sheet.status}`);
@@ -1428,7 +1442,7 @@ export function expertReviewRoutes(ctx: AppContext) {
     if (!sheet) return;
     const project = ensureProject(ctx, sheet.projectId, res);
     if (!project) return;
-    if (!assertReviewManager(ctx, req, res, project, "scoring_sheet.reevaluation_approve.denied")) return;
+    if (!assertReviewApprover(ctx, req, res, project, "scoring_sheet.reevaluation_approve.denied")) return;
     if (!assertReportMutable(ctx, req, res, project, "scoring_sheet.reevaluation_approve.denied")) return;
     if (sheet.status !== "reevaluation_requested") {
       return denyResponse(ctx, req, res, 400, "REEVALUATION_STATUS_DENIED", "Only requested reevaluations can be approved.", "scoring_sheet.reevaluation_approve.status.denied", "scoring_sheet", sheet.id, sheet.projectId, `status=${sheet.status}`);

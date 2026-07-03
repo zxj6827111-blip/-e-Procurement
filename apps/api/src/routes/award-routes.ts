@@ -242,6 +242,12 @@ function latestApprovedAwardApproval(ctx: AppContext, projectId: string) {
   return [...ctx.state.awardApprovals].reverse().find((item) => item.projectId === projectId && item.approvalStatus === "approved");
 }
 
+function hasFormalApprovedWorkflow(ctx: AppContext, approval: AwardApproval) {
+  const instance = ctx.r8WorkflowTaskRepository.getApprovalInstanceByBusiness("award_approval", approval.id);
+  if (instance) return instance.approvalStatus === "approved";
+  return Boolean(approval.submittedAt && approval.approvedAt && approval.approvalStatus === "approved");
+}
+
 function addSupplierRecipient(targets: Set<string>, supplierId?: string | null) {
   const normalized = String(supplierId ?? "").trim();
   if (normalized) targets.add(normalized);
@@ -700,6 +706,20 @@ export function awardRoutes(ctx: AppContext) {
     const approval = latestApprovedAwardApproval(ctx, project.id);
     if (!approval) {
       return denyResponse(ctx, req, res, 400, "AWARD_APPROVAL_NOT_APPROVED", "Approved award approval is required before result notification.", "result_notification.approval.denied", "project", project.id, project.id);
+    }
+    if (!hasFormalApprovedWorkflow(ctx, approval)) {
+      return denyResponse(
+        ctx,
+        req,
+        res,
+        400,
+        "AWARD_APPROVAL_WORKFLOW_REQUIRED",
+        "Result notification requires an approved award approval that has been submitted through the formal workflow.",
+        "result_notification.workflow.denied",
+        "award_approval",
+        approval.id,
+        project.id
+      );
     }
     const scope = String(req.body?.scope ?? "supplier_self");
     const visibilityConfig = String(req.body?.visibilityConfig ?? "supplier_self_only");

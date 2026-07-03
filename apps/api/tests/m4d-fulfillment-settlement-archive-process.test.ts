@@ -138,6 +138,24 @@ async function buildOrderSettlementFlow(runtime: ReturnType<typeof boot>) {
 }
 
 async function buildArchiveFlow(runtime: ReturnType<typeof boot>, projectId = "p-award") {
+  const project = runtime.ctx.state.projects.find((item) => item.id === projectId);
+  expect(project).toBeTruthy();
+  project!.status = "evaluated";
+  runtime.ctx.state.supplierEvaluations.push({
+    id: `se-m4d-archive-${projectId}`,
+    supplierId: "sup-1",
+    projectId,
+    contractId: "cl-award-1",
+    dimensions: { quality: 91, delivery: 90, service: 92, cooperation: 90, priceReasonableness: 89 },
+    score: 90,
+    status: "submitted_locked",
+    versionNo: 1,
+    description: "M4-D archive closeout evidence",
+    lockedAt: "2026-07-02T11:00:00.000Z",
+    createdBy: "u2",
+    createdAt: "2026-07-02T11:00:00.000Z"
+  });
+
   const snapshot = await request(runtime.app).post(`/api/projects/${projectId}/archive-snapshot`).set("x-mock-user-id", "u2");
   expect(snapshot.status).toBe(201);
   expect(Object.keys(snapshot.body).sort()).toEqual(["archiveItems", "auditLogId", "projectId"]);

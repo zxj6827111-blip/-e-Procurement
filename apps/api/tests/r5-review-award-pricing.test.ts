@@ -5,7 +5,7 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { createAppContext } from "../src/app-context.js";
-import type { Bid, ComparisonReport, User } from "../src/types.js";
+import type { Bid, ComparisonReport, Expert, User } from "../src/types.js";
 
 function makeDataRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "eproc-r5-"));
@@ -81,16 +81,37 @@ describe("R5 review award pricing formal source", () => {
   it("persists expert assignments, scoring, comparison, award and pricing reports into r2 tables and restores after restart", async () => {
     const dataRoot = makeDataRoot();
     const runtime1 = boot(dataRoot);
+    runtime1.ctx.state.projects.find((item) => item.id === "p-award")!.status = "bidding_locked";
+    const appointedExpert: Expert = {
+      id: "exp-r5-formal",
+      name: "R5 Formal Expert",
+      category: "hotel supplies",
+      status: "available",
+      active: true,
+      accountUserIds: ["u-r5-formal-expert"],
+      reviewScopes: ["technical", "commercial"]
+    };
+    runtime1.ctx.state.experts.push(appointedExpert);
+    runtime1.ctx.state.users.push({
+      id: "u-r5-formal-expert",
+      name: "R5 Formal Expert",
+      orgId: "org-hotel",
+      roleId: "expert",
+      expertId: appointedExpert.id,
+      orgScope: ["org-hotel", "org-east", "org-group"]
+    });
+    runtime1.ctx.authStore.seedAccounts(runtime1.ctx.state.users, true);
+    runtime1.ctx.r5ReviewAwardRepository.upsertExpert(appointedExpert);
 
     const appointed = await request(runtime1.app)
       .post("/api/projects/p-award/expert-assignments/appoint")
       .set("x-mock-user-id", "u2")
-      .send({ expertId: "exp-1", reason: "R5 formal table assignment" });
+      .send({ expertId: appointedExpert.id, reason: "R5 formal table assignment" });
     expect(appointed.status).toBe(201);
     const assignmentId = appointed.body.assignment.id as string;
     expect(single(runtime1, "select id from r2_expert_assignments where id = ?", assignmentId)).toBeTruthy();
 
-    const confirmations = await confirmAll(runtime1, assignmentId, "u4");
+    const confirmations = await confirmAll(runtime1, assignmentId, "u-r5-formal-expert");
     expect(confirmations.every((response) => response.status === 200)).toBe(true);
     expect(single<{ assignment_status: string }>(runtime1, "select assignment_status from r2_expert_assignments where id = ?", assignmentId)?.assignment_status).toBe("confirmed");
 

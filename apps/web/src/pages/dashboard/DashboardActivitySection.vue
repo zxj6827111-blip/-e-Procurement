@@ -6,6 +6,7 @@ defineProps<{
   rows: Array<{ title: string; meta: string; time: string; to: string }>;
   columns: DataTableColumn[];
   activityLink: { label: string; to: string };
+  emptyText: string;
 }>();
 </script>
 
@@ -14,7 +15,7 @@ defineProps<{
     <template #actions>
       <RouterLink class="eds-button" :to="activityLink.to">{{ activityLink.label }}</RouterLink>
     </template>
-    <DataTable :columns="columns" :rows="rows" empty-text="暂无近期动态">
+    <DataTable :columns="columns" :rows="rows" :empty-text="emptyText">
       <template #action="{ row }">
         <RouterLink class="eds-button eds-button-text" :to="row.to">查看</RouterLink>
       </template>

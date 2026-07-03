@@ -212,6 +212,46 @@ body {
   padding: var(--ep-space-md);
 }
 
+.eds-role-workbench-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--ep-space-md);
+  min-width: 0;
+}
+
+.eds-role-workbench-panel {
+  display: grid;
+  align-content: start;
+  gap: var(--ep-space-sm);
+  min-width: 0;
+  border: var(--ep-border-base);
+  border-radius: var(--ep-radius-sm);
+  background: var(--ep-color-bg);
+  padding: var(--ep-space-md);
+}
+
+.eds-role-workbench-panel h4 {
+  margin: 0;
+  color: var(--ep-color-text);
+  font-size: var(--ep-font-section-title);
+  font-weight: 600;
+}
+
+.eds-role-workbench-panel ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ep-color-text-secondary);
+  font-size: var(--ep-font-body);
+}
+
+.eds-role-workbench-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ep-space-sm);
+}
+
 .eds-page-header {
   display: flex;
   gap: var(--ep-space-md);

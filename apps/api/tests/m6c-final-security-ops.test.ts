@@ -111,7 +111,7 @@ async function createEnabledPilot(runtime: ReturnType<typeof boot>, requestId: s
       businessType: "procurement_request",
       status: "enabled",
       scope: {
-        orgIds: ["org-east"],
+        orgIds: ["org-hotel"],
         businessIds: [requestId],
         environments: ["test"]
       }
@@ -201,10 +201,10 @@ describe("M6-C final security, operations and delivery gate", () => {
 
   it("locks process timeline and task DTO redaction while preserving traceable procurement events", async () => {
     const runtime = boot();
-    const procurementRequest = await createReadyRequest(runtime, "u2", "org-east", "M6-C redaction request");
-    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u2").expect(200);
+    const procurementRequest = await createReadyRequest(runtime, "u8", "org-hotel", "M6-C redaction request");
+    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u8").expect(200);
     await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/approve`).set("x-mock-user-id", "u1").send({ approved: true, opinion: "M6-C should stay internal" }).expect(200);
-    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/method-decision`).set("x-mock-user-id", "u1").send({ ruleId: "pmr-open" }).expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/method-decision`).set("x-mock-user-id", "u2").send({ ruleId: "pmr-open" }).expect(200);
 
     const timeline = await request(runtime.app).get(`/api/process/business/procurement_request/${procurementRequest.id}`).set("x-mock-user-id", "u1");
     expect(timeline.status).toBe(200);
@@ -290,10 +290,10 @@ describe("M6-C final security, operations and delivery gate", () => {
 
   it("keeps BPMN pilot health permissioned and redacted while R8 and Process remain the execution path", async () => {
     const runtime = boot();
-    const procurementRequest = await createReadyRequest(runtime, "u2", "org-east", "M6-C BPMN pilot request");
+    const procurementRequest = await createReadyRequest(runtime, "u8", "org-hotel", "M6-C BPMN pilot request");
     const pilot = await createEnabledPilot(runtime, procurementRequest.id);
 
-    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u2").expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u8").expect(200);
 
     const adminHealth = await request(runtime.app).get("/api/bpmn/pilot-health").set("x-mock-user-id", "u6");
     expect(adminHealth.status).toBe(200);

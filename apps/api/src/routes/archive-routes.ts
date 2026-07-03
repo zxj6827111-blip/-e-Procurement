@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import type { AppContext } from "../app-context.js";
 import type { ArchiveSupplementRequest } from "../types.js";
-import { isOrgReaderRole, isProcurementMaintainerRole, isSupplierRole, supplierIdMatches } from "../role-groups.js";
+import { isOrgReaderRole, isProcurementMaintainerRole, isSupplierGovernanceRole, isSupplierRole, supplierIdMatches } from "../role-groups.js";
 import { canReadProject, denyResponse } from "./permission-helpers.js";
 import { ensureArchiveSnapshot } from "./project-workbench-routes.js";
 
@@ -43,6 +43,16 @@ function assertMaintainer(ctx: AppContext, req: Request, res: Response, projectI
   return project;
 }
 
+function assertSupplementApprover(ctx: AppContext, req: Request, res: Response, projectId: string, action: string) {
+  const project = assertReadable(ctx, req, res, projectId, action);
+  if (!project) return null;
+  if (!isSupplierGovernanceRole(req.auth.roleId) && !isProcurementMaintainerRole(req.auth.roleId)) {
+    denyResponse(ctx, req, res, 403, "ARCHIVE_SUPPLEMENT_APPROVER_REQUIRED", "Only authorized procurement approvers can approve archive supplement requests.", action, "project", project.id, project.id);
+    return null;
+  }
+  return project;
+}
+
 function readableArchiveProjectIds(ctx: AppContext, req: Request) {
   return new Set(ctx.state.projects.filter((project) => canReadProject(req, project)).map((project) => project.id));
 }
@@ -54,6 +64,15 @@ function syncArchiveStatus(items: AppContext["state"]["archiveItems"]) {
     if (!entry.sealed) entry.status = status;
   }
   return { status, missing };
+}
+
+function archiveCloseoutReady(ctx: AppContext, project: NonNullable<ReturnType<typeof ensureProject>>) {
+  const allowedStatuses = new Set(["evaluated", "closed", "external_evaluated", "external_closed"]);
+  if (!allowedStatuses.has(project.status)) return false;
+  const hasEvaluation = ctx.state.supplierEvaluations.some((entry) => entry.projectId === project.id && entry.status === "submitted_locked");
+  const hasClosedOrder = ctx.state.purchaseOrders.some((entry) => entry.projectId === project.id && ["received", "closed"].includes(entry.status));
+  const hasCompletedContract = ctx.state.contractLedgers.some((entry) => entry.projectId === project.id && ["performing", "completed"].includes(entry.status));
+  return hasEvaluation || hasClosedOrder || hasCompletedContract;
 }
 
 export function archiveRoutes(ctx: AppContext) {
@@ -153,6 +172,22 @@ export function archiveRoutes(ctx: AppContext) {
       denyResponse(ctx, req, res, 400, "ARCHIVE_INCOMPLETE", "Archive cannot be sealed while required items are missing.", "archive.seal.denied", "project", project.id, project.id, `missing=${missing.length}`);
       return;
     }
+    if (!archiveCloseoutReady(ctx, project)) {
+      denyResponse(
+        ctx,
+        req,
+        res,
+        400,
+        "ARCHIVE_CLOSEOUT_NOT_READY",
+        "Archive can be sealed only after the project reaches a completed fulfillment/evaluation state.",
+        "archive.seal.closeout.denied",
+        "project",
+        project.id,
+        project.id,
+        `status=${project.status}`
+      );
+      return;
+    }
     const sealedAt = new Date().toISOString();
     items.forEach((entry) => {
       entry.sealed = true;
@@ -236,7 +271,7 @@ export function archiveRoutes(ctx: AppContext) {
   router.post("/archive-supplement-requests/:requestId/approve", (req, res) => {
     const supplementRequest = ctx.state.archiveSupplementRequests.find((entry) => entry.id === req.params.requestId);
     if (!supplementRequest) return res.status(404).json({ error: { code: "SUPPLEMENT_REQUEST_NOT_FOUND", message: "Supplement request does not exist." } });
-    const project = assertMaintainer(ctx, req, res, supplementRequest.projectId, "archive_supplement_request.approve.denied");
+    const project = assertSupplementApprover(ctx, req, res, supplementRequest.projectId, "archive_supplement_request.approve.denied");
     if (!project) return;
     const item = ctx.state.archiveItems.find((entry) => entry.id === supplementRequest.archiveItemId);
     const approved = Boolean(req.body?.approved ?? true);

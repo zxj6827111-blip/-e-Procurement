@@ -3,7 +3,21 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 
 const apiBaseUrl = process.env.UI_ROLE_FLOW_API_BASE_URL ?? process.env.VITE_API_BASE_URL ?? "http://127.0.0.1:3000";
-const webBaseUrl = process.env.UI_ROLE_FLOW_WEB_BASE_URL ?? process.env.UI_SMOKE_BASE_URL ?? "http://127.0.0.1:5173";
+async function resolveWebBaseUrl() {
+  const configured = process.env.UI_ROLE_FLOW_WEB_BASE_URL ?? process.env.UI_SMOKE_BASE_URL;
+  if (configured) return configured;
+  for (const candidate of ["http://127.0.0.1:5173", "http://127.0.0.1:5174"]) {
+    try {
+      const response = await fetch(candidate);
+      if (response.ok) return candidate;
+    } catch {
+      // Try the next common Vite port.
+    }
+  }
+  return "http://127.0.0.1:5173";
+}
+
+const webBaseUrl = await resolveWebBaseUrl();
 const outDir = join(process.cwd(), "output", "ui-role-flow");
 
 const actors = {

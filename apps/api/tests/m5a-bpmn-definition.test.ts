@@ -277,10 +277,10 @@ describe("M5-A BPMN controlled definition layer", () => {
 
     const created = await request(runtime.app)
       .post("/api/procurement-requests")
-      .set("x-mock-user-id", "u2")
+      .set("x-mock-user-id", "u8")
       .send({
         title: "M5-A R8 still works",
-        orgId: "org-east",
+        orgId: "org-hotel",
         requestDepartment: "M5-A",
         requesterName: "Requester",
         category: "linen",
@@ -290,7 +290,7 @@ describe("M5-A BPMN controlled definition layer", () => {
         lineItems: [{ itemName: "item", specification: "std", quantity: 1, unit: "piece", budgetAmount: 1000 }]
       });
     expect(created.status).toBe(201);
-    const submitted = await request(runtime.app).post(`/api/procurement-requests/${created.body.procurementRequest.id}/submit`).set("x-mock-user-id", "u2");
+    const submitted = await request(runtime.app).post(`/api/procurement-requests/${created.body.procurementRequest.id}/submit`).set("x-mock-user-id", "u8");
     expect(submitted.status).toBe(200);
     expect(Object.keys(submitted.body).sort()).toEqual(["auditLogId", "procurementRequest", "workflow"]);
     expect(one(runtime, "select approval_status from r2_approval_instances where business_type = 'procurement_request' and business_id = ?", created.body.procurementRequest.id)).toEqual({ approval_status: "submitted" });

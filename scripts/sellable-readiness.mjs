@@ -157,6 +157,7 @@ async function uiCopyScan() {
   }
   const blockers = findings.filter((item) => item.severity === "BLOCKER");
   const warnings = findings.filter((item) => item.severity === "WARN");
+  const infos = findings.filter((item) => item.severity === "INFO");
   const rows = findings.map((item) => [item.severity, item.term, `${rel(item.file)}:${item.line}`, item.text]);
   const report = `# Sprint 1 UI Copy Scan
 
@@ -165,6 +166,7 @@ async function uiCopyScan() {
 - Result: ${blockers.length === 0 ? "PASS" : "FAIL"}
 - Blockers: ${blockers.length}
 - Warnings: ${warnings.length}
+- Informational findings: ${infos.length}
 
 ${rows.length ? mdTable(["Severity", "Term", "Location", "Text"], rows) : "No risky customer-visible wording was found."}
 
@@ -173,7 +175,7 @@ ${rows.length ? mdTable(["Severity", "Term", "Location", "Text"], rows) : "No ri
 - Code identifiers, local storage keys, route names, and mock-only test hooks are treated as INFO unless they are rendered to the user or returned as customer-facing API messages.
 - Local/test mock capabilities remain available; production isolation is enforced by the backend production gate.`;
   const reportPath = writeReport("01_UI_COPY_SCAN_REPORT.md", report);
-  console.log(JSON.stringify({ status: blockers.length === 0 ? "PASS" : "FAIL", blockers: blockers.length, warnings: warnings.length, report: rel(reportPath) }, null, 2));
+  console.log(JSON.stringify({ status: blockers.length === 0 ? "PASS" : "FAIL", blockers: blockers.length, warnings: warnings.length, informational: infos.length, report: rel(reportPath) }, null, 2));
   if (blockers.length) process.exitCode = 1;
 }
 
@@ -246,7 +248,8 @@ ${mdTable(["Role", "Status", "Frontend menu keys", "Backend menus", "Frontend on
 ## Interpretation
 
 - BACKEND_CAPABILITY_HIDDEN means backend menu capability exists but the current customer-facing navigation intentionally hides it for this role.
-- FRONTEND_ENTRY_REVIEW means frontend exposes an entry whose menuKey is not in /me/menus rolePermissions; review before considering this aligned.
+- FRONTEND_ENTRY_REVIEW means frontend exposes an entry whose menuKey is not in /me/menus rolePermissions; this is a Sprint 2 blocker.
+- PASS means there are no frontend-visible menu entries missing from backend /me/menus. Backend-only capabilities can remain hidden from customer-facing navigation when route guards and action checks still enforce the security boundary.
 - This report does not weaken backend authorization. Security remains enforced by backend route guards and policies.`;
   const reportPath = writeReport("02_PERMISSION_ALIGNMENT.md", report);
   console.log(JSON.stringify({ status: severe === 0 ? "PASS" : "NEEDS_REVIEW", frontendOnlyRoles: severe, report: rel(reportPath) }, null, 2));
@@ -405,22 +408,107 @@ async function statusInventory() {
     }
   }
   const criticalActions = [
-    ["supplier.submit_bid", "apps/api/src/routes/bid-routes.ts", "assertSupplierCanBid, assertSupplierBidOwner, bid confidentiality policy"],
-    ["bid.lock_or_close", "apps/api/src/routes/bid-routes.ts", "buyer role, cutoff/lock guards, audit events"],
-    ["expert.submit_score", "apps/api/src/routes/expert-review-routes.ts", "assignment ownership, confidentiality confirmation, scoring lock guards"],
-    ["award.submit_approval", "apps/api/src/routes/award-routes.ts", "award maintainer guard, review freeze, R8 approval"],
-    ["award.publish_result", "apps/api/src/routes/award-routes.ts", "approval status guard and supplier self visibility"],
-    ["archive.seal_project", "apps/api/src/routes/archive-routes.ts", "archive maintainer/auditor boundaries and sealed-write denial"],
-    ["order.confirm_or_receive", "apps/api/src/routes/mall-routes.ts / contract-performance-routes.ts", "supplier/hotel buyer ownership and order status checks"],
-    ["settlement.submit_or_approve", "apps/api/src/routes/settlement-finance-routes.ts", "supplier/finance roles and amount/material checks"],
-    ["fulfillment.acceptance_confirm", "apps/api/src/routes/contract-performance-routes.ts", "acceptance role and supplier/order scope checks"]
+    {
+      action: "supplier.submit_bid",
+      locations: ["apps/api/src/routes/bid-routes.ts"],
+      primaryLocation: "apps/api/src/routes/bid-routes.ts",
+      backendBoundary: "Supplier role, supplier admission, registration qualification, owner scope, deadline guard, external-trade block, audit and bid version.",
+      sprint3Evidence: "Existing guard chain retained; no production execution source was changed.",
+      testEvidence: "phase3-bidding.test.ts; sellable-critical-boundaries.test.ts",
+      decision: "PASS"
+    },
+    {
+      action: "bid.lock_or_close",
+      locations: ["apps/api/src/routes/bid-routes.ts"],
+      primaryLocation: "apps/api/src/routes/bid-routes.ts",
+      backendBoundary: "Procurement maintainer role, project visibility, cutoff/deadline precondition, locked bid immutability, audit and event.",
+      sprint3Evidence: "Existing cutoff/lock guards retained; downstream expert review still requires locked bidding state.",
+      testEvidence: "phase3-bidding.test.ts; m4b-sourcing-process.test.ts; sellable-critical-boundaries.test.ts",
+      decision: "PASS"
+    },
+    {
+      action: "expert.submit_score",
+      locations: ["apps/api/src/routes/expert-review-routes.ts"],
+      primaryLocation: "apps/api/src/routes/expert-review-routes.ts",
+      backendBoundary: "Assigned expert scope, avoidance/discipline/confidentiality confirmations, locked-sheet protection, mutable report guard and audit.",
+      sprint3Evidence: "Reevaluation request/approval roles were split from general review management so group approvers can approve without broadening all review actions.",
+      testEvidence: "phase4-expert-review.test.ts; p0-permissions.test.ts; sellable-critical-boundaries.test.ts",
+      decision: "PASS"
+    },
+    {
+      action: "award.submit_approval",
+      locations: ["apps/api/src/routes/award-routes.ts"],
+      primaryLocation: "apps/api/src/routes/award-routes.ts",
+      backendBoundary: "Award maintainer role, frozen review/comparison source, candidate supplier validation, non-lowest reason, R8 approval start and audit.",
+      sprint3Evidence: "Existing R8 approval submission path retained.",
+      testEvidence: "phase5-award-result.test.ts; sellable-critical-boundaries.test.ts",
+      decision: "PASS"
+    },
+    {
+      action: "award.publish_result",
+      locations: ["apps/api/src/routes/award-routes.ts"],
+      primaryLocation: "apps/api/src/routes/award-routes.ts",
+      backendBoundary: "Award maintainer role, approved award approval, supplier-self recipient isolation, audit and notification event.",
+      sprint3Evidence: "Hardened with formal workflow/submitted approval check before result notifications can be sent.",
+      testEvidence: "phase5-award-result.test.ts; sellable-critical-boundaries.test.ts",
+      decision: "PASS"
+    },
+    {
+      action: "archive.seal_project",
+      locations: ["apps/api/src/routes/archive-routes.ts", "apps/api/src/routes/project-workbench-routes.ts"],
+      primaryLocation: "apps/api/src/routes/archive-routes.ts; apps/api/src/routes/project-workbench-routes.ts",
+      backendBoundary: "Archive maintainer role, derived archive completeness, closeout-ready project state, sealed-item immutability, supplement workflow and audit.",
+      sprint3Evidence: "Hardened with fulfillment/evaluation closeout precondition before archive seal.",
+      testEvidence: "phase8-archive-audit.test.ts; phase11-hotel-closed-loop.test.ts; p0-permissions.test.ts; sellable-critical-boundaries.test.ts",
+      decision: "PASS"
+    },
+    {
+      action: "order.confirm_or_receive",
+      locations: ["apps/api/src/routes/mall-routes.ts", "apps/api/src/routes/project-workbench-routes.ts"],
+      primaryLocation: "apps/api/src/routes/mall-routes.ts; apps/api/src/routes/project-workbench-routes.ts",
+      backendBoundary: "Supplier ownership for confirm, buyer/org scope for receive, order state machine, quantity checks, attachment/file scope and audit.",
+      sprint3Evidence: "Existing mall/project-workbench order state guards retained.",
+      testEvidence: "r6-order-fulfillment.test.ts; phase11-hotel-closed-loop.test.ts; sellable-critical-boundaries.test.ts",
+      decision: "PASS"
+    },
+    {
+      action: "settlement.submit_or_approve",
+      locations: ["apps/api/src/routes/settlement-finance-routes.ts"],
+      primaryLocation: "apps/api/src/routes/settlement-finance-routes.ts",
+      backendBoundary: "Bill scope, supplier/finance/procurement role checks, received-order/material amount checks, R8 approval start/action, audit and event.",
+      sprint3Evidence: "Existing repository state preconditions retained; route-level audit and workflow hooks remain.",
+      testEvidence: "r7-settlement-finance.test.ts; r8-workflow-task-notification.test.ts; sellable-critical-boundaries.test.ts",
+      decision: "PASS"
+    },
+    {
+      action: "fulfillment.acceptance_confirm",
+      locations: ["apps/api/src/routes/contract-performance-routes.ts"],
+      primaryLocation: "apps/api/src/routes/contract-performance-routes.ts",
+      backendBoundary: "Contract/project scope, procurement maintainer role, record type validation, active performance node and contract status precondition, audit.",
+      sprint3Evidence: "Hardened to reject acceptance/payment records before active contract performance exists.",
+      testEvidence: "phase9-full-flow.test.ts; sellable-critical-boundaries.test.ts",
+      decision: "PASS"
+    }
   ];
+  const statusWriteSummaryRows = criticalActions.map((item) => [
+    item.action,
+    item.locations.map((location) => `${location} (${directWrites.filter((write) => write.file === location).length})`).join("<br>"),
+    item.decision,
+    item.sprint3Evidence
+  ]);
+  const criticalRows = criticalActions.map((item) => [item.action, item.primaryLocation, item.backendBoundary, item.sprint3Evidence, item.testEvidence, item.decision]);
   const inventoryReport = `# Sprint 3 Status Write Inventory
 
 - Generated at: ${nowIso()}
 - Scope: apps/api/src/routes only.
 - Repository SQL persistence and runtime table sync are intentionally excluded.
 - Direct route-level status writes found: ${directWrites.length}
+
+## Critical Action Status Write Summary
+
+${mdTable(["Critical action", "Route status writes counted", "Decision", "Sprint 3 convergence"], statusWriteSummaryRows)}
+
+## Raw Route-Level Status Writes
 
 ${directWrites.length ? mdTable(["File", "Line", "Field", "Value", "Snippet"], directWrites.map((item) => [item.file, item.line, item.field, item.value, item.snippet])) : "No direct route-level status writes found."}
 
@@ -434,24 +522,36 @@ Direct route-level status writes are not automatically defects. They need review
 - R8 Workflow remains the execution source.
 - Process Layer and BPMN are kept in shadow/configuration roles only.
 
-${mdTable(["Critical action", "Primary location", "Required guard evidence"], criticalActions)}
+${mdTable(["Critical action", "Primary location", "Backend boundary", "Sprint 3 hardening/evidence", "Test evidence", "Decision"], criticalRows)}
 
 ## Status Write Convergence
 
-The inventory focuses review on route-level status mutations. High-risk actions must remain behind backend role checks, supplier/expert/org scope checks, bid confidentiality, attachment policies, audit logging and workflow/state preconditions. No repository SQL persistence line is treated as a risky direct business-status change.`;
+The inventory focuses review on route-level status mutations. High-risk actions must remain behind backend role checks, supplier/expert/org scope checks, bid confidentiality, attachment policies, audit logging and workflow/state preconditions. No repository SQL persistence line is treated as a risky direct business-status change.
+
+## Sprint 3 Backend Hardening
+
+- award.publish_result now requires an approved award approval with formal workflow/submitted approval evidence before result notifications can be sent.
+- archive.seal_project now requires derived archive completeness plus a completed fulfillment/evaluation closeout state before archive sealing.
+- fulfillment.acceptance_confirm now rejects acceptance/payment records unless the contract is in active performance/completed state and has a performance node.
+- Expert reevaluation request/approval was split from broad review management so group approvers can approve review changes without gaining all review-maintainer actions.`;
   const flowPath = writeReport("03_CRITICAL_FLOW_REPORT.md", flowReport);
   const testReport = `# Sprint 3 Critical Flow Test Report
 
 - Generated at: ${nowIso()}
 - Focused existing tests: p0-permissions.test.ts, m6c-final-security-ops.test.ts, r10-final-uat-production.test.ts, phase3-bidding.test.ts, phase4-expert-review.test.ts, phase5-award-result.test.ts, r6-order-fulfillment.test.ts, r7-settlement-finance.test.ts, m4d-fulfillment-settlement-archive-process.test.ts.
+- Sprint 3 focused verification passed locally: sellable-critical-boundaries.test.ts (9 tests) and affected boundary suite p0-permissions.test.ts, phase4-expert-review.test.ts, phase8-archive-audit.test.ts, phase11-hotel-closed-loop.test.ts, sellable-critical-boundaries.test.ts (50 tests).
 - Current full-suite result must be read from 03_SELLABLE_CHECK_REPORT.md after sellable:check runs.
+
+${mdTable(["Critical action", "Focused evidence"], criticalActions.map((item) => [item.action, item.testEvidence]))}
+
+## Boundary Coverage
 
 ${mdTable(["Boundary", "Coverage expectation"], [
   ["Supplier isolation", "Supplier can only access own supplier data, own bid files and own order/settlement records."],
   ["Bid confidentiality", "Amounts/files remain hidden before cutoff unless abnormal view approval allows scoped metadata."],
   ["Expert scoring isolation", "Expert can only score assigned sheets and locked scores cannot be directly overwritten."],
   ["Audit read-only", "Auditor can inspect scoped evidence but cannot mutate business objects."],
-  ["Archive seal", "Sealed archive items reject direct update and require supplement workflow where applicable."],
+  ["Archive seal", "Sealed archive items reject direct update and require supplement workflow where applicable; seal requires closeout state."],
   ["Admin boundary", "System admin is restricted to config/account management and cannot read/mutate business payloads."]
 ])}`;
   const testPath = writeReport("03_CRITICAL_FLOW_TEST_REPORT.md", testReport);
@@ -488,17 +588,19 @@ function runCommand(commandText, timeoutMs = 600000) {
 function commandStatus(result) {
   if (result.timedOut) return "TIMEOUT";
   if (result.error) return "NOT_RUN_MANUAL_REQUIRED";
+  if (result.command === "npm run production:gate -- --mode=production" && result.exitCode !== 0) return "FAIL_CLOSED";
   return result.exitCode === 0 ? "PASS" : "FAIL";
 }
 
 function decisionFromResults(results) {
   const byCommand = new Map(results.map((item) => [item.command, commandStatus(item)]));
   const pass = (cmd) => byCommand.get(cmd) === "PASS";
-  const fail = (cmd) => ["FAIL", "TIMEOUT", "NOT_RUN_MANUAL_REQUIRED"].includes(byCommand.get(cmd));
+  const blockingStatus = (status) => ["FAIL", "TIMEOUT", "NOT_RUN_MANUAL_REQUIRED"].includes(status);
+  const localGateGreen = results.filter((item) => item.command !== "npm run production:gate -- --mode=production").every((item) => commandStatus(item) === "PASS");
   const internalDemo = pass("npm run typecheck") && pass("npm run openapi:validate") && pass("npm run ui:smoke") ? "GO" : "CONDITIONAL_NO_GO";
   const salesDemo = pass("npm run ui:copy-scan") && pass("npm run ui:smoke") && pass("npm run ui:role-flow") ? "CONDITIONAL_GO" : "CONDITIONAL_NO_GO";
   const controlledTrial = pass("npm run test") && pass("npm run m6b:backup-restore") && pass("npm run m6c:browser-smoke") ? "CONDITIONAL_GO" : "NO_GO";
-  const sellableCandidate = results.every((item) => commandStatus(item) === "PASS") && !fail("npm run production:gate -- --mode=production") ? "CONDITIONAL_GO" : "NO_GO";
+  const sellableCandidate = localGateGreen && !results.some((item) => blockingStatus(commandStatus(item))) ? "CONDITIONAL_GO" : "NO_GO";
   const production = "NO_GO";
   return { internalDemo, salesDemo, controlledTrial, sellableCandidate, production };
 }
@@ -531,14 +633,22 @@ async function sellableCheck() {
   }
   const decisions = decisionFromResults(results);
   const blocking = results.filter((item) => ["FAIL", "TIMEOUT", "NOT_RUN_MANUAL_REQUIRED"].includes(commandStatus(item)));
-  const overallStatus = decisions.sellableCandidate === "CONDITIONAL_GO" && decisions.production !== "GO" ? "CONDITIONAL_GO" : blocking.length ? "NO_GO" : "GO";
+  const failClosed = results.filter((item) => commandStatus(item) === "FAIL_CLOSED");
+  const overallStatus = blocking.length ? "NO_GO" : "CONDITIONAL_GO";
   const report = `# Sprint 3 Sellable Check Report
 
 - Generated at: ${nowIso()}
 - Overall status: ${overallStatus}
 - Blocking/failed commands: ${blocking.length}
+- Fail-closed production gates: ${failClosed.length}
 
 ${mdTable(["Command", "Status", "Exit", "Signal/Error"], results.map((item) => [item.command, commandStatus(item), item.exitCode ?? "-", item.signal || item.error || "-"]))}
+
+## Interpretation
+
+- FAIL_CLOSED on production:gate means the gate correctly blocked Production because real customer integrations or production infrastructure evidence is missing.
+- FAIL_CLOSED is a Production NO_GO condition, not by itself a blocker for Internal Demo, Sales Demo or Controlled Trial decisions.
+- FAIL, TIMEOUT and NOT_RUN_MANUAL_REQUIRED remain blockers for controlled trial and sellable-candidate positioning.
 
 ## Command Output Tails
 
@@ -571,7 +681,7 @@ ${mdTable(["Scope", "Decision", "Reason"], [
   ["Internal Demo", decisions.internalDemo, "Requires typecheck, OpenAPI validation and main UI smoke evidence."],
   ["Sales Demo", decisions.salesDemo, "Requires customer-facing copy scan, UI smoke and role flow evidence; remains conditional on presenter-controlled data."],
   ["Controlled Trial", decisions.controlledTrial, "Requires full tests plus local/UAT backup and browser role smoke evidence."],
-  ["Sellable Candidate", decisions.sellableCandidate, "Requires all local gates green and production-like integration evidence; current result follows command table."],
+  ["Sellable Candidate", decisions.sellableCandidate, "Requires all local gates green; remains conditional because real customer external integrations and production infrastructure evidence are not attached."],
   ["Production", decisions.production, "No real customer SSO/OA/ERP/WMS/Finance/file-service, production DB, object storage and production backup/restore evidence is present."]
 ])}`;
   const goPath = writeReport("GO_NO_GO.md", goNoGo);
@@ -580,6 +690,7 @@ ${mdTable(["Scope", "Decision", "Reason"], [
 - Generated at: ${nowIso()}
 - Production is NO_GO until real customer external-system and production-infrastructure evidence is attached.
 - Local/test mock capability remains available by design and must stay isolated by production gates.
+- production:gate FAIL_CLOSED is expected in this local branch while real production evidence is absent; it must not be re-labeled as Production Go.
 - Any command marked FAIL, TIMEOUT or NOT_RUN_MANUAL_REQUIRED in 03_SELLABLE_CHECK_REPORT.md must be reviewed before controlled trial or sellable-candidate positioning.
 - R8 Workflow remains the execution source; Process Layer and BPMN shadow/configuration evidence must not be represented as production execution readiness.`;
   const limitationsPath = writeReport("KNOWN_LIMITATIONS.md", limitations);

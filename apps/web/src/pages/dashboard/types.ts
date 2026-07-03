@@ -70,6 +70,11 @@ export interface DashboardTodoItem {
   to: string;
 }
 
+export interface WorkbenchListItem {
+  text: string;
+  tone?: "neutral" | "warning";
+}
+
 export function taskKey(task: Pick<ProcessTaskView | R8WorkflowTaskView, "businessType" | "businessId" | "taskType">) {
   return `${task.businessType}:${task.businessId}:${task.taskType}`;
 }

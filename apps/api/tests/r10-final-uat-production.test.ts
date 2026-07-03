@@ -149,13 +149,20 @@ describe("R10 final UAT and production go/no-go evidence", () => {
         qualificationAttachments: [{ fileName: "r10-license.pdf", contentType: "application/pdf", sizeBytes: 1024 }]
       });
     expect(admission.status).toBe(201);
-    expect(admission.body.supplier.admissionStatus).toBe("admitted");
+    expect(admission.body.supplier.admissionStatus).toBe("pending");
+
+    const qualificationReview = await request(runtime.app)
+      .post(`/api/suppliers/${admission.body.supplier.id}/reviews`)
+      .set("x-mock-user-id", "u1")
+      .send({ reviewType: "qualification_initial_review", status: "passed", score: 90, opinion: "R10 UAT 资质初审通过" });
+    expect(qualificationReview.status).toBe(201);
 
     const review = await request(runtime.app)
       .post(`/api/suppliers/${admission.body.supplier.id}/reviews`)
       .set("x-mock-user-id", "u1")
       .send({ reviewType: "admission_assessment", status: "passed", score: 91, opinion: "R10 UAT 准入通过" });
     expect(review.status).toBe(201);
+    expect(review.body.supplier.admissionStatus).toBe("admitted");
 
     const { order } = await createReceivedMallOrder(runtime);
     expect(order.status).toBe("received");

@@ -74,7 +74,7 @@ function fallbackBpmnXml() {
 </definitions>`;
 }
 
-async function createReadyRequest(runtime: ReturnType<typeof boot>, title: string, userId = "u2", orgId = "org-east") {
+async function createReadyRequest(runtime: ReturnType<typeof boot>, title: string, userId = "u8", orgId = "org-hotel") {
   const created = await request(runtime.app)
     .post("/api/procurement-requests")
     .set("x-mock-user-id", userId)
@@ -118,7 +118,7 @@ async function createPilot(runtime: ReturnType<typeof boot>, definitionId: strin
       businessType: "procurement_request",
       status,
       scope: {
-        orgIds: ["org-east"],
+        orgIds: ["org-hotel"],
         businessIds: [requestId],
         environments: ["test"]
       }
@@ -137,10 +137,10 @@ describe("M5-D BPMN pilot closing gate", () => {
     const healthyPilot = await createPilot(runtime, healthyDefinition.id, healthyRequest.id, "M5-D healthy shadow pilot");
     const fallbackPilot = await createPilot(runtime, fallbackDefinition.id, fallbackRequest.id, "M5-D fallback shadow pilot");
 
-    await request(runtime.app).post(`/api/procurement-requests/${healthyRequest.id}/submit`).set("x-mock-user-id", "u2").expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${healthyRequest.id}/submit`).set("x-mock-user-id", "u8").expect(200);
     await request(runtime.app).post(`/api/procurement-requests/${healthyRequest.id}/approve`).set("x-mock-user-id", "u1").send({ approved: true, opinion: "M5-D approve" }).expect(200);
-    await request(runtime.app).post(`/api/procurement-requests/${healthyRequest.id}/method-decision`).set("x-mock-user-id", "u1").send({ ruleId: "pmr-open" }).expect(200);
-    await request(runtime.app).post(`/api/procurement-requests/${fallbackRequest.id}/submit`).set("x-mock-user-id", "u2").expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${healthyRequest.id}/method-decision`).set("x-mock-user-id", "u2").send({ ruleId: "pmr-open" }).expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${fallbackRequest.id}/submit`).set("x-mock-user-id", "u8").expect(200);
 
     const response = await request(runtime.app).get("/api/bpmn/pilot-health").set("x-mock-user-id", "u6");
     expect(response.status).toBe(200);
@@ -161,7 +161,7 @@ describe("M5-D BPMN pilot closing gate", () => {
         needsAttention: false
       })
     );
-    expect(healthy.scope).toEqual({ orgIds: ["org-east"], businessIdCount: 1, environments: ["test"] });
+    expect(healthy.scope).toEqual({ orgIds: ["org-hotel"], businessIdCount: 1, environments: ["test"] });
 
     const fallback = response.body.bpmnPilotHealth.find((item: { pilotId: string }) => item.pilotId === fallbackPilot.id);
     expect(fallback).toEqual(
@@ -192,8 +192,8 @@ describe("M5-D BPMN pilot closing gate", () => {
     const enabledPilot = await createPilot(runtime, definition.id, enabledRequest.id, "M5-D enabled pilot", "enabled");
     const disabledPilot = await createPilot(runtime, definition.id, disabledRequest.id, "M5-D disabled pilot", "disabled");
 
-    await request(runtime.app).post(`/api/procurement-requests/${enabledRequest.id}/submit`).set("x-mock-user-id", "u2").expect(200);
-    await request(runtime.app).post(`/api/procurement-requests/${disabledRequest.id}/submit`).set("x-mock-user-id", "u2").expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${enabledRequest.id}/submit`).set("x-mock-user-id", "u8").expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${disabledRequest.id}/submit`).set("x-mock-user-id", "u8").expect(200);
 
     const auditor = await request(runtime.app).get("/api/bpmn/pilot-health").set("x-mock-user-id", "u5");
     expect(auditor.status).toBe(200);
@@ -219,7 +219,7 @@ describe("M5-D BPMN pilot closing gate", () => {
     const pilot = await createPilot(runtime, definition.id, procurementRequest.id, "M5-D rollback pilot");
 
     await request(runtime.app).post(`/api/bpmn/pilots/${pilot.id}/rollback`).set("x-mock-user-id", "u6").send({ reason: "M5-D closing gate rollback" }).expect(200);
-    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u2").expect(200);
+    await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u8").expect(200);
 
     const health = await request(runtime.app).get("/api/bpmn/pilot-health").set("x-mock-user-id", "u6");
     expect(health.status).toBe(200);

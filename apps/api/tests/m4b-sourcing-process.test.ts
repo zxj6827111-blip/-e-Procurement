@@ -254,6 +254,9 @@ describe("M4-B RFQ / TENDER / DIRECT sourcing process", () => {
     const registration = await request(runtime.app).post(`/api/announcements/${announcement.id}/registrations`).set("x-mock-user-id", user.id).send({ materialMetadata: [] });
     expect(registration.status).toBe(201);
 
+    const qualified = await request(runtime.app).post(`/api/registrations/${registration.body.registration.id}/qualify`).set("x-mock-user-id", "u2").send({ status: "qualified" });
+    expect(qualified.status).toBe(200);
+
     const draft = await request(runtime.app).post(`/api/projects/${projectId}/bids`).set("x-mock-user-id", user.id).send({ amount: 900, deliveryDays: 2, responseSummary: "M4-B RFQ quote" });
     expect(draft.status).toBe(201);
     const submitted = await request(runtime.app).post(`/api/bids/${draft.body.bid.id}/submit`).set("x-mock-user-id", user.id);

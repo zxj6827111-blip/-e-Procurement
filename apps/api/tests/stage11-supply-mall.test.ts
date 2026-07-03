@@ -319,7 +319,7 @@ describe("Stage 11 supply chain mall expansion", () => {
 
     const contract = await request(runtime.app).get(`/api/mall/orders/${order.body.order.id}/contract`).set("x-mock-user-id", "u8");
     expect(contract.status).toBe(200);
-    expect(contract.body.contract.adapterBoundary).toContain("未声明真实合同系统联调完成");
+    expect(contract.body.contract.adapterBoundary).toContain("真实合同系统验收资料尚未提供");
 
     const copied = await request(runtime.app).post(`/api/mall/orders/${order.body.order.id}/copy`).set("x-mock-user-id", "u8").send({ shippingAddress: "PDF 1:1 复制订单收货仓" });
     expect(copied.status).toBe(201);

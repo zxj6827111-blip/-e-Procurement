@@ -122,7 +122,7 @@ function canReadOrg(req: Request, orgId: string) {
 
 function canReadProject(ctx: AppContext, req: Request, project: ProcurementProject) {
   if (req.auth.roleId === "buyer") {
-    return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || project.buyer === req.auth.user.name || req.auth.orgScope.includes(project.orgId);
+    return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || project.buyer === req.auth.user.name;
   }
   if (["hotel_buyer", "platform_operator"].includes(req.auth.roleId)) {
     return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || req.auth.orgScope.includes(project.orgId);

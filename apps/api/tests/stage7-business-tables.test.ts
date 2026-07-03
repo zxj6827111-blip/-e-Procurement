@@ -38,10 +38,12 @@ describe("Stage 7 formal business tables", () => {
     const beforeRequests = count(runtime1.ctx, "business_procurement_requests");
     const createdRequest = await request(runtime1.app)
       .post("/api/procurement-requests")
-      .set("x-mock-user-id", "u2")
+      .set("x-mock-user-id", "u8")
       .send({
         title: "Stage7 正式表采购申请",
         orgId: "org-hotel",
+        requestDepartment: "客房部",
+        requesterName: "酒店采购",
         category: "客房一次性用品",
         budgetLabel: "正式表同步",
         budgetAmount: 58000,

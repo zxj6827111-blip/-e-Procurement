@@ -2,7 +2,20 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
-const baseUrl = process.env.UI_SMOKE_BASE_URL ?? "http://127.0.0.1:5173";
+async function resolveWebBaseUrl() {
+  if (process.env.UI_SMOKE_BASE_URL) return process.env.UI_SMOKE_BASE_URL;
+  for (const candidate of ["http://127.0.0.1:5173", "http://127.0.0.1:5174"]) {
+    try {
+      const response = await fetch(candidate);
+      if (response.ok) return candidate;
+    } catch {
+      // Try the next common Vite port.
+    }
+  }
+  return "http://127.0.0.1:5173";
+}
+
+const baseUrl = await resolveWebBaseUrl();
 const outDir = join(process.cwd(), "output", "ui-page-kind-smoke");
 const classificationText = readFileSync(join(process.cwd(), "apps/web/src/router/page-classification.ts"), "utf8");
 
@@ -16,7 +29,7 @@ const userByRoute = [
   { pattern: /^\/expert-scoring/, userId: "u4" },
   { pattern: /^\/expert-review/, userId: "u2" },
   { pattern: /^\/approval-rules/, userId: "u1" },
-  { pattern: /^\/integration-boundary/, userId: "u6" },
+  { pattern: /^\/integration-boundary/, userId: "u5" },
   { pattern: /^\/permissions/, userId: "u6" },
   { pattern: /^\/audit/, userId: "u5" },
   { pattern: /^\/file-center/, userId: "u2" },

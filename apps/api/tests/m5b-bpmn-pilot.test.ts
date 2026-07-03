@@ -78,7 +78,7 @@ function fallbackBpmnXml() {
 </definitions>`;
 }
 
-async function createReadyRequest(runtime: ReturnType<typeof boot>, title: string, userId = "u2", orgId = "org-east") {
+async function createReadyRequest(runtime: ReturnType<typeof boot>, title: string, userId = "u8", orgId = "org-hotel") {
   const created = await request(runtime.app)
     .post("/api/procurement-requests")
     .set("x-mock-user-id", userId)
@@ -124,7 +124,7 @@ async function createEnabledPilot(runtime: ReturnType<typeof boot>, definitionId
       businessType: "procurement_request",
       status,
       scope: {
-        orgIds: ["org-east"],
+        orgIds: ["org-hotel"],
         businessIds: [requestId]
       }
     });
@@ -145,16 +145,16 @@ describe("M5-B BPMN controlled pilot", () => {
     expect(pilot.scope.businessIdCount).toBe(1);
     expect(JSON.stringify(pilot)).not.toContain(pilotedRequest.id);
 
-    const submitted = await request(runtime.app).post(`/api/procurement-requests/${pilotedRequest.id}/submit`).set("x-mock-user-id", "u2");
+    const submitted = await request(runtime.app).post(`/api/procurement-requests/${pilotedRequest.id}/submit`).set("x-mock-user-id", "u8");
     expect(submitted.status).toBe(200);
     expect(Object.keys(submitted.body).sort()).toEqual(["auditLogId", "procurementRequest", "workflow"]);
     const approved = await request(runtime.app).post(`/api/procurement-requests/${pilotedRequest.id}/approve`).set("x-mock-user-id", "u1").send({ approved: true, opinion: "M5-B approve" });
     expect(approved.status).toBe(200);
     expect(Object.keys(approved.body).sort()).toEqual(["auditLogId", "procurementRequest"]);
-    const method = await request(runtime.app).post(`/api/procurement-requests/${pilotedRequest.id}/method-decision`).set("x-mock-user-id", "u1").send({ ruleId: "pmr-open" });
+    const method = await request(runtime.app).post(`/api/procurement-requests/${pilotedRequest.id}/method-decision`).set("x-mock-user-id", "u2").send({ ruleId: "pmr-open" });
     expect(method.status).toBe(200);
 
-    const otherSubmitted = await request(runtime.app).post(`/api/procurement-requests/${otherRequest.id}/submit`).set("x-mock-user-id", "u2");
+    const otherSubmitted = await request(runtime.app).post(`/api/procurement-requests/${otherRequest.id}/submit`).set("x-mock-user-id", "u8");
     expect(otherSubmitted.status).toBe(200);
 
     expect(one(runtime, "select approval_status from r2_approval_instances where business_type = 'procurement_request' and business_id = ?", pilotedRequest.id)).toEqual({ approval_status: "approved" });
@@ -190,11 +190,11 @@ describe("M5-B BPMN controlled pilot", () => {
     const definition = await createEnabledDefinition(runtime, "m5b_fallback_procurement_request", fallbackBpmnXml());
     const pilot = await createEnabledPilot(runtime, definition.id, procurementRequest.id);
 
-    const submitted = await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u2");
+    const submitted = await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/submit`).set("x-mock-user-id", "u8");
     expect(submitted.status).toBe(200);
     const approved = await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/approve`).set("x-mock-user-id", "u1").send({ approved: true });
     expect(approved.status).toBe(200);
-    const method = await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/method-decision`).set("x-mock-user-id", "u1").send({ ruleId: "pmr-open" });
+    const method = await request(runtime.app).post(`/api/procurement-requests/${procurementRequest.id}/method-decision`).set("x-mock-user-id", "u2").send({ ruleId: "pmr-open" });
     expect(method.status).toBe(200);
 
     expect(one(runtime, "select approval_status from r2_procurement_requests where id = ?", procurementRequest.id)).toEqual({ approval_status: "approved" });
