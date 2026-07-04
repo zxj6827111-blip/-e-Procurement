@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ProcessBusinessType } from "../../api/process";
-import ProcessTimeline from "../../components/ProcessTimeline.vue";
+import ActivityRecordPanel from "../../components/ActivityRecordPanel.vue";
 import { EnterpriseSurface } from "../../components/base";
 
 defineProps<{
@@ -11,12 +11,12 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="采购流程轨迹" description="展示项目级招采主流程，公告创建、发布、邀请和关闭后会追加对应事件。">
-    <ProcessTimeline
+  <EnterpriseSurface title="采购活动记录" description="展示公告创建、发布、邀请和关闭后的项目级招采活动。">
+    <ActivityRecordPanel
       v-if="selectedProjectId"
       :business-type="processBusinessType"
       :business-id="selectedProjectId"
-      title="项目招采流程轨迹"
+      title="项目招采活动记录"
       :refresh-key="processRefreshKey"
     />
   </EnterpriseSurface>

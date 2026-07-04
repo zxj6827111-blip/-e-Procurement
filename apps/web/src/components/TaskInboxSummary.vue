@@ -21,7 +21,7 @@ const props = withDefaults(
     compact?: boolean;
   }>(),
   {
-    title: "待办与消息",
+    title: "任务与提醒",
     businessTypes: () => [],
     projectId: "",
     compact: false
@@ -49,8 +49,8 @@ const summary = computed(() => summarizeWorkflow(visibleTasks.value, visibleMess
 
 const taskColumns: DataTableColumn[] = [
   { key: "statusLabel", label: "状态" },
-  { key: "taskTypeLabel", label: "待办类型" },
-  { key: "title", label: "标题" },
+  { key: "taskTypeLabel", label: "任务类型" },
+  { key: "title", label: "事项" },
   { key: "createdAt", label: "创建时间" },
   { key: "actions", label: "操作" }
 ];
@@ -58,7 +58,7 @@ const taskColumns: DataTableColumn[] = [
 const messageColumns: DataTableColumn[] = [
   { key: "readLabel", label: "状态" },
   { key: "businessTypeLabel", label: "业务类型" },
-  { key: "title", label: "标题" },
+  { key: "title", label: "提醒" },
   { key: "createdAt", label: "创建时间" },
   { key: "actions", label: "操作" }
 ];
@@ -85,7 +85,7 @@ async function load() {
     tasks.value = taskViews;
     messages.value = messageViews;
   } catch (error) {
-    loadError.value = error instanceof Error ? error.message : "待办消息加载失败";
+    loadError.value = error instanceof Error ? error.message : "任务提醒加载失败";
     tasks.value = [];
     messages.value = [];
   }
@@ -102,22 +102,22 @@ watch(
 </script>
 
 <template>
-  <EnterpriseSurface :title="title" description="按当前角色和业务范围汇总待办任务、未读消息和跳转入口。">
+  <EnterpriseSurface :title="title" description="按当前角色和业务范围汇总待处理事项、未读提醒和操作入口。">
     <template #actions>
-      <RouterLink class="eds-button eds-button-text" to="/my-tasks">待办中心</RouterLink>
+      <RouterLink class="eds-button eds-button-text" to="/my-tasks">任务中心</RouterLink>
       <RouterLink class="eds-button eds-button-text" to="/messages">消息中心</RouterLink>
     </template>
 
     <div class="eds-section">
       <SummaryCards
         :items="[
-          { label: '待办任务', value: summary.pendingTasks },
+          { label: '待处理事项', value: summary.pendingTasks },
           { label: '未读消息', value: summary.unreadMessages }
         ]"
       />
 
       <FeedbackMessage v-if="loadError" tone="error">{{ loadError }}</FeedbackMessage>
-      <FeedbackMessage v-else-if="!visibleTasks.length && !visibleMessages.length">当前角色暂无相关待办或消息。</FeedbackMessage>
+      <FeedbackMessage v-else-if="!visibleTasks.length && !visibleMessages.length">当前角色暂无相关任务或提醒。</FeedbackMessage>
 
       <DataTable v-if="visibleTasks.length" :columns="taskColumns" :rows="taskRows" row-key="id">
         <template #statusLabel="{ value }">

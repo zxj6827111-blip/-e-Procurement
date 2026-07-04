@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ErrorAlert from "../../components/ErrorAlert.vue";
-import ProcessTimeline from "../../components/ProcessTimeline.vue";
+import ActivityRecordPanel from "../../components/ActivityRecordPanel.vue";
 import { EnterpriseSurface, FeedbackMessage, FilterBar, PageHeader, StatusTag, SummaryCards, type SummaryCardItem } from "../../components/base";
 
 defineProps<{
@@ -37,11 +37,11 @@ defineProps<{
   <FeedbackMessage v-if="message">{{ message }}</FeedbackMessage>
   <FeedbackMessage v-if="loading">正在加载订单履约数据...</FeedbackMessage>
 
-  <ProcessTimeline
+  <ActivityRecordPanel
     v-if="selectedMallOrderId"
     business-type="order_fulfillment"
     :business-id="selectedMallOrderId"
-    title="商城订单履约流程"
+    title="商城订单履约业务"
     :refresh-key="processRefreshKey"
   />
 

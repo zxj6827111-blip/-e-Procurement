@@ -9,7 +9,7 @@ defineProps<{
 </script>
 
 <template>
-  <PageHeader title="消息中心" eyebrow="业务通知" description="查看审批、任务和业务事件提醒，并按业务对象进入对应处理页面。">
+  <PageHeader title="消息中心" eyebrow="业务通知" description="查看审批、任务和业务活动提醒，并按业务对象进入对应处理页面。">
     <template #actions>
       <StatusTag v-if="loading" tone="warning">加载中</StatusTag>
       <RouterLink class="eds-button eds-button-text" to="/my-tasks">待办中心</RouterLink>

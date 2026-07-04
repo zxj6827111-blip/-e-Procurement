@@ -1,6 +1,6 @@
 # Visual Review Pack
 
-- Generated at: 2026-07-04T15:43:36.069Z
+- Generated at: 2026-07-04T17:18:31.528Z
 - Result: PASS
 - Web: http://127.0.0.1:5306
 - API: http://127.0.0.1:3346
@@ -12,10 +12,10 @@
 | 采购经办工作台 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/buyer-dashboard-1440x900.png | 805 | shell=1 | 2 |
 | 集团采购工作台 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/group-dashboard-1440x900.png | 598 | shell=1 | 2 |
 | 供应商门户 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/supplier-portal-1440x900.png | 598 | shell=1 | 1 |
-| 采购项目详情 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/project-detail-1440x900.png | 1391 | shell=1 | 2 |
+| 采购项目详情 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/project-detail-1440x900.png | 1393 | shell=1 | 2 |
 | 招采执行详情 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/project-sourcing-1440x900.png | 1572 | shell=1 | 8 |
 | 报价响应 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/bid-response-1440x900.png | 839 | shell=1 | 1 |
-| 专家评分 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/expert-scoring-1440x900.png | 1363 | shell=1 | 4 |
+| 专家评分 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/expert-scoring-1440x900.png | 1365 | shell=1 | 4 |
 | 履约结算详情 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/project-fulfillment-1440x900.png | 1241 | shell=1 | 6 |
 | 结算材料 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/settlement-1440x900.png | 1886 | shell=1 | 4 |
 | 审计日志 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/audit-1440x900.png | 509 | shell=1 | 1 |

@@ -1,11 +1,11 @@
 # Sprint 1 UI Copy Scan
 
-- Generated at: 2026-07-04T15:42:59.364Z
+- Generated at: 2026-07-04T17:18:02.744Z
 - Scope: apps/web/src visible Vue copy and apps/api/src user-facing string literals.
 - Result: PASS
 - Blockers: 0
-- Warnings: 14
-- Informational findings: 42
+- Warnings: 7
+- Informational findings: 41
 
 | Severity | Term | Location | Text |
 | --- | --- | --- | --- |
@@ -47,20 +47,12 @@
 | INFO | R8/Process/BPMN display | apps/api/src/services/bpmn-pilot-service.ts:297 | BPMN_PILOT_SIMULATION_FAILED |
 | WARN | 治理 | apps/web/src/pages/approval-rules/ApprovalRulesPageShell.vue:18 | 系统治理 |
 | WARN | 治理 | apps/web/src/pages/file-center/FileCenterPageShell.vue:12 | 附件治理 |
-| WARN | R8/Process/BPMN display | apps/web/src/pages/permissions/BpmnDefinitionsTable.vue:13 | BPMN 流程定义 |
-| WARN | 治理 | apps/web/src/pages/permissions/BpmnDefinitionsTable.vue:13 | 流程定义以版本、校验状态和 XML 摘要作为治理字段。 |
-| WARN | R8/Process/BPMN display | apps/web/src/pages/permissions/BpmnDefinitionsTable.vue:14 | 暂无 BPMN 定义 |
-| WARN | 治理 | apps/web/src/pages/permissions/BpmnPilotGovernanceLogsTable.vue:13 | BPMN 试点治理日志 |
-| WARN | 治理 | apps/web/src/pages/permissions/BpmnPilotGovernanceLogsTable.vue:13 | 展示最近的试点治理动作、执行角色和治理摘要。 |
+| WARN | 治理 | apps/web/src/pages/permissions/BpmnDefinitionsTable.vue:13 | 规则版本以版本号、校验状态和签名摘要作为治理字段。 |
+| WARN | 治理 | apps/web/src/pages/permissions/BpmnPilotGovernanceLogsTable.vue:13 | 展示最近的规则变更、执行角色和治理说明。 |
 | WARN | 治理 | apps/web/src/pages/permissions/BpmnPilotGovernanceLogsTable.vue:14 | 暂无治理日志 |
-| WARN | R8/Process/BPMN display | apps/web/src/pages/permissions/BpmnPilotHealthTable.vue:19 | BPMN 试点健康 |
-| WARN | R8/Process/BPMN display | apps/web/src/pages/permissions/BpmnPilotRunsTable.vue:16 | BPMN 试点运行 |
-| WARN | R8/Process/BPMN display | apps/web/src/pages/permissions/BpmnPilotsTable.vue:13 | BPMN 试点 |
-| WARN | R8/Process/BPMN display | apps/web/src/pages/permissions/BpmnPilotsTable.vue:14 | 暂无 BPMN 试点 |
-| WARN | R8/Process/BPMN display | apps/web/src/pages/permissions/PermissionsPageShell.vue:20 | 集中查看菜单权限、动作授权、审批规则、BPMN 版本管理与组织账号。 |
-| INFO | R8/Process/BPMN display | apps/web/src/pages/permissions/display.ts:16 | BPMN 流程配置 |
+| WARN | 治理 | apps/web/src/pages/permissions/PermissionsPageShell.vue:20 | 集中查看菜单权限、动作授权、审批规则、规则版本治理与组织账号。 |
+| INFO | 治理 | apps/web/src/pages/permissions/display.ts:16 | 规则版本治理 |
 | INFO | 治理 | apps/web/src/pages/permissions/display.ts:93 | 版本治理 |
-| INFO | R8/Process/BPMN display | apps/web/src/pages/permissions/usePermissionsPage.ts:45 | BPMN 试点 |
 | WARN | 治理 | apps/web/src/pages/supplier-management/SupplierActionPanel.vue:66 | 这里保存的基础信息、资质附件会同步到集团供应商治理页，用于资质初审和准入评审。 |
 | INFO | Mock customer message | apps/web/src/router/page-classification.ts:30 | Mock role switch is a controlled system form. |
 | INFO | R8/Process/BPMN display | apps/web/src/utils/status-labels.ts:72 | 影子试点 |

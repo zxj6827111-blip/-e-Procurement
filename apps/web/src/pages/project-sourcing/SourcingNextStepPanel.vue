@@ -8,7 +8,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="下一段流程">
+  <EnterpriseSurface title="下一段业务">
     <div class="eds-form-section">
       <div>
         <span class="eds-meta">履约结算与归档</span>

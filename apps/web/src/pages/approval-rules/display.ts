@@ -6,7 +6,7 @@ export const RULE_COLUMNS: DataTableColumn[] = [
   { key: "rule", label: "规则" },
   { key: "businessType", label: "业务类型" },
   { key: "amountRange", label: "金额范围" },
-  { key: "nodeRoles", label: "审批节点" },
+  { key: "nodeRoles", label: "审批环节" },
   { key: "actions", label: "动作" },
   { key: "strategy", label: "默认策略" },
   { key: "status", label: "状态" },

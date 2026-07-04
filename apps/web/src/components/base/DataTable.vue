@@ -27,7 +27,7 @@ defineProps<{
             <div class="eds-state">
               <span class="eds-state-icon" aria-hidden="true"></span>
               <h3>{{ emptyTitle ?? "暂无业务记录" }}</h3>
-              <p>{{ emptyText ?? "当前没有符合条件的业务记录，请调整筛选条件或完成上一流程节点后再查看。" }}</p>
+              <p>{{ emptyText ?? "当前没有符合条件的业务记录，请调整筛选条件或完成上一业务动作后再查看。" }}</p>
             </div>
           </td>
         </tr>

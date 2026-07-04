@@ -2,7 +2,7 @@
 import { RouterLink } from "vue-router";
 import AuditLogRef from "../../components/AuditLogRef.vue";
 import ErrorAlert from "../../components/ErrorAlert.vue";
-import ProcessTimeline from "../../components/ProcessTimeline.vue";
+import ActivityRecordPanel from "../../components/ActivityRecordPanel.vue";
 import {
   EnterpriseButton,
   EnterpriseSurface,
@@ -71,8 +71,8 @@ defineEmits<{
             </ul>
           </RiskAlertPanel>
 
-          <EnterpriseSurface title="流程进度">
-            <ProcessTimeline business-type="procurement_request" :business-id="requestId" title="采购需求流程进度" :refresh-key="processRefreshKey" />
+          <EnterpriseSurface title="审批进度">
+            <ActivityRecordPanel business-type="procurement_request" :business-id="requestId" title="采购需求审批进度" :refresh-key="processRefreshKey" />
           </EnterpriseSurface>
         </template>
       </SplitDetailLayout>

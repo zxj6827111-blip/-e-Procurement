@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ErrorAlert from "../../components/ErrorAlert.vue";
-import ProcessTimeline from "../../components/ProcessTimeline.vue";
+import ActivityRecordPanel from "../../components/ActivityRecordPanel.vue";
 import {
   EnterpriseSurface,
   FeedbackMessage,
@@ -60,20 +60,20 @@ defineProps<{
         </ul>
       </RiskAlertPanel>
 
-      <EnterpriseSurface v-if="selectedSettlementBillId" title="结算流程">
-        <ProcessTimeline
+      <EnterpriseSurface v-if="selectedSettlementBillId" title="结算记录">
+        <ActivityRecordPanel
           business-type="settlement"
           :business-id="selectedSettlementBillId"
-          title="结算流程"
+          title="结算记录"
           :refresh-key="processRefreshKey"
         />
       </EnterpriseSurface>
 
-      <EnterpriseSurface v-if="selectedInvoiceId" title="发票流程">
-        <ProcessTimeline
+      <EnterpriseSurface v-if="selectedInvoiceId" title="发票业务">
+        <ActivityRecordPanel
           business-type="invoice"
           :business-id="selectedInvoiceId"
-          title="发票流程"
+          title="发票业务"
           :refresh-key="processRefreshKey"
         />
       </EnterpriseSurface>

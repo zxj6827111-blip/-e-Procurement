@@ -5,9 +5,9 @@ defineProps<{
 </script>
 
 <template>
-  <div class="eds-business-timeline">
-    <div v-for="(item, index) in items" :key="`${item.title}-${index}`" class="eds-process-step">
-      <span class="eds-process-step-index">{{ index + 1 }}</span>
+  <div class="eds-activity-rail">
+    <div v-for="(item, index) in items" :key="`${item.title}-${index}`" class="eds-step-item">
+      <span class="eds-step-index">{{ index + 1 }}</span>
       <div>
         <strong>{{ item.title }}</strong>
         <p v-if="item.description || item.time" class="eds-meta">{{ item.description }}<span v-if="item.description && item.time"> / </span>{{ item.time }}</p>

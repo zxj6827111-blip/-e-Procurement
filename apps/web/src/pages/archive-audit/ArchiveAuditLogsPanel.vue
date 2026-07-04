@@ -11,8 +11,8 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="项目审计轨迹" :description="`当前项目 ${projectAuditLogs.length} 条审计记录。`">
-    <DataTable :columns="AUDIT_COLUMNS" :rows="projectAuditLogs" row-key="id" empty-text="当前项目暂无审计轨迹。">
+  <EnterpriseSurface title="项目审计记录" :description="`当前项目 ${projectAuditLogs.length} 条审计记录。`">
+    <DataTable :columns="AUDIT_COLUMNS" :rows="projectAuditLogs" row-key="id" empty-text="当前项目暂无审计记录。">
       <template #action="{ row }">{{ labelAuditAction(row.action) }}</template>
       <template #objectType="{ row }">{{ labelObjectType(row.objectType) }}</template>
       <template #result="{ row }">

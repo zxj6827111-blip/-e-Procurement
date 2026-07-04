@@ -16,7 +16,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="BPMN 试点健康" description="集中查看兼容率、回退、失败和需关注状态。">
+  <EnterpriseSurface title="规则试点健康" description="集中查看兼容率、回退、失败和需关注状态。">
     <SummaryCards
       :items="[
         { label: '试点数', value: summary.pilotCount },

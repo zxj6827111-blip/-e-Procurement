@@ -6,7 +6,7 @@ import BiddingBusinessDialog from "./BiddingBusinessDialog.vue";
 import BiddingDraftPanel from "./BiddingDraftPanel.vue";
 import BiddingListPanel from "./BiddingListPanel.vue";
 import BiddingPageShell from "./BiddingPageShell.vue";
-import BiddingTimelinePanel from "./BiddingTimelinePanel.vue";
+import BiddingActivityRecordPanel from "./BiddingActivityRecordPanel.vue";
 import { useBiddingPage } from "./useBiddingPage";
 
 const {
@@ -77,7 +77,7 @@ const {
       :bid-status-tone="bidStatusTone"
     />
 
-    <BiddingTimelinePanel
+    <BiddingActivityRecordPanel
       :selected-project-id="selectedProjectId"
       :process-refresh-key="processRefreshKey"
       :project-process-type="projectProcessType"

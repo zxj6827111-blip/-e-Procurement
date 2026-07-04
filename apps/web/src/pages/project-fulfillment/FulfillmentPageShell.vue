@@ -40,7 +40,7 @@ defineProps<{
       <p>{{ description }}</p>
     </div>
     <div class="eds-business-context-aside">
-      <span class="eds-meta">当前节点</span>
+      <span class="eds-meta">当前阶段</span>
       <strong>{{ statusLabel }}</strong>
       <StatusTag :tone="statusTone">{{ statusLabel }}</StatusTag>
       <RouterLink class="eds-action-link" :to="`/project-workbench/${encodeURIComponent(projectId)}`">返回项目详情 <span>→</span></RouterLink>

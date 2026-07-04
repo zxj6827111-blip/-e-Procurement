@@ -6,7 +6,7 @@ import AnnouncementDraftForm from "./AnnouncementDraftForm.vue";
 import AnnouncementListPanel from "./AnnouncementListPanel.vue";
 import AnnouncementProjectDocumentPanel from "./AnnouncementProjectDocumentPanel.vue";
 import AnnouncementsPageShell from "./AnnouncementsPageShell.vue";
-import AnnouncementTimelinePanel from "./AnnouncementTimelinePanel.vue";
+import AnnouncementActivityRecordPanel from "./AnnouncementActivityRecordPanel.vue";
 import InvitationListPanel from "./InvitationListPanel.vue";
 import { useAnnouncementsInvitationsPage } from "./useAnnouncementsInvitationsPage";
 
@@ -124,7 +124,7 @@ const {
       @select="(announcementId) => (selectedAnnouncementId = announcementId)"
     />
 
-    <AnnouncementTimelinePanel :selected-project-id="selectedProjectId" :process-business-type="selectedProjectProcessType" :process-refresh-key="processRefreshKey" />
+    <AnnouncementActivityRecordPanel :selected-project-id="selectedProjectId" :process-business-type="selectedProjectProcessType" :process-refresh-key="processRefreshKey" />
 
     <InvitationListPanel
       :invitations="displayedInvitations"

@@ -39,7 +39,7 @@ defineProps<{
       <p>{{ description }}</p>
     </div>
     <div class="eds-business-context-aside">
-      <span class="eds-meta">当前节点</span>
+      <span class="eds-meta">当前阶段</span>
       <strong>{{ hasWorkbench ? projectStatusText : "未加载" }}</strong>
       <RouterLink class="eds-action-link" :to="`/project-workbench/${encodeURIComponent(projectId)}`">返回项目详情 <span>→</span></RouterLink>
     </div>
@@ -58,7 +58,7 @@ defineProps<{
       </EnterpriseSurface>
 
       <template #aside>
-        <RiskAlertPanel title="招采控制点" description="报价、开标和评审节点需要同时满足时限、保密和审批要求。">
+        <RiskAlertPanel title="招采控制点" description="报价、开标和评审安排需要同时满足时限、保密和审批要求。">
           <ul class="eds-meta-list">
             <li>报价截止前不得暴露供应商报价明细。</li>
             <li>评审材料和专家评分需按项目留痕。</li>

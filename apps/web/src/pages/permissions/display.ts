@@ -13,7 +13,7 @@ export const menuLabels: Record<string, string> = {
 export const actionLabels: Record<string, string> = {
   "audit:read": "查看审计日志",
   "bid:read": "查看报价",
-  "bpmn:manage": "BPMN 流程配置",
+  "bpmn:manage": "规则版本治理",
   "config:manage": "维护基础配置",
   "file:download": "下载文件",
   "file:upload": "上传文件",
@@ -52,36 +52,36 @@ export const businessTypeLabels: Record<string, string> = {
   archive_supplement: "档案补档审批",
   award_approval: "定标审批",
   contract_preparation: "合同入口",
-  direct_purchase: "直采流程",
-  invoice: "发票流程",
+  direct_purchase: "直采业务",
+  invoice: "发票业务",
   mall_order: "商城订单审批",
   order_fulfillment: "履约订单",
-  payment: "付款流程",
+  payment: "付款记录",
   price_approval: "价格审批",
   procurement_request: "采购需求审批",
   review_award: "评审定标",
-  rfq: "询价流程",
-  settlement: "结算流程",
+  rfq: "询价业务",
+  settlement: "结算记录",
   supplier_onboarding: "供应商准入",
-  tender: "招标流程"
+  tender: "招标业务"
 };
 
 export const approvalRuleColumns = [
   { key: "ruleName", label: "规则" },
   { key: "businessType", label: "业务类型" },
-  { key: "nodeRoleIds", label: "节点角色" },
+  { key: "nodeRoleIds", label: "审批角色" },
   { key: "actions", label: "动作" },
   { key: "status", label: "状态" },
   { key: "versionNo", label: "版本" }
 ];
 
 export const bpmnDefinitionColumns = [
-  { key: "process", label: "流程" },
+  { key: "ruleVersion", label: "业务" },
   { key: "businessType", label: "业务类型" },
   { key: "versionNo", label: "版本" },
   { key: "status", label: "状态" },
   { key: "validationStatus", label: "校验" },
-  { key: "xmlSha256", label: "XML 摘要" }
+  { key: "xmlSha256", label: "签名摘要" }
 ];
 
 export const bpmnPilotColumns = [
@@ -113,10 +113,10 @@ export const bpmnChangeLogColumns = [
 ];
 
 export const bpmnRunColumns = [
-  { key: "eventCode", label: "事件" },
+  { key: "eventCode", label: "活动" },
   { key: "business", label: "业务" },
   { key: "status", label: "状态" },
-  { key: "predictedNodeKey", label: "预测节点" },
+  { key: "predictedNodeKey", label: "预测环节" },
   { key: "stoppedReason", label: "停止原因" },
   { key: "fallbackTo", label: "回退" }
 ];

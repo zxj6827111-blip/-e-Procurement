@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
-import WorkflowSurfaceSummary from "../../components/WorkflowSurfaceSummary.vue";
+import TaskInboxSummary from "../../components/TaskInboxSummary.vue";
 import { EnterpriseSurface } from "../../components/base";
 import type { NextAction } from "./types";
 
@@ -12,7 +12,7 @@ defineProps<{
 
 <template>
   <div class="eds-responsive-grid">
-    <WorkflowSurfaceSummary
+    <TaskInboxSummary
       title="项目相关待办与消息"
       :business-types="['procurement_request', 'award_approval', 'settlement_bill', 'invoice', 'payment_request']"
       :project-id="projectId"

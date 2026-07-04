@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { apiGet } from "../../api/http";
 import { loadProcessTasks, type ProcessTaskView } from "../../api/process";
@@ -208,7 +208,7 @@ const todoItems = computed(() => {
         title: item.name ?? item.title ?? "采购项目",
         meta: `预算 ${money(item.budgetAmount)}`,
         status: labelStatus(item.status),
-        due: item.dueAt ? formatDateTime(item.dueAt) : "按项目节点推进",
+        due: item.dueAt ? formatDateTime(item.dueAt) : "按项目阶段推进",
         risk: ["document_published", "bidding_open"].includes(item.status) ? "关注报价截止" : "按计划",
         to: "/project-workbench"
       })),
@@ -271,7 +271,7 @@ const todoColumns = computed<DataTableColumn[]>(() => {
   if (["buyer", "platform_operator"].includes(session.roleId)) {
     return [
       { key: "title", label: "项目 / 事项" },
-      { key: "status", label: "当前节点" },
+      { key: "status", label: "项目阶段" },
       { key: "due", label: "时限" },
       { key: "risk", label: "风险" },
       { key: "action", label: "操作" }

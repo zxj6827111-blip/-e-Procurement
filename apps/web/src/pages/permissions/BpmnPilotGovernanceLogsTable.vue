@@ -10,7 +10,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="BPMN 试点治理日志" description="展示最近的试点治理动作、执行角色和治理摘要。">
+  <EnterpriseSurface title="规则试点变更记录" description="展示最近的规则变更、执行角色和治理说明。">
     <DataTable :columns="bpmnChangeLogColumns" :rows="rows.slice(0, 8)" row-key="id" empty-text="暂无治理日志">
       <template #actionCode="{ row }"><StatusTag>{{ labelStatus(row.actionCode) }}</StatusTag></template>
       <template #pilotId="{ row }">{{ shortId(row.pilotId) }}</template>

@@ -1507,22 +1507,22 @@ body {
   align-items: start;
 }
 
-.eds-process-step-bar,
-.eds-business-timeline,
+.eds-step-list,
+.eds-activity-rail,
 .eds-audit-rail {
   display: grid;
   gap: var(--ep-space-10);
   min-width: 0;
 }
 
-.eds-process-step {
+.eds-step-item {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
   gap: var(--ep-space-10);
   align-items: start;
 }
 
-.eds-process-step-index {
+.eds-step-index {
   display: inline-flex;
   align-items: center;
   justify-content: center;

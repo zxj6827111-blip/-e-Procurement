@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import AuditLogRef from "../../components/AuditLogRef.vue";
 import ErrorAlert from "../../components/ErrorAlert.vue";
 import EnterpriseTabs from "../../components/base/EnterpriseTabs.vue";
@@ -57,7 +57,7 @@ const detailTabs = [
         <p>{{ currentProjectLabel }}</p>
       </div>
       <div class="eds-business-context-aside">
-        <span class="eds-meta">当前节点</span>
+        <span class="eds-meta">当前阶段</span>
         <strong>{{ projectStatusText }}</strong>
         <StatusTag>{{ projectStatusText }}</StatusTag>
       </div>
@@ -102,11 +102,11 @@ const detailTabs = [
         />
 
         <template #aside>
-          <RiskAlertPanel title="下一步关注" description="优先处理当前项目的下一节点、截止时间和责任人。">
+          <RiskAlertPanel title="下一步关注" description="优先处理当前项目的下一动作、截止时间和责任人。">
             <ul class="eds-meta-list">
               <li>优先确认公告、报价截止和评审安排。</li>
               <li>涉及外部采购备案时保留完整审批依据。</li>
-              <li>项目状态变化必须与流程记录一致。</li>
+              <li>项目状态变化必须与业务记录一致。</li>
             </ul>
           </RiskAlertPanel>
 

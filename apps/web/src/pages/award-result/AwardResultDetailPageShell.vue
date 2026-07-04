@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import AuditLogRef from "../../components/AuditLogRef.vue";
 import ErrorAlert from "../../components/ErrorAlert.vue";
 import { FeedbackMessage } from "../../components/base";
@@ -6,7 +6,7 @@ import AwardBuyerActions from "./AwardBuyerActions.vue";
 import AwardGroupApprovalPanel from "./AwardGroupApprovalPanel.vue";
 import AwardPageShell from "./AwardPageShell.vue";
 import AwardPostApprovalActions from "./AwardPostApprovalActions.vue";
-import AwardProcessTimelinePanel from "./AwardProcessTimelinePanel.vue";
+import AwardActivityRecordPanel from "./AwardActivityRecordPanel.vue";
 import AwardRecommendationPanel from "./AwardRecommendationPanel.vue";
 import AwardRecordTables from "./AwardRecordTables.vue";
 import AwardSupplierResultSection from "./AwardSupplierResultSection.vue";
@@ -179,7 +179,7 @@ const {
     <AuditLogRef :audit-log-id="auditLogId" />
     <ErrorAlert v-if="error" :message="error" />
 
-    <AwardProcessTimelinePanel
+    <AwardActivityRecordPanel
       :is-supplier-result-view="isSupplierResultView"
       :selected-project-id="selectedProjectId"
       :selected-approval-id="selectedApprovalId"

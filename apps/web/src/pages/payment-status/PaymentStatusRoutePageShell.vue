@@ -1,6 +1,6 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import ErrorAlert from "../../components/ErrorAlert.vue";
-import ProcessTimeline from "../../components/ProcessTimeline.vue";
+import ActivityRecordPanel from "../../components/ActivityRecordPanel.vue";
 import FundAccountsPanel from "./FundAccountsPanel.vue";
 import FundLedgerPanel from "./FundLedgerPanel.vue";
 import FundOperationPanel from "./FundOperationPanel.vue";
@@ -36,11 +36,11 @@ const {
   <section class="eds-section">
     <PaymentStatusPageShell :can-maintain-funds="canMaintainFunds" :loading="loading" :message="message" :summary-items="summaryItems" />
 
-    <ProcessTimeline
+    <ActivityRecordPanel
       v-if="selectedPaymentBusinessId"
       business-type="payment"
       :business-id="selectedPaymentBusinessId"
-      title="付款流程"
+      title="付款记录"
       :refresh-key="processRefreshKey"
     />
 

@@ -401,7 +401,7 @@ export function useAwardResultPage() {
   async function processAwardApproval(approved: boolean) {
     const instanceId = selectedApprovalInstance.value?.id;
     if (!instanceId) {
-      error.value = "未找到当前定标审批的正式流程实例，请先由采购经办提交审批。";
+      error.value = "未找到当前定标审批的正式业务实例，请先由采购经办提交审批。";
       success.value = "";
       return;
     }

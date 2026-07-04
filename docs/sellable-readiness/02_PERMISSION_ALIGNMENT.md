@@ -1,6 +1,6 @@
 # Sprint 2 Permission Alignment
 
-- Generated at: 2026-07-04T15:45:32.063Z
+- Generated at: 2026-07-04T17:19:53.515Z
 - Result: PASS
 - Frontend entries that are not represented in backend menu keys: 0
 

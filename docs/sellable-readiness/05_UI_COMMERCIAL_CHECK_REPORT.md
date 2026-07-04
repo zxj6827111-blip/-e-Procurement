@@ -1,8 +1,8 @@
 # UI Commercial Check Report
 
-- Generated at: 2026-07-04T15:43:01.574Z
+- Generated at: 2026-07-04T17:18:05.337Z
 - Result: PASS
-- Pass: 62
+- Pass: 67
 - Failures: 0
 - TODO / blocker records: 0
 
@@ -35,17 +35,19 @@
 | component:PermissionState | PASS | apps/web/src/components/base/PermissionState.vue exported from base index. |
 | component:KpiCard | PASS | apps/web/src/components/base/KpiCard.vue exported from base index. |
 | component:ActionCard | PASS | apps/web/src/components/base/ActionCard.vue exported from base index. |
-| component:ProcessStepBar | PASS | apps/web/src/components/base/ProcessStepBar.vue exported from base index. |
+| component:StepList | PASS | apps/web/src/components/base/StepList.vue exported from base index. |
 | component:RiskAlertPanel | PASS | apps/web/src/components/base/RiskAlertPanel.vue exported from base index. |
 | component:AuditRail | PASS | apps/web/src/components/base/AuditRail.vue exported from base index. |
-| component:BusinessTimeline | PASS | apps/web/src/components/base/BusinessTimeline.vue exported from base index. |
+| component:ActivityRail | PASS | apps/web/src/components/base/ActivityRail.vue exported from base index. |
 | component:SplitDetailLayout | PASS | apps/web/src/components/base/SplitDetailLayout.vue exported from base index. |
 | component:EnvironmentBadge | PASS | apps/web/src/components/base/EnvironmentBadge.vue exported from base index. |
 | component:RoleBadge | PASS | apps/web/src/components/base/RoleBadge.vue exported from base index. |
+| component:ActivityRecordPanel | PASS | apps/web/src/components/ActivityRecordPanel.vue exposes task-first product language. |
+| component:TaskInboxSummary | PASS | apps/web/src/components/TaskInboxSummary.vue exposes task-first product language. |
 | state-pages:routed | PASS | Dedicated permission denied and not-found/error state pages are routed through AppShell. |
 | dashboard:role-workbench | PASS | apps/web/src/pages/dashboard/DashboardRoleWorkbenchSection.vue contains 风险提醒, 常用操作, eds-workbench-side. |
 | dashboard:information-architecture | PASS | apps/web/src/pages/dashboard/DashboardPageShell.vue contains eds-workbench-layout, DashboardTodoSection, DashboardActivitySection, DashboardRoleWorkbenchSection. |
-| request-detail:split-layout | PASS | apps/web/src/pages/procurement-requests/ProcurementRequestDetailShell.vue contains SplitDetailLayout, RiskAlertPanel, 流程进度. |
+| request-detail:split-layout | PASS | apps/web/src/pages/procurement-requests/ProcurementRequestDetailShell.vue contains SplitDetailLayout, RiskAlertPanel, 审批进度. |
 | project-detail:split-layout | PASS | apps/web/src/pages/project-workbench/ProjectWorkbenchDetailPageShell.vue contains SplitDetailLayout, RiskAlertPanel, 下一步关注. |
 | sourcing:control-panel | PASS | apps/web/src/pages/project-sourcing/SourcingPageShell.vue contains SplitDetailLayout, RiskAlertPanel, 招采控制点. |
 | fulfillment:control-panel | PASS | apps/web/src/pages/project-fulfillment/FulfillmentPageShell.vue contains SplitDetailLayout, RiskAlertPanel, 履约与结算关注. |
@@ -56,6 +58,8 @@
 | audit:table-state | PASS | apps/web/src/pages/audit/AuditPageShell.vue contains 审计日志, DataTable, StatusTag. |
 | dashboard:not-function-matrix | PASS | DashboardRoleWorkbenchSection no longer renders the old four-card function matrix. |
 | sellable:commercial-gate | PASS | scripts/sellable-readiness.mjs includes ui:commercial-check in sellable aggregation. |
+| sellable:terminology-gate | PASS | Task-first terminology check script exists, is registered and is included in sellable aggregation. |
+| terminology-check:rule-coverage | PASS | scripts/ui-terminology-check.mjs covers key task-first forbidden terms and scans base components. |
 | visual-evidence:script | PASS | scripts/ui-visual-evidence.mjs and package.json script exist. |
 | third-pass:plan-exists | PASS | Third-pass visual correction plan records the human-review gap and stricter acceptance rules. |
 | third-pass:portal-login | PASS | Login is constrained as a portal-style panel instead of a floating marketing card. |
@@ -65,6 +69,7 @@
 | fourth-pass:business-context | PASS | Fourth-pass key project pages use business context and ledger-style summaries. |
 | fourth-pass:expert-supplier-productized | PASS | Expert scoring and supplier portal now expose real business context instead of generic card scaffolding. |
 | fourth-pass:visual-pack-key-business-pages | PASS | Visual review pack captures project detail, sourcing detail and fulfillment detail pages. |
+| script:ui:terminology-check | PASS | package.json registers ui:terminology-check via scripts/ui-terminology-check.mjs. |
 | script:ui:login-role-smoke | PASS | package.json registers ui:login-role-smoke via scripts/ui-second-pass-checks.mjs. |
 | script:ui:layout-check | PASS | package.json registers ui:layout-check via scripts/ui-second-pass-checks.mjs. |
 | script:ui:visual-review-pack | PASS | package.json registers ui:visual-review-pack via scripts/ui-second-pass-checks.mjs. |

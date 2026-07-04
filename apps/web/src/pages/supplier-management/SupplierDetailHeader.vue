@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ProcessTimeline from "../../components/ProcessTimeline.vue";
+import ActivityRecordPanel from "../../components/ActivityRecordPanel.vue";
 import { EnterpriseButton, EnterpriseSurface, StatusTag, SummaryCards } from "../../components/base";
 import type { Supplier, SupplierActionMode } from "./types";
 
@@ -47,17 +47,17 @@ const emit = defineEmits<{
     />
   </EnterpriseSurface>
 
-  <EnterpriseSurface title="准入流程" description="用于审计追溯和查看供应商准入节点，日常维护可不展开。">
+  <EnterpriseSurface title="准入记录" description="用于审计追溯和查看供应商准入活动，日常维护可不展开。">
     <div class="eds-disclosure-head">
       <EnterpriseButton type="text" @click="emit('toggleAdmissionProcess')">
-        {{ showAdmissionProcess ? "隐藏流程" : "查看流程" }}
+        {{ showAdmissionProcess ? "隐藏记录" : "查看记录" }}
       </EnterpriseButton>
     </div>
-    <ProcessTimeline
+    <ActivityRecordPanel
       v-if="showAdmissionProcess"
       business-type="supplier_onboarding"
       :business-id="supplier.id"
-      title="供应商准入流程进度"
+      title="供应商准入审批进度"
       :refresh-key="processRefreshKey"
     />
   </EnterpriseSurface>

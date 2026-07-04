@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { apiDelete, apiGet, apiPatch, apiPost, uploadFile, type UploadedFileMetadata } from "../../api/http";
@@ -143,7 +143,7 @@ async function saveProfile() {
     auditLogId.value = result.auditLogId ?? "";
     qualificationFiles.value = [];
     qualificationFileName.value = "";
-    message.value = "档案资料已提交，集团采购侧会按准入流程继续审核。";
+    message.value = "档案资料已提交，集团采购侧会继续完成准入审核。";
     syncProfileForm();
   } catch (err) {
     error.value = err instanceof Error ? err.message : "档案资料保存失败";

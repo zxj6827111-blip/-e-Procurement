@@ -101,7 +101,7 @@ function lineProgress(order: PurchaseOrder) {
     <div v-if="canGenerateOrder" class="eds-form-section">
       <div>
         <span class="eds-meta">订单生成</span>
-        <strong>定标审批已通过，生成采购订单后进入供应商确认与收货流程。</strong>
+        <strong>定标审批已通过，生成采购订单后进入供应商确认与收货业务。</strong>
       </div>
       <EnterpriseButton type="primary" :disabled="Boolean(actionBusy)" @click="emit('generateOrder')">生成采购订单</EnterpriseButton>
     </div>

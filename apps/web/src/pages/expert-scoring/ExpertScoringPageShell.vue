@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import WorkflowSurfaceSummary from "../../components/WorkflowSurfaceSummary.vue";
+import TaskInboxSummary from "../../components/TaskInboxSummary.vue";
 import { EnterpriseButton, EnterpriseSurface, StatusTag, SummaryCards, type SummaryCardItem } from "../../components/base";
 import type { ScoringSheet } from "./types";
 
@@ -30,7 +30,7 @@ const emit = defineEmits<{
     </div>
   </header>
 
-  <WorkflowSurfaceSummary title="专家评审待办" :business-types="['review_award', 'expert_scoring']" compact />
+  <TaskInboxSummary title="专家评审待办" :business-types="['review_award', 'expert_scoring']" compact />
 
   <EnterpriseSurface title="评分台账" description="专家确认、当前评分单和逐项评分汇总。">
     <SummaryCards :items="summaryItems" />

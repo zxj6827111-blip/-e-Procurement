@@ -17,7 +17,7 @@ export function useMyTasksPage() {
   const businessTypeFilter = ref<"all" | R8ApprovalBusinessType>("all");
   const dateFilter = ref<DateFilter>("all");
   const actionBusy = ref("");
-  const opinion = ref("页面验收处理意见：资料符合当前节点要求。");
+  const opinion = ref("页面验收处理意见：资料符合当前环节要求。");
 
   function findCompatibleR8Task(processTask: ProcessTaskView) {
     return r8Tasks.value.find(
@@ -37,7 +37,7 @@ export function useMyTasksPage() {
       return {
         id: task.id,
         source: "process" as const,
-        sourceLabel: "流程待办",
+        sourceLabel: "业务待办",
         actionTaskId: r8Task?.id,
         approvalInstanceId: r8Task?.approvalInstanceId,
         businessType: task.businessType,
@@ -64,7 +64,7 @@ export function useMyTasksPage() {
       .map((task) => ({
         id: task.id,
         source: "r8" as const,
-        sourceLabel: "审批待办",
+        sourceLabel: "审批任务",
         actionTaskId: task.id,
         approvalInstanceId: task.approvalInstanceId,
         businessType: task.businessType,
@@ -100,7 +100,7 @@ export function useMyTasksPage() {
   const summaryItems = computed<SummaryCardItem[]>(() => [
     { label: "待办任务", value: taskStats.value.pending, meta: "当前角色可处理" },
     { label: "我已处理", value: taskStats.value.handledByMe, meta: "按当前用户统计" },
-    { label: "已完成任务", value: taskStats.value.completed, meta: "流程任务归档" },
+    { label: "已完成任务", value: taskStats.value.completed, meta: "业务任务归档" },
     { label: "权限边界", value: session.roleId === "admin" ? "不处理业务" : "按角色隔离", meta: "待办按角色与组织过滤" }
   ]);
 
@@ -133,7 +133,7 @@ export function useMyTasksPage() {
       processTasks.value = processResult.status === "fulfilled" ? processResult.value : [];
       r8Tasks.value = r8Result.status === "fulfilled" ? r8Result.value : [];
       if (processResult.status === "rejected" && r8Result.status === "rejected") throw r8Result.reason;
-      if (processResult.status === "rejected") error.value = "流程待办暂不可用，已显示审批待办。";
+      if (processResult.status === "rejected") error.value = "业务待办暂不可用，已显示审批任务。";
     } catch (err) {
       error.value = err instanceof Error ? err.message : "任务加载失败";
       processTasks.value = [];
@@ -158,7 +158,7 @@ export function useMyTasksPage() {
         const result = await completeWorkflowTask(task.actionTaskId);
         auditLogId.value = result.auditLogId ?? "";
       } else {
-        throw new Error("该任务当前仅可查看流程轨迹。");
+        throw new Error("该任务当前仅可查看活动记录。");
       }
       await load();
     } catch (err) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import WorkflowSurfaceSummary from "../../components/WorkflowSurfaceSummary.vue";
+import TaskInboxSummary from "../../components/TaskInboxSummary.vue";
 import { EnterpriseSurface, PageHeader, StatusTag, SummaryCards, type SummaryCardItem } from "../../components/base";
 
 defineProps<{
@@ -19,7 +19,7 @@ defineProps<{
     </template>
   </PageHeader>
 
-  <WorkflowSurfaceSummary
+  <TaskInboxSummary
     v-if="isSupplierView"
     title="供应商补充材料、退货与结算消息"
     :business-types="['return_request', 'settlement_bill', 'invoice', 'payment_request']"

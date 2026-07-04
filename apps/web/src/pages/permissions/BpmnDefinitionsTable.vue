@@ -10,9 +10,9 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="BPMN 流程定义" description="流程定义以版本、校验状态和 XML 摘要作为治理字段。">
-    <DataTable :columns="bpmnDefinitionColumns" :rows="rows" row-key="id" empty-text="暂无 BPMN 定义">
-      <template #process="{ row }">{{ row.processName }} / {{ row.processCode }}</template>
+  <EnterpriseSurface title="规则版本库" description="规则版本以版本号、校验状态和签名摘要作为治理字段。">
+    <DataTable :columns="bpmnDefinitionColumns" :rows="rows" row-key="id" empty-text="暂无规则版本">
+      <template #ruleVersion="{ row }">{{ row.processName }} / {{ row.processCode }}</template>
       <template #businessType="{ row }">{{ businessTypeText(row.businessType) }}</template>
       <template #status="{ row }"><StatusTag>{{ labelStatus(row.status) }}</StatusTag></template>
       <template #validationStatus="{ row }"><StatusTag tone="success">{{ labelStatus(row.validationStatus) }}</StatusTag></template>

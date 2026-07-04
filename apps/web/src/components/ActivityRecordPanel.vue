@@ -21,7 +21,7 @@ const props = withDefaults(
     refreshKey?: number;
   }>(),
   {
-    title: "流程进度",
+    title: "活动记录",
     businessId: "",
     refreshKey: 0
   }
@@ -42,9 +42,13 @@ const currentRoleLabel = computed(() => {
 const currentNodeLabel = computed(() => processNodeLabel(primaryInstance.value?.currentNodeKey ?? currentTask.value?.nodeKey));
 const currentStatusLabel = computed(() => processStatusLabel(primaryInstance.value?.status));
 
+function activityText(value?: string | null) {
+  return String(value || "-").replaceAll("流程", "活动").replaceAll("事件", "活动").replaceAll("节点", "环节");
+}
+
 const eventColumns: DataTableColumn[] = [
-  { key: "eventName", label: "事件" },
-  { key: "nodeLabel", label: "节点" },
+  { key: "eventName", label: "活动" },
+  { key: "nodeLabel", label: "办理环节" },
   { key: "statusLabel", label: "状态" },
   { key: "createdAt", label: "时间" }
 ];
@@ -52,8 +56,8 @@ const eventColumns: DataTableColumn[] = [
 const eventRows = computed(() =>
   events.value.map((event) => ({
     id: event.id,
-    eventName: event.eventName,
-    nodeLabel: processNodeLabel(event.toNodeKey),
+    eventName: activityText(event.eventName),
+    nodeLabel: activityText(processNodeLabel(event.toNodeKey)),
     statusLabel: processStatusLabel(event.toStatus),
     createdAt: formatDateTime(event.createdAt)
   }))
@@ -70,7 +74,7 @@ async function load() {
     processData.value = await loadBusinessProcess(props.businessType, props.businessId);
   } catch (err) {
     processData.value = null;
-    error.value = err instanceof Error ? err.message : "流程轨迹加载失败";
+    error.value = err instanceof Error ? activityText(err.message) : "活动记录加载失败";
   } finally {
     loading.value = false;
   }
@@ -87,27 +91,27 @@ watch(
 </script>
 
 <template>
-  <EnterpriseSurface :title="title" eyebrow="流程轨迹">
+  <EnterpriseSurface :title="title" eyebrow="活动记录">
     <template #actions>
       <StatusTag>只读</StatusTag>
     </template>
 
-    <FeedbackMessage v-if="loading">正在加载流程轨迹...</FeedbackMessage>
+    <FeedbackMessage v-if="loading">正在加载活动记录...</FeedbackMessage>
     <ErrorAlert v-else-if="error" :message="error" />
-    <FeedbackMessage v-else-if="!primaryInstance" align="center">当前业务对象暂无可查看的流程轨迹。</FeedbackMessage>
+    <FeedbackMessage v-else-if="!primaryInstance" align="center">当前业务对象暂无可查看的活动记录。</FeedbackMessage>
 
     <div v-else class="eds-section">
       <SummaryCards
         :items="[
-          { label: '流程状态', value: currentStatusLabel },
-          { label: '当前节点', value: currentNodeLabel },
+          { label: '办理状态', value: currentStatusLabel },
+          { label: '当前环节', value: activityText(currentNodeLabel) },
           { label: '当前处理角色', value: currentRoleLabel },
           { label: '开始时间', value: formatDateTime(primaryInstance.startedAt) },
           { label: '完成时间', value: formatDateTime(primaryInstance.completedAt) }
         ]"
       />
 
-      <DataTable :columns="eventColumns" :rows="eventRows" row-key="id" empty-text="暂无流程事件">
+      <DataTable :columns="eventColumns" :rows="eventRows" row-key="id" empty-text="暂无活动记录">
         <template #statusLabel="{ value }">
           <StatusTag :tone="value === '已完成' ? 'success' : value === '已驳回' ? 'error' : 'default'">{{ value }}</StatusTag>
         </template>

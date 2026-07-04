@@ -17,7 +17,7 @@ const state = usePermissionsPage();
   <PageHeader
     title="权限与基础配置"
     eyebrow="SYSTEM CONFIGURATION"
-    description="集中查看菜单权限、动作授权、审批规则、BPMN 版本管理与组织账号。"
+    description="集中查看菜单权限、动作授权、审批规则、规则版本治理与组织账号。"
   />
   <SummaryCards :items="state.summaryItems.value" />
   <FilterBar>

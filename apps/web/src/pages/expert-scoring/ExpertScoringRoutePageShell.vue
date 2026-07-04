@@ -1,7 +1,7 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import AuditLogRef from "../../components/AuditLogRef.vue";
 import ErrorAlert from "../../components/ErrorAlert.vue";
-import ProcessTimeline from "../../components/ProcessTimeline.vue";
+import ActivityRecordPanel from "../../components/ActivityRecordPanel.vue";
 import ExpertConfirmationPanel from "./ExpertConfirmationPanel.vue";
 import ExpertScoreSheetPanel from "./ExpertScoreSheetPanel.vue";
 import ExpertScoringMaterialsPanel from "./ExpertScoringMaterialsPanel.vue";
@@ -95,11 +95,11 @@ const {
     <ErrorAlert v-if="error" :message="error" />
   </section>
 
-  <ProcessTimeline
+  <ActivityRecordPanel
     v-if="selectedProjectId"
     business-type="review_award"
     :business-id="selectedProjectId"
-    title="评审定标流程轨迹"
+    title="评审定标活动记录"
     :refresh-key="processRefreshKey"
   />
 </template>

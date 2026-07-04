@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ProcessTimeline from "../../components/ProcessTimeline.vue";
+import ActivityRecordPanel from "../../components/ActivityRecordPanel.vue";
 import {
   DataTable,
   EnterpriseButton,
@@ -81,11 +81,11 @@ const emit = defineEmits<{
         <EnterpriseButton v-if="buyerVisible" @click="emit('copyOrder', row.id)">复购</EnterpriseButton>
       </template>
     </DataTable>
-    <ProcessTimeline
+    <ActivityRecordPanel
       v-if="selectedOrderProcessId"
       business-type="order_fulfillment"
       :business-id="selectedOrderProcessId"
-      title="最近订单履约流程"
+      title="最近订单履约业务"
       :refresh-key="processRefreshKey"
     />
   </EnterpriseSurface>

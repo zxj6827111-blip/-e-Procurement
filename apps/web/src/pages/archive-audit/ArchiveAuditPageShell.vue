@@ -9,7 +9,7 @@ defineProps<{
 </script>
 
 <template>
-  <PageHeader title="项目档案与审计" eyebrow="档案归集" description="集中查看项目档案项、补档申请、项目审计轨迹和敏感操作日志。">
+  <PageHeader title="项目档案与审计" eyebrow="档案归集" description="集中查看项目档案项、补档申请、项目审计记录和敏感操作日志。">
     <template #actions>
       <StatusTag v-if="loading" tone="warning">加载中</StatusTag>
       <StatusTag :tone="canMaintainArchive ? 'success' : 'warning'">{{ canMaintainArchive ? "可维护" : "只读" }}</StatusTag>

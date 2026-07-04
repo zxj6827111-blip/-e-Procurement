@@ -1,6 +1,6 @@
 # UI Visual Redesign Evidence
 
-- Generated at: 2026-07-04T15:37:05.152Z
+- Generated at: 2026-07-04T16:39:09.630Z
 - Result: PASS
 - Web: http://127.0.0.1:5276
 - API: http://127.0.0.1:3316
@@ -22,18 +22,18 @@
 | 采购申请列表 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/procurement-list-1366x768.png | 766 | 3 | 1 | shell=1, nav=4 |
 | 采购申请列表 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/procurement-list-1440x900.png | 766 | 3 | 1 | shell=1, nav=4 |
 | 采购申请列表 | 390x844 | PASS | output/ui-visual-evidence/screenshots/procurement-list-390x844.png | 625 | 3 | 1 | shell=1, nav=4 |
-| 采购项目详情 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/project-detail-1366x768.png | 1457 | 8 | 2 | shell=1, nav=4 |
-| 采购项目详情 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/project-detail-1440x900.png | 1457 | 8 | 2 | shell=1, nav=4 |
-| 采购项目详情 | 390x844 | PASS | output/ui-visual-evidence/screenshots/project-detail-390x844.png | 1336 | 8 | 2 | shell=1, nav=4 |
+| 采购项目详情 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/project-detail-1366x768.png | 1459 | 8 | 2 | shell=1, nav=4 |
+| 采购项目详情 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/project-detail-1440x900.png | 1459 | 8 | 2 | shell=1, nav=4 |
+| 采购项目详情 | 390x844 | PASS | output/ui-visual-evidence/screenshots/project-detail-390x844.png | 1338 | 8 | 2 | shell=1, nav=4 |
 | 供应商门户 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/supplier-portal-1366x768.png | 598 | 4 | 1 | shell=1, nav=3 |
 | 供应商门户 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/supplier-portal-1440x900.png | 598 | 4 | 1 | shell=1, nav=3 |
 | 供应商门户 | 390x844 | PASS | output/ui-visual-evidence/screenshots/supplier-portal-390x844.png | 497 | 4 | 1 | shell=1, nav=3 |
 | 报价响应 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/bidding-1366x768.png | 837 | 6 | 1 | shell=1, nav=3 |
 | 报价响应 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/bidding-1440x900.png | 837 | 6 | 1 | shell=1, nav=3 |
 | 报价响应 | 390x844 | PASS | output/ui-visual-evidence/screenshots/bidding-390x844.png | 722 | 6 | 1 | shell=1, nav=3 |
-| 专家评分 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/expert-scoring-1366x768.png | 1363 | 7 | 4 | shell=1, nav=1 |
-| 专家评分 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/expert-scoring-1440x900.png | 1363 | 7 | 4 | shell=1, nav=1 |
-| 专家评分 | 390x844 | PASS | output/ui-visual-evidence/screenshots/expert-scoring-390x844.png | 1229 | 7 | 4 | shell=1, nav=1 |
+| 专家评分 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/expert-scoring-1366x768.png | 1365 | 7 | 4 | shell=1, nav=1 |
+| 专家评分 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/expert-scoring-1440x900.png | 1365 | 7 | 4 | shell=1, nav=1 |
+| 专家评分 | 390x844 | PASS | output/ui-visual-evidence/screenshots/expert-scoring-390x844.png | 1231 | 7 | 4 | shell=1, nav=1 |
 | 结算材料 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/settlement-1366x768.png | 1886 | 12 | 4 | shell=1, nav=2 |
 | 结算材料 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/settlement-1440x900.png | 1886 | 12 | 4 | shell=1, nav=2 |
 | 结算材料 | 390x844 | PASS | output/ui-visual-evidence/screenshots/settlement-390x844.png | 1691 | 12 | 4 | shell=1, nav=2 |

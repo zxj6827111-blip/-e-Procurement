@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ProcessBusinessType } from "../../api/process";
-import ProcessTimeline from "../../components/ProcessTimeline.vue";
+import ActivityRecordPanel from "../../components/ActivityRecordPanel.vue";
 import { DataTable, EnterpriseSurface, StatusTag } from "../../components/base";
 import { formatDateTime } from "../../utils/status-labels";
 import { PROGRESS_COLUMNS } from "./constants";
@@ -30,12 +30,12 @@ defineProps<{
     </DataTable>
   </EnterpriseSurface>
 
-  <EnterpriseSurface title="截标 / 比价流程轨迹" description="截标、锁定和保密审批动作会写入项目流程记录。">
-    <ProcessTimeline
+  <EnterpriseSurface title="截标 / 比价活动记录" description="截标、锁定和保密审批动作会写入项目业务记录。">
+    <ActivityRecordPanel
       v-if="selectedProjectId"
       :business-type="projectProcessType(selectedProjectId)"
       :business-id="selectedProjectId"
-      title="截标 / 比价流程轨迹"
+      title="截标 / 比价活动记录"
       :refresh-key="processRefreshKey"
     />
   </EnterpriseSurface>

@@ -562,6 +562,15 @@ function npmCommand() {
   return process.platform === "win32" ? "npm.cmd" : "npm";
 }
 
+function sanitizeOutputTail(output) {
+  return output
+    .slice(-5000)
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trimEnd();
+}
+
 function runCommand(commandText, timeoutMs = 600000) {
   const result = spawnSync(commandText, {
     cwd: repoRoot,
@@ -580,8 +589,8 @@ function runCommand(commandText, timeoutMs = 600000) {
     signal: result.signal,
     timedOut: Boolean(result.error?.code === "ETIMEDOUT"),
     error: result.error?.message ?? "",
-    stdoutTail: stdout.slice(-5000),
-    stderrTail: stderr.slice(-5000)
+    stdoutTail: sanitizeOutputTail(stdout),
+    stderrTail: sanitizeOutputTail(stderr)
   };
 }
 
@@ -614,6 +623,7 @@ async function sellableCheck() {
     "npm run ui:scan:test",
     "npm run ui:scan",
     "npm run ui:copy-scan",
+    "npm run ui:terminology-check",
     "npm run ui:commercial-check",
     "npm run ui:visual-review-pack",
     "npm run ui:login-role-smoke",

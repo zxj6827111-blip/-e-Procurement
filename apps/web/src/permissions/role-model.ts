@@ -63,7 +63,7 @@ export const businessRoles: RoleId[] = [...procurementBusinessRoles, ...hotelBuy
 
 export const navItems: NavItem[] = [
   { label: "工作台", to: "/", roles: [...businessRoles], menuKey: "dashboard", group: "工作", description: "今日事项", priority: 10 },
-  { label: "我的待办", to: "/my-tasks", roles: [...businessRoles], menuKey: "myTasks", group: "工作", description: "流程任务", priority: 20 },
+  { label: "我的待办", to: "/my-tasks", roles: [...businessRoles], menuKey: "myTasks", group: "工作", description: "业务任务", priority: 20 },
   { label: "审批规则", to: "/approval-rules", roles: [...groupManagerRoles, ...auditRoles, "admin"], menuKey: "admin", group: "审计与配置", description: "规则配置", priority: 80 },
   { label: "需求审批", to: "/procurement-requests", roles: [...groupManagerRoles], menuKey: "needs", group: "采购", description: "需求准入", priority: 20 },
   { label: "采购项目", to: "/project-workbench", roles: [...groupManagerRoles, ...procurementExecutorRoles], menuKey: "projects", group: "采购", description: "执行进度", priority: 30 },

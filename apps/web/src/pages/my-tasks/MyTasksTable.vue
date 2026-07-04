@@ -23,7 +23,7 @@ const emit = defineEmits<{
       <template #task="{ row }">
         <strong>{{ row.taskTypeLabel }} <StatusTag>{{ row.sourceLabel }}</StatusTag></strong>
         <p class="eds-meta">{{ row.title }}</p>
-        <p v-if="row.nodeLabel" class="eds-meta">当前节点：{{ row.nodeLabel }} / 流程状态：{{ row.processStatusLabel }}</p>
+        <p v-if="row.nodeLabel" class="eds-meta">办理环节：{{ row.nodeLabel }} / 处理状态：{{ row.processStatusLabel }}</p>
       </template>
       <template #business="{ row }">{{ row.businessTypeLabel }} / {{ row.businessId }}</template>
       <template #status="{ row }">

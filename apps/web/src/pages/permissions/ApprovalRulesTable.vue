@@ -10,7 +10,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="审批规则" description="按业务类型维护审批节点、角色和可执行动作。">
+  <EnterpriseSurface title="审批规则" description="按业务类型维护审批环节、角色和可执行动作。">
     <DataTable :columns="approvalRuleColumns" :rows="rows" row-key="id" empty-text="暂无审批规则">
       <template #businessType="{ row }">{{ businessTypeText(row.businessType) }}</template>
       <template #nodeRoleIds="{ row }">{{ row.nodeRoleIds.map((role: string) => roleText(role)).join(" / ") }}</template>

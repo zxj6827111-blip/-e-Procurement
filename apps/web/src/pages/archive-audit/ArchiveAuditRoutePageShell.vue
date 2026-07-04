@@ -1,8 +1,8 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import AuditLogRef from "../../components/AuditLogRef.vue";
 import ErrorAlert from "../../components/ErrorAlert.vue";
-import ProcessTimeline from "../../components/ProcessTimeline.vue";
-import WorkflowSurfaceSummary from "../../components/WorkflowSurfaceSummary.vue";
+import ActivityRecordPanel from "../../components/ActivityRecordPanel.vue";
+import TaskInboxSummary from "../../components/TaskInboxSummary.vue";
 import ArchiveAuditLogsPanel from "./ArchiveAuditLogsPanel.vue";
 import ArchiveAuditPageShell from "./ArchiveAuditPageShell.vue";
 import ArchiveControlPanel from "./ArchiveControlPanel.vue";
@@ -44,13 +44,13 @@ const {
   <section class="eds-section">
     <ArchiveAuditPageShell :can-maintain-archive="canMaintainArchive" :loading="loading" :summary-items="summaryItems" />
 
-    <WorkflowSurfaceSummary title="档案补档审批与消息" :business-types="['archive_supplement']" compact />
+    <TaskInboxSummary title="档案补档审批与消息" :business-types="['archive_supplement']" compact />
 
-    <ProcessTimeline
+    <ActivityRecordPanel
       v-if="selectedProjectId"
       business-type="archive"
       :business-id="selectedProjectId"
-      title="档案归集流程"
+      title="档案归集业务"
       :refresh-key="processRefreshKey"
     />
 

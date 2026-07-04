@@ -54,9 +54,14 @@ function addCheck(checks, key, pass, evidence, blocker = true) {
   });
 }
 
+function packageScriptIncludes(packageJson, scriptName, expectedFragment) {
+  return String(packageJson.scripts?.[scriptName] ?? "").includes(expectedFragment);
+}
+
 ensureDirs();
 
 const tokens = readJson("apps/web/src/design-system/tokens.json");
+const packageJson = readJson("package.json");
 const checks = [];
 
 for (const tokenPath of [
@@ -147,10 +152,10 @@ for (const component of [
   "PermissionState",
   "KpiCard",
   "ActionCard",
-  "ProcessStepBar",
+  "StepList",
   "RiskAlertPanel",
   "AuditRail",
-  "BusinessTimeline",
+  "ActivityRail",
   "SplitDetailLayout",
   "EnvironmentBadge",
   "RoleBadge"
@@ -160,6 +165,18 @@ for (const component of [
     `component:${component}`,
     exists(`apps/web/src/components/base/${component}.vue`) && readText("apps/web/src/components/base/index.ts").includes(`as ${component}`),
     `apps/web/src/components/base/${component}.vue exported from base index.`
+  );
+}
+
+for (const [component, file, patterns] of [
+  ["ActivityRecordPanel", "apps/web/src/components/ActivityRecordPanel.vue", ["活动记录", "办理状态", "当前环节"]],
+  ["TaskInboxSummary", "apps/web/src/components/TaskInboxSummary.vue", ["任务与提醒", "待处理事项", "任务中心"]]
+]) {
+  addCheck(
+    checks,
+    `component:${component}`,
+    exists(file) && textIncludes(file, patterns),
+    `${file} exposes task-first product language.`
   );
 }
 
@@ -176,7 +193,7 @@ addCheck(
 for (const [key, file, patterns] of [
   ["dashboard:role-workbench", "apps/web/src/pages/dashboard/DashboardRoleWorkbenchSection.vue", ["风险提醒", "常用操作", "eds-workbench-side"]],
   ["dashboard:information-architecture", "apps/web/src/pages/dashboard/DashboardPageShell.vue", ["eds-workbench-layout", "DashboardTodoSection", "DashboardActivitySection", "DashboardRoleWorkbenchSection"]],
-  ["request-detail:split-layout", "apps/web/src/pages/procurement-requests/ProcurementRequestDetailShell.vue", ["SplitDetailLayout", "RiskAlertPanel", "流程进度"]],
+  ["request-detail:split-layout", "apps/web/src/pages/procurement-requests/ProcurementRequestDetailShell.vue", ["SplitDetailLayout", "RiskAlertPanel", "审批进度"]],
   ["project-detail:split-layout", "apps/web/src/pages/project-workbench/ProjectWorkbenchDetailPageShell.vue", ["SplitDetailLayout", "RiskAlertPanel", "下一步关注"]],
   ["sourcing:control-panel", "apps/web/src/pages/project-sourcing/SourcingPageShell.vue", ["SplitDetailLayout", "RiskAlertPanel", "招采控制点"]],
   ["fulfillment:control-panel", "apps/web/src/pages/project-fulfillment/FulfillmentPageShell.vue", ["SplitDetailLayout", "RiskAlertPanel", "履约与结算关注"]],
@@ -202,6 +219,33 @@ addCheck(
   "sellable:commercial-gate",
   readText("scripts/sellable-readiness.mjs").includes("npm run ui:commercial-check"),
   "scripts/sellable-readiness.mjs includes ui:commercial-check in sellable aggregation."
+);
+
+addCheck(
+  checks,
+  "sellable:terminology-gate",
+  readText("scripts/sellable-readiness.mjs").includes("npm run ui:terminology-check") &&
+    packageScriptIncludes(packageJson, "ui:terminology-check", "scripts/ui-terminology-check.mjs") &&
+    exists("scripts/ui-terminology-check.mjs"),
+  "Task-first terminology check script exists, is registered and is included in sellable aggregation."
+);
+
+addCheck(
+  checks,
+  "terminology-check:rule-coverage",
+  textIncludes("scripts/ui-terminology-check.mjs", [
+    "apps/web/src/components",
+    "流程轨迹",
+    "流程进度",
+    "流程任务",
+    "当前节点",
+    "WorkflowSurfaceSummary",
+    "ProcessTimeline",
+    "base components"
+  ]) &&
+    !readText("scripts/ui-terminology-check.mjs").includes("/components/base/ActivityRail.vue") &&
+    !readText("scripts/ui-terminology-check.mjs").includes("/components/base/StepList.vue"),
+  "scripts/ui-terminology-check.mjs covers key task-first forbidden terms and scans base components."
 );
 
 addCheck(
@@ -291,12 +335,13 @@ addCheck(
   "Visual review pack captures project detail, sourcing detail and fulfillment detail pages."
 );
 
-for (const scriptName of ["ui:login-role-smoke", "ui:layout-check", "ui:visual-review-pack"]) {
+for (const scriptName of ["ui:terminology-check", "ui:login-role-smoke", "ui:layout-check", "ui:visual-review-pack"]) {
+  const expectedScript = scriptName === "ui:terminology-check" ? "scripts/ui-terminology-check.mjs" : "scripts/ui-second-pass-checks.mjs";
   addCheck(
     checks,
     `script:${scriptName}`,
-    readText("package.json").includes(`"${scriptName}"`) && exists("scripts/ui-second-pass-checks.mjs"),
-    `package.json registers ${scriptName} via scripts/ui-second-pass-checks.mjs.`
+    packageScriptIncludes(packageJson, scriptName, expectedScript) && exists(expectedScript),
+    `package.json registers ${scriptName} via ${expectedScript}.`
   );
 }
 

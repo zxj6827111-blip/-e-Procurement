@@ -23,6 +23,7 @@
     "ui:scan": "node scripts/ui-violation-scan.mjs",
     "ui:copy-scan": "node scripts/sellable-readiness.mjs ui-copy-scan",
     "ui:commercial-check": "node scripts/ui-commercial-check.mjs",
+    "ui:terminology-check": "node scripts/ui-terminology-check.mjs",
     "ui:visual-evidence": "node scripts/ui-visual-evidence.mjs",
     "ui:login-role-smoke": "node scripts/ui-second-pass-checks.mjs login-role-smoke",
     "ui:layout-check": "node scripts/ui-second-pass-checks.mjs layout-check",
