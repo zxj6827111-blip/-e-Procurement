@@ -1,6 +1,6 @@
 # UI Visual Redesign Evidence
 
-- Generated at: 2026-07-04T16:39:09.630Z
+- Generated at: 2026-07-04T18:43:14.963Z
 - Result: PASS
 - Web: http://127.0.0.1:5276
 - API: http://127.0.0.1:3316
@@ -13,12 +13,12 @@
 | 登录页 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/login-1366x768.png | 454 | 0 | 0 | login=1 |
 | 登录页 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/login-1440x900.png | 454 | 0 | 0 | login=1 |
 | 登录页 | 390x844 | PASS | output/ui-visual-evidence/screenshots/login-390x844.png | 454 | 0 | 0 | login=1 |
-| 集团采购工作台 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/dashboard-group-1366x768.png | 598 | 5 | 2 | shell=1, nav=4 |
-| 集团采购工作台 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/dashboard-group-1440x900.png | 598 | 5 | 2 | shell=1, nav=4 |
-| 集团采购工作台 | 390x844 | PASS | output/ui-visual-evidence/screenshots/dashboard-group-390x844.png | 463 | 5 | 2 | shell=1, nav=4 |
-| 采购经办工作台 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/dashboard-buyer-1366x768.png | 805 | 5 | 2 | shell=1, nav=4 |
-| 采购经办工作台 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/dashboard-buyer-1440x900.png | 805 | 5 | 2 | shell=1, nav=4 |
-| 采购经办工作台 | 390x844 | PASS | output/ui-visual-evidence/screenshots/dashboard-buyer-390x844.png | 671 | 5 | 2 | shell=1, nav=4 |
+| 集团采购工作台 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/dashboard-group-1366x768.png | 605 | 4 | 0 | shell=1, nav=4 |
+| 集团采购工作台 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/dashboard-group-1440x900.png | 605 | 4 | 0 | shell=1, nav=4 |
+| 集团采购工作台 | 390x844 | PASS | output/ui-visual-evidence/screenshots/dashboard-group-390x844.png | 500 | 4 | 0 | shell=1, nav=4 |
+| 采购经办工作台 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/dashboard-buyer-1366x768.png | 709 | 4 | 0 | shell=1, nav=4 |
+| 采购经办工作台 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/dashboard-buyer-1440x900.png | 709 | 4 | 0 | shell=1, nav=4 |
+| 采购经办工作台 | 390x844 | PASS | output/ui-visual-evidence/screenshots/dashboard-buyer-390x844.png | 619 | 4 | 0 | shell=1, nav=4 |
 | 采购申请列表 | 1366x768 | PASS | output/ui-visual-evidence/screenshots/procurement-list-1366x768.png | 766 | 3 | 1 | shell=1, nav=4 |
 | 采购申请列表 | 1440x900 | PASS | output/ui-visual-evidence/screenshots/procurement-list-1440x900.png | 766 | 3 | 1 | shell=1, nav=4 |
 | 采购申请列表 | 390x844 | PASS | output/ui-visual-evidence/screenshots/procurement-list-390x844.png | 625 | 3 | 1 | shell=1, nav=4 |

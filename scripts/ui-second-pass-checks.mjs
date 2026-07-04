@@ -191,9 +191,12 @@ async function collectPageDiagnostics(page) {
       workbenchSide: document.querySelectorAll(".eds-workbench-side").length,
       surfaces: document.querySelectorAll(".eds-surface").length,
       workbenchSurfaces: document.querySelectorAll(".eds-workbench-layout .eds-surface").length,
+      businessSummaryStrip: document.querySelectorAll(".eds-business-summary-strip").length,
       tables: document.querySelectorAll(".eds-table").length,
       tableHorizontalOverflow: tableWraps.filter((node) => node.scrollWidth > node.clientWidth + 1).length,
       stackedActionButtons: document.querySelectorAll(".eds-action-list .eds-button").length,
+      taskItems: document.querySelectorAll(".eds-task-item").length,
+      activityItems: document.querySelectorAll(".eds-activity-item").length,
       gradientMentions: [...document.styleSheets]
         .map((sheet) => {
           try {
@@ -257,8 +260,11 @@ async function runLayoutCheck(browser) {
       dashboard.bodyText.includes("待办事项") &&
       dashboard.bodyText.includes("风险提醒") &&
       dashboard.bodyText.includes("常用操作") &&
-      dashboard.bodyText.includes("进行中项目"),
-    evidence: `layout=${dashboard.workbenchLayout}, side=${dashboard.workbenchSide}`
+      dashboard.bodyText.includes("进行中项目") &&
+      dashboard.businessSummaryStrip === 1 &&
+      dashboard.taskItems > 0 &&
+      dashboard.activityItems > 0,
+    evidence: `layout=${dashboard.workbenchLayout}, side=${dashboard.workbenchSide}, summaryStrip=${dashboard.businessSummaryStrip}, taskItems=${dashboard.taskItems}, activityItems=${dashboard.activityItems}`
   });
   checks.push({
     key: "dashboard-not-function-matrix",
@@ -300,7 +306,7 @@ ${mdTable(["Check", "Status", "Evidence"], checks.map((item) => [item.key, item.
 
 ## Boundary
 
-This check validates second-pass visual layout rules: one-screen login on desktop, light commercial shell, no single-character nav icons, and dashboard information architecture. It does not change production readiness decisions.
+This check validates second-pass visual layout rules: one-screen login on desktop, light commercial sidebar, no single-character nav icons, and dashboard information architecture. It does not change production readiness decisions.
 `,
     "utf8"
   );

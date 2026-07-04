@@ -1,8 +1,8 @@
 # UI Commercial Check Report
 
-- Generated at: 2026-07-04T17:18:05.337Z
+- Generated at: 2026-07-04T18:49:13.075Z
 - Result: PASS
-- Pass: 67
+- Pass: 68
 - Failures: 0
 - TODO / blocker records: 0
 
@@ -23,8 +23,8 @@
 | token:density.tableRowHeight | PASS | apps/web/src/design-system/tokens.json -> density.tableRowHeight |
 | token:focus.ring | PASS | apps/web/src/design-system/tokens.json -> focus.ring |
 | token:chinese-b2b-typography | PASS | apps/web/src/design-system/tokens.json prioritizes Chinese system fonts and restrained title weight. |
-| token:light-commercial-sidebar | PASS | apps/web/src/design-system/tokens.json sets white sidebar and compact <=232px width. |
-| shell:grouped-navigation | PASS | apps/web/src/layouts/AppShell.vue renders grouped nav and removes single-character nav icon slots. |
+| token:light-commercial-sidebar | PASS | apps/web/src/design-system/tokens.json sets white sidebar and compact <=260px width. |
+| shell:grouped-navigation | PASS | apps/web/src/layouts/AppShell.vue renders grouped light sidebar navigation and removes single-character nav icon slots. |
 | role-model:navigation-metadata | PASS | apps/web/src/permissions/role-model.ts preserves role entries and grouping metadata without single-character icons. |
 | login:commercial-layout | PASS | apps/web/src/pages/login/LoginPageShell.vue contains branded product login layout. |
 | login:production-hides-local-access | PASS | apps/web/src/pages/login/useLoginPage.ts hides local role quick entry when mode is production. |
@@ -63,7 +63,8 @@
 | visual-evidence:script | PASS | scripts/ui-visual-evidence.mjs and package.json script exist. |
 | third-pass:plan-exists | PASS | Third-pass visual correction plan records the human-review gap and stricter acceptance rules. |
 | third-pass:portal-login | PASS | Login is constrained as a portal-style panel instead of a floating marketing card. |
-| third-pass:workbench-anti-template | PASS | Workbench removes horizontal table overflow, badge-stack risks and stacked action buttons. |
+| third-pass:workbench-anti-template | PASS | Workbench uses a business summary strip, task list and project list instead of a KPI card matrix. |
+| third-pass:active-project-source | PASS | Dashboard activity section is sourced from active projects instead of product catalog or audit log filler items. |
 | third-pass:layout-gate-strengthened | PASS | ui:layout-check now blocks obvious AI-template regressions. |
 | fourth-pass:plan-exists | PASS | Fourth-pass productization plan records key business-page scope and human-review acceptance. |
 | fourth-pass:business-context | PASS | Fourth-pass key project pages use business context and ledger-style summaries. |

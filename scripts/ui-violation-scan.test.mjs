@@ -56,8 +56,8 @@ const cases = [
     }
   },
   {
-    name: "Dashboard without enough tables",
-    expectedRule: "dashboard-not-table-first",
+    name: "Dashboard with KPI matrix instead of task-first workbench",
+    expectedRule: "dashboard-not-task-first",
     files: {
       "router/index.ts": 'const DashboardPage = {};\nexport const routes = [{ path: "/", component: DashboardPage, meta: getPageClassification("/") }];\n',
       "router/page-classification.ts":

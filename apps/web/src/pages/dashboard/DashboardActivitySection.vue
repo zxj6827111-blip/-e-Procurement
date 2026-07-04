@@ -11,14 +11,17 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="进行中项目">
+  <EnterpriseSurface title="进行中项目" class="eds-workbench-activities">
     <template #actions>
       <RouterLink class="eds-button" :to="activityLink.to">{{ activityLink.label }}</RouterLink>
     </template>
-    <DataTable :columns="columns" :rows="rows" :empty-text="emptyText">
-      <template #action="{ row }">
-        <RouterLink class="eds-button eds-button-text" :to="row.to">查看</RouterLink>
-      </template>
-    </DataTable>
+    <div v-if="rows.length" class="eds-activity-list">
+      <RouterLink v-for="row in rows" :key="`${row.title}-${row.time}`" class="eds-activity-item" :to="row.to">
+        <strong>{{ row.title }}</strong>
+        <span>{{ row.meta }}</span>
+        <time>{{ row.time }}</time>
+      </RouterLink>
+    </div>
+    <DataTable v-else :columns="columns" :rows="rows" :empty-text="emptyText" />
   </EnterpriseSurface>
 </template>

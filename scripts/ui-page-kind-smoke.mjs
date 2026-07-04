@@ -47,7 +47,7 @@ const requiredSelectors = {
   LIST_PAGE: [".eds-page-header", ".eds-filter-bar", ".eds-table", ".eds-pagination"],
   DETAIL_PAGE: [".eds-page-header", ".eds-summary-grid", ".eds-tabs"],
   FORM_PAGE: [".eds-form-section", ".eds-submit-panel"],
-  DASHBOARD_PAGE: [".eds-page-header", ".eds-summary-grid", ".eds-table"]
+  DASHBOARD_PAGE: [".eds-page-header", ".eds-business-summary-strip", ".eds-task-item", ".eds-risk-list", ".eds-action-list", ".eds-activity-item"]
 };
 const stateRouteExpectations = new Map([
   ["/permission-denied", { finalPath: "/permission-denied", text: "当前角色不可访问", selector: ".eds-state-warning" }],

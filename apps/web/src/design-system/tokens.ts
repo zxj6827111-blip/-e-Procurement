@@ -68,18 +68,18 @@ export const enterpriseTokens = {
     "xl": 32
   },
   "typography": {
-    "fontFamily": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", \"PingFang SC\", \"Hiragino Sans GB\", \"Microsoft YaHei\", \"Noto Sans CJK SC\", Arial, sans-serif",
-    "fontFamilyNumber": "\"DIN Alternate\", \"Segoe UI\", Arial, sans-serif",
-    "pageTitle": 22,
+    "fontFamily": "\"Microsoft YaHei UI\", \"Microsoft YaHei\", \"PingFang SC\", \"Hiragino Sans GB\", \"Noto Sans CJK SC\", \"Segoe UI\", Arial, sans-serif",
+    "fontFamilyNumber": "\"Microsoft YaHei UI\", \"Segoe UI\", Arial, sans-serif",
+    "pageTitle": 20,
     "sectionTitle": 16,
     "cardTitle": 15,
     "body": 14,
     "meta": 12,
     "lineHeightBody": 1.6,
-    "lineHeightTight": 1.35,
+    "lineHeightTight": 1.42,
     "weightRegular": 400,
     "weightMedium": 500,
-    "weightSemibold": 600,
+    "weightSemibold": 500,
     "weightBold": 600
   },
   "border": {
@@ -96,7 +96,7 @@ export const enterpriseTokens = {
   "layout": {
     "contentMax": 1320,
     "contentWide": 1680,
-    "sidebarWidth": 228,
+    "sidebarWidth": 246,
     "topbarHeight": 54,
     "tableMinWidth": 760
   },

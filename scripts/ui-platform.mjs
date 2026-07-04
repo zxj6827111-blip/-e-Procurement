@@ -122,6 +122,7 @@ function tokenCssPath(path) {
   const [group, ...rest] = path;
   if (group === "spacing") return ["space", ...rest];
   if (group === "typography" && rest[0] === "fontFamily") return ["font", "family", ...rest.slice(1)];
+  if (group === "typography" && rest[0] === "fontFamilyNumber") return ["font", "family", "number"];
   if (group === "typography") return ["font", ...rest];
   if (group === "zIndex") return ["z", ...rest];
   return path;
@@ -455,7 +456,7 @@ const visualRequiredSelectors = {
   LIST_PAGE: [".eds-page-header", ".eds-filter-bar", ".eds-table", ".eds-pagination"],
   DETAIL_PAGE: [".eds-page-header", ".eds-summary-grid", ".eds-tabs"],
   FORM_PAGE: [".eds-form-section", ".eds-submit-panel"],
-  DASHBOARD_PAGE: [".eds-page-header", ".eds-summary-grid", ".eds-table"]
+  DASHBOARD_PAGE: [".eds-page-header", ".eds-business-summary-strip", ".eds-task-item", ".eds-risk-list", ".eds-action-list", ".eds-activity-item"]
 };
 
 async function applyVisualUser(page, baseUrl, userId) {

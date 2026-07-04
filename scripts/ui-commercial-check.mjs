@@ -95,16 +95,16 @@ addCheck(
 addCheck(
   checks,
   "token:light-commercial-sidebar",
-  tokens.color?.sidebar === "#FFFFFF" && Number(tokens.layout?.sidebarWidth ?? 999) <= 232,
-  "apps/web/src/design-system/tokens.json sets white sidebar and compact <=232px width."
+  tokens.color?.sidebar === "#FFFFFF" && Number(tokens.layout?.sidebarWidth ?? 999) <= 260,
+  "apps/web/src/design-system/tokens.json sets white sidebar and compact <=260px width."
 );
 
 addCheck(
   checks,
   "shell:grouped-navigation",
-  textIncludes("apps/web/src/layouts/AppShell.vue", ["enterprise-nav-group", "environmentLabel", "roleLabel", "roleSwitchEnabled"]) &&
+  textIncludes("apps/web/src/layouts/AppShell.vue", ["enterprise-sidebar", "enterprise-nav-group", "environmentLabel", "roleLabel", "roleSwitchEnabled"]) &&
     !readText("apps/web/src/layouts/AppShell.vue").includes("enterprise-nav-icon"),
-  "apps/web/src/layouts/AppShell.vue renders grouped nav and removes single-character nav icon slots."
+  "apps/web/src/layouts/AppShell.vue renders grouped light sidebar navigation and removes single-character nav icon slots."
 );
 
 addCheck(
@@ -266,7 +266,7 @@ addCheck(
   checks,
   "third-pass:portal-login",
   textIncludes("apps/web/src/design-system/enterprise.css", [
-    "grid-template-columns: minmax(320px, 0.82fr)",
+    "grid-template-columns: minmax(340px, 0.88fr)",
     "box-shadow: var(--ep-shadow-sm)",
     ".enterprise-login-proof-item"
   ]),
@@ -277,13 +277,24 @@ addCheck(
   checks,
   "third-pass:workbench-anti-template",
   textIncludes("apps/web/src/design-system/enterprise.css", [
+    ".eds-task-item",
+    ".eds-activity-item",
+    ".eds-business-summary-strip",
     ".eds-workbench-brief",
-    "overflow-x: hidden",
     ".eds-action-link",
     ".eds-risk-dot"
   ]) &&
+    textIncludes("apps/web/src/pages/dashboard/DashboardMetricsSection.vue", ["eds-business-summary-strip"]) &&
     !readText("apps/web/src/pages/dashboard/DashboardRoleWorkbenchSection.vue").includes("StatusTag"),
-  "Workbench removes horizontal table overflow, badge-stack risks and stacked action buttons."
+  "Workbench uses a business summary strip, task list and project list instead of a KPI card matrix."
+);
+
+addCheck(
+  checks,
+  "third-pass:active-project-source",
+  textIncludes("apps/web/src/pages/dashboard/DashboardPageShell.vue", ["activeProjectItems", "isFormalProject", "DashboardActivitySection"]) &&
+    !readText("apps/web/src/pages/dashboard/DashboardPageShell.vue").includes("const recentActivities"),
+  "Dashboard activity section is sourced from active projects instead of product catalog or audit log filler items."
 );
 
 addCheck(

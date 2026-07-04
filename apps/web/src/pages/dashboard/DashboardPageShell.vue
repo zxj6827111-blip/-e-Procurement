@@ -228,41 +228,32 @@ const todoItems = computed(() => {
   ].slice(0, 5);
 });
 
-const recentActivities = computed(() => {
+const activeProjectItems = computed(() => {
+  const activeProjects = projects.value.filter((item) => isFormalProject(item) && !["archived", "closed"].includes(item.status));
   if (session.roleId === "expert") {
-    return workflowMessages.value
+    return expertPendingTasks.value
+      .filter((task) => task.businessType === "expert_scoring" || task.businessType === "review_award")
       .slice(0, 5)
-      .map((message) => ({
-        title: message.title,
-        meta: message.businessTypeLabel,
-        time: formatDateTime(message.createdAt),
-        to: message.targetPath
+      .map((task) => ({
+        title: task.title,
+        meta: task.businessTypeLabel,
+        time: formatDateTime(task.updatedAt),
+        to: task.targetPath
       }));
   }
-  const productActivities = canUseCatalogActivities(session.roleId)
-    ? products.value.slice(0, 2).map((item) => ({
-        title: item.name,
-        meta: `${item.supplierName ?? supplierName(item.supplierId)} / ${productPrice(item)}`,
-        time: item.activePrice?.deliveryDays ? `${item.activePrice.deliveryDays} 天交付` : "商品目录",
-        to: "/supply-mall"
-      }))
-    : [];
-  const auditActivities = auditLogs.value.slice(0, 3).map((item) => ({
-    title: labelAuditAction(item.action),
-    meta: labelObjectType(item.objectType),
-    time: formatDateTime(item.createdAt),
-    to: auditActivityTarget(session.roleId)
-  }));
-  return [...productActivities, ...auditActivities].slice(0, 5);
+  return activeProjects
+    .slice(0, 5)
+    .map((project) => ({
+      title: project.name ?? project.title ?? "采购项目",
+      meta: `${labelStatus(project.status)} / ${money(project.budgetAmount)}`,
+      time: project.dueAt ? formatDateTime(project.dueAt) : (project.updatedAt ? formatDateTime(project.updatedAt) : "按项目阶段推进"),
+      to: "/project-workbench"
+    }));
 });
 
 const activityLink = computed(() => {
-  if (session.roleId === "group_manager") return { label: "项目档案", to: "/archive-audit" };
-  if (auditRoles.has(session.roleId)) return { label: "日志与监督", to: "/audit" };
-  if (financeRoles.has(session.roleId)) return { label: "结算与发票", to: "/settlement-materials" };
-  if (supplierRoles.has(session.roleId)) return { label: "报价响应", to: "/bidding" };
-  if (session.roleId === "expert") return { label: "消息中心", to: "/messages" };
-  return { label: "商品目录", to: "/supply-mall" };
+  if (session.roleId === "expert") return { label: "进入评审", to: "/expert-scoring" };
+  return { label: "查看项目", to: "/project-workbench" };
 });
 
 const summaryItems = computed<SummaryCardItem[]>(() => summaryCards.value.map((item) => ({ label: item.label, value: item.value })));
@@ -362,7 +353,7 @@ watch(
         />
 
         <DashboardActivitySection
-          :rows="recentActivities"
+          :rows="activeProjectItems"
           :columns="activityColumns"
           :activity-link="activityLink"
           :empty-text="roleWorkbench.emptyActivityText"

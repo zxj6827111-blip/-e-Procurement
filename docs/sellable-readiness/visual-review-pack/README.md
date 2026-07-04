@@ -1,6 +1,6 @@
 # Visual Review Pack
 
-- Generated at: 2026-07-04T17:18:31.528Z
+- Generated at: 2026-07-04T18:49:40.178Z
 - Result: PASS
 - Web: http://127.0.0.1:5306
 - API: http://127.0.0.1:3346
@@ -9,8 +9,8 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | 登录页桌面 | 1366x768 | PASS | docs/sellable-readiness/visual-review-pack/login-desktop-1366x768.png | 454 | login=1 | 0 |
 | 登录页移动端 | 390x844 | PASS | docs/sellable-readiness/visual-review-pack/login-mobile-390x844.png | 454 | login=1 | 0 |
-| 采购经办工作台 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/buyer-dashboard-1440x900.png | 805 | shell=1 | 2 |
-| 集团采购工作台 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/group-dashboard-1440x900.png | 598 | shell=1 | 2 |
+| 采购经办工作台 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/buyer-dashboard-1440x900.png | 709 | shell=1 | 0 |
+| 集团采购工作台 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/group-dashboard-1440x900.png | 605 | shell=1 | 0 |
 | 供应商门户 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/supplier-portal-1440x900.png | 598 | shell=1 | 1 |
 | 采购项目详情 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/project-detail-1440x900.png | 1393 | shell=1 | 2 |
 | 招采执行详情 | 1440x900 | PASS | docs/sellable-readiness/visual-review-pack/project-sourcing-1440x900.png | 1572 | shell=1 | 8 |

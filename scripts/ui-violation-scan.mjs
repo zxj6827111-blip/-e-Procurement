@@ -144,7 +144,7 @@ const pageKindComponents = {
   LIST_PAGE: ["PageHeader", "FilterBar", "DataTable", "PaginationBar"],
   DETAIL_PAGE: ["PageHeader", "SummaryCards", "EnterpriseTabs"],
   FORM_PAGE: ["FormSection", "SubmitPanel"],
-  DASHBOARD_PAGE: ["PageHeader", "SummaryCards", "DataTable"]
+  DASHBOARD_PAGE: ["PageHeader"]
 };
 const domainDecompositionRequirements = {
   supplier: ["LIST_PAGE", "DETAIL_PAGE", "FORM_PAGE"],
@@ -326,6 +326,21 @@ function usesComponent(text, component) {
 
 function countComponentUses(text, component) {
   return [...text.matchAll(new RegExp(`<${component}\\b`, "g"))].length;
+}
+
+function dashboardTaskFirstMissingEvidence(text) {
+  const checks = [
+    ["DashboardMetricsSection", usesComponent(text, "DashboardMetricsSection")],
+    ["DashboardTodoSection", usesComponent(text, "DashboardTodoSection")],
+    ["DashboardRoleWorkbenchSection", usesComponent(text, "DashboardRoleWorkbenchSection")],
+    ["DashboardActivitySection", usesComponent(text, "DashboardActivitySection")],
+    ["eds-business-summary-strip", text.includes("eds-business-summary-strip")],
+    ["eds-task-item", text.includes("eds-task-item")],
+    ["eds-risk-list", text.includes("eds-risk-list")],
+    ["eds-action-list", text.includes("eds-action-list")],
+    ["eds-activity-item", text.includes("eds-activity-item")]
+  ];
+  return checks.filter(([, present]) => !present).map(([label]) => label);
 }
 
 function scanSourceRules(violations) {
@@ -526,13 +541,26 @@ function scanPageKindStructure(violations) {
       );
     }
 
-    if (entry.kind === "DASHBOARD_PAGE" && countComponentUses(featureText, "DataTable") < 2) {
+    if (entry.kind === "DASHBOARD_PAGE") {
+      const missingEvidence = dashboardTaskFirstMissingEvidence(featureText);
+      if (missingEvidence.length > 0) {
+        addViolation(
+          violations,
+          classificationFile,
+          1,
+          "dashboard-not-task-first",
+          `DASHBOARD_PAGE route "${entry.path}" must use task-first workbench sections: ${missingEvidence.join(", ")}.`
+        );
+      }
+    }
+
+    if (entry.kind === "DASHBOARD_PAGE" && usesComponent(featureText, "SummaryCards")) {
       addViolation(
         violations,
         classificationFile,
         1,
-        "dashboard-not-table-first",
-        `DASHBOARD_PAGE route "${entry.path}" must contain at least two DataTable blocks.`
+        "dashboard-template-matrix",
+        `DASHBOARD_PAGE route "${entry.path}" must not use SummaryCards as a KPI matrix.`
       );
     }
   }
