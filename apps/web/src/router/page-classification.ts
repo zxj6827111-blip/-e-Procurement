@@ -14,6 +14,13 @@ export const pageClassifications: PageClassification[] = [
   { path: "/", domain: "dashboard", kind: "DASHBOARD_PAGE", component: "DashboardPage" },
   { path: "/login", domain: "identity", kind: "FORM_PAGE", component: "LoginPage", exceptionReason: "Authentication entry is a controlled form page." },
   {
+    path: "/permission-denied",
+    domain: "state",
+    kind: "DETAIL_PAGE",
+    component: "PermissionDeniedPage",
+    exceptionReason: "System state page uses a controlled status layout instead of business detail modules."
+  },
+  {
     path: "/supplier-onboarding-register",
     domain: "supplier",
     kind: "FORM_PAGE",
@@ -31,15 +38,39 @@ export const pageClassifications: PageClassification[] = [
   { path: "/suppliers/new", domain: "supplier", kind: "FORM_PAGE", component: "SupplierCreatePage" },
   { path: "/suppliers/:supplierId", domain: "supplier", kind: "DETAIL_PAGE", component: "SupplierManagementPage" },
   { path: "/suppliers/:supplierId/:section", domain: "supplier", kind: "DETAIL_PAGE", component: "SupplierManagementPage" },
-  { path: "/supplier-portal", domain: "supplier", kind: "DETAIL_PAGE", component: "SupplierPortalPage" },
-  { path: "/supplier-portal/:section", domain: "supplier", kind: "DETAIL_PAGE", component: "SupplierPortalPage" },
+  {
+    path: "/supplier-portal",
+    domain: "supplier",
+    kind: "DETAIL_PAGE",
+    component: "SupplierPortalPage",
+    exceptionReason: "Supplier self-service detail uses a controlled account ledger layout."
+  },
+  {
+    path: "/supplier-portal/:section",
+    domain: "supplier",
+    kind: "DETAIL_PAGE",
+    component: "SupplierPortalPage",
+    exceptionReason: "Supplier self-service detail uses a controlled account ledger layout."
+  },
   { path: "/procurement-requests", domain: "procurement-request", kind: "LIST_PAGE", component: "ProcurementRequestsPage" },
   { path: "/procurement-requests/new", domain: "procurement-request", kind: "FORM_PAGE", component: "ProcurementRequestCreatePage" },
   { path: "/procurement-requests/:requestId", domain: "procurement-request", kind: "DETAIL_PAGE", component: "ProcurementRequestDetailPage" },
   { path: "/project-workbench", domain: "project", kind: "LIST_PAGE", component: "ProjectWorkbenchListPage" },
   { path: "/project-workbench/:projectId", domain: "project", kind: "DETAIL_PAGE", component: "ProjectWorkbenchPage" },
-  { path: "/project-workbench/:projectId/sourcing", domain: "project-sourcing", kind: "DETAIL_PAGE", component: "ProjectSourcingPage" },
-  { path: "/project-workbench/:projectId/fulfillment", domain: "project-fulfillment", kind: "DETAIL_PAGE", component: "ProjectFulfillmentPage" },
+  {
+    path: "/project-workbench/:projectId/sourcing",
+    domain: "project-sourcing",
+    kind: "DETAIL_PAGE",
+    component: "ProjectSourcingPage",
+    exceptionReason: "Project sourcing detail uses a controlled business context layout."
+  },
+  {
+    path: "/project-workbench/:projectId/fulfillment",
+    domain: "project-fulfillment",
+    kind: "DETAIL_PAGE",
+    component: "ProjectFulfillmentPage",
+    exceptionReason: "Project fulfillment detail uses a controlled business context layout."
+  },
   { path: "/procurement-documents", domain: "procurement-document", kind: "LIST_PAGE", component: "ProcurementDocumentsPage" },
   { path: "/announcements-invitations", domain: "announcement", kind: "LIST_PAGE", component: "AnnouncementsInvitationsPage" },
   { path: "/supplier-registration", domain: "supplier-registration", kind: "FORM_PAGE", component: "SupplierRegistrationPage" },
@@ -59,7 +90,14 @@ export const pageClassifications: PageClassification[] = [
   { path: "/settlement-materials", domain: "settlement", kind: "LIST_PAGE", component: "SettlementMaterialsPage" },
   { path: "/payment-status", domain: "payment", kind: "LIST_PAGE", component: "PaymentStatusPage" },
   { path: "/archive-audit", domain: "archive", kind: "LIST_PAGE", component: "ArchiveAuditPage" },
-  { path: "/audit", domain: "audit", kind: "LIST_PAGE", component: "AuditPage" }
+  { path: "/audit", domain: "audit", kind: "LIST_PAGE", component: "AuditPage" },
+  {
+    path: "/:pathMatch(.*)*",
+    domain: "state",
+    kind: "DETAIL_PAGE",
+    component: "NotFoundPage",
+    exceptionReason: "System state page uses a controlled status layout instead of business detail modules."
+  }
 ];
 
 export const redirectRoutePaths = [

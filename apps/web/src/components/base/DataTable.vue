@@ -25,14 +25,14 @@ defineProps<{
         <tr v-if="rows.length === 0">
           <td :colspan="columns.length">
             <div class="eds-state">
-              <span class="eds-state-icon" aria-hidden="true">空</span>
+              <span class="eds-state-icon" aria-hidden="true"></span>
               <h3>{{ emptyTitle ?? "暂无业务记录" }}</h3>
               <p>{{ emptyText ?? "当前没有符合条件的业务记录，请调整筛选条件或完成上一流程节点后再查看。" }}</p>
             </div>
           </td>
         </tr>
         <tr v-for="(row, index) in rows" v-else :key="String(row[rowKey ?? 'id'] ?? index)">
-          <td v-for="column in columns" :key="column.key">
+          <td v-for="column in columns" :key="column.key" :data-label="column.label">
             <slot :name="column.key" :row="row" :value="row[column.key]" :index="index">
               {{ row[column.key] ?? "-" }}
             </slot>

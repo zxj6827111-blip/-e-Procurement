@@ -8,9 +8,7 @@ import {
   EnterpriseSurface,
   EnterpriseTabs,
   FeedbackMessage,
-  PageHeader,
   StatusTag,
-  SummaryCards,
   type DataTableColumn
 } from "../../components/base";
 import {
@@ -235,24 +233,32 @@ onMounted(load);
 
 <template>
   <section class="eds-section">
-    <PageHeader
-      title="我的供应商档案"
-      eyebrow="供应商门户"
-      description="维护本企业基础资料、资质证照和封样样品；集团侧准入评审、账号管理和停用启用不在供应商门户展示。"
-    >
-      <template #actions>
+    <header class="eds-page-header eds-business-context">
+      <div class="eds-business-context-main">
+        <p class="eds-business-eyebrow">供应商门户 / 企业档案</p>
+        <h2>{{ supplier?.name || "我的供应商档案" }}</h2>
+        <p>维护本企业基础资料、资质证照和封样样品；准入评审、账号管理和停用启用由集团采购侧处理。</p>
+      </div>
+      <div class="eds-business-context-aside">
+        <span class="eds-meta">准入状态</span>
+        <strong>{{ supplierStatus }}</strong>
         <StatusTag :tone="statusTone">{{ supplierStatus }}</StatusTag>
-        <EnterpriseButton type="text" @click="load">刷新</EnterpriseButton>
-      </template>
-    </PageHeader>
+        <EnterpriseButton type="text" @click="load">刷新资料</EnterpriseButton>
+      </div>
+    </header>
 
     <FeedbackMessage v-if="message" tone="success">{{ message }}</FeedbackMessage>
 
-    <EnterpriseSurface v-if="supplier" title="档案概览">
-      <SummaryCards :items="summaryItems" />
+    <EnterpriseSurface v-if="supplier" title="档案完整度" class="eds-business-panel">
+      <div class="eds-ledger-strip">
+        <div v-for="item in summaryItems" :key="item.label">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </div>
+      </div>
     </EnterpriseSurface>
 
-    <EnterpriseSurface v-if="supplier" title="供应商资料">
+    <EnterpriseSurface v-if="supplier" title="供应商资料台账">
       <EnterpriseTabs :tabs="supplierPortalTabs" :active-key="activeTab" @change="switchTab" />
 
       <SupplierPortalProfilePanel

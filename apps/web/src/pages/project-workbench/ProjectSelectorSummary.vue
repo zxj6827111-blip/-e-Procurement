@@ -15,9 +15,9 @@ const selectedProjectId = defineModel<string>("selectedProjectId", { required: t
 </script>
 
 <template>
-  <EnterpriseSurface title="当前操作项目">
-    <div class="eds-form-section">
-      <div>
+  <EnterpriseSurface title="当前操作项目" class="eds-business-panel">
+    <div class="eds-project-switcher">
+      <div class="eds-project-switcher-title">
         <span class="eds-meta">项目名称</span>
         <strong>{{ currentProjectLabel }}</strong>
       </div>

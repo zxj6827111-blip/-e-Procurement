@@ -6,7 +6,7 @@ import { demoUsers } from "./display";
 const roleDefaultRoutes: Record<string, string> = {
   group_manager: "/",
   buyer: "/",
-  hotel_buyer: "/supply-mall",
+  hotel_buyer: "/procurement-requests",
   supplier: "/",
   platform_operator: "/supply-mall",
   supplier_admin: "/",

@@ -7,7 +7,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="今日业务台账" description="按当前岗位汇总需要优先处理的采购、履约、结算和监督事项。">
+  <EnterpriseSurface class="eds-workbench-brief" title="待处理概览">
     <SummaryCards :items="items" />
   </EnterpriseSurface>
 </template>

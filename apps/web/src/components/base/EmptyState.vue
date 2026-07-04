@@ -13,7 +13,7 @@ withDefaults(
 
 <template>
   <section class="eds-state">
-    <span class="eds-state-icon" aria-hidden="true">空</span>
+    <span class="eds-state-icon" aria-hidden="true"></span>
     <h3>{{ title }}</h3>
     <p>{{ description }}</p>
     <div v-if="$slots.actions" class="eds-actions">

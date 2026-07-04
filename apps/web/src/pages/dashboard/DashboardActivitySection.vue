@@ -11,7 +11,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="近期动态">
+  <EnterpriseSurface title="进行中项目">
     <template #actions>
       <RouterLink class="eds-button" :to="activityLink.to">{{ activityLink.label }}</RouterLink>
     </template>

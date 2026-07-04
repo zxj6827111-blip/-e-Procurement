@@ -19,8 +19,10 @@ import LoginPage from "../pages/LoginPage.vue";
 import MessageCenterPage from "../pages/MessageCenterPage.vue";
 import ModuleEntrypointsPage from "../pages/ModuleEntrypointsPage.vue";
 import MyTasksPage from "../pages/MyTasksPage.vue";
+import NotFoundPage from "../pages/NotFoundPage.vue";
 import OrderFulfillmentPage from "../pages/OrderFulfillmentPage.vue";
 import PaymentStatusPage from "../pages/PaymentStatusPage.vue";
+import PermissionDeniedPage from "../pages/PermissionDeniedPage.vue";
 import PermissionsPage from "../pages/PermissionsPage.vue";
 import ProcurementDocumentsPage from "../pages/ProcurementDocumentsPage.vue";
 import ProcurementRequestCreatePage from "../pages/ProcurementRequestCreatePage.vue";
@@ -41,6 +43,8 @@ import SupplierPortalPage from "../pages/SupplierPortalPage.vue";
 import SupplierRegistrationPage from "../pages/SupplierRegistrationPage.vue";
 import SupplyMallPage from "../pages/SupplyMallPage.vue";
 import SupplyMallSectionPage from "../pages/SupplyMallSectionPage.vue";
+import { routeAllowed, supplierRoles } from "../permissions/role-model";
+import { useSessionStore } from "../stores/session";
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -48,6 +52,7 @@ export const router = createRouter({
     { path: "/", component: DashboardPage, meta: getPageClassification("/") },
     { path: "/login", component: LoginPage, meta: getPageClassification("/login") },
     { path: "/supplier-onboarding-register", component: SupplierOnboardingRegisterPage, meta: getPageClassification("/supplier-onboarding-register") },
+    { path: "/permission-denied", component: PermissionDeniedPage, meta: getPageClassification("/permission-denied") },
     { path: "/role-switch", component: RoleSwitchPage, meta: getPageClassification("/role-switch") },
     { path: "/my-tasks", component: MyTasksPage, meta: getPageClassification("/my-tasks") },
     { path: "/messages", component: MessageCenterPage, meta: getPageClassification("/messages") },
@@ -93,6 +98,39 @@ export const router = createRouter({
     { path: "/payment-status", component: PaymentStatusPage, meta: getPageClassification("/payment-status") },
     { path: "/funds", redirect: "/payment-status" },
     { path: "/archive-audit", component: ArchiveAuditPage, meta: getPageClassification("/archive-audit") },
-    { path: "/audit", component: AuditPage, meta: getPageClassification("/audit") }
+    { path: "/audit", component: AuditPage, meta: getPageClassification("/audit") },
+    { path: "/:pathMatch(.*)*", component: NotFoundPage, meta: getPageClassification("/:pathMatch(.*)*") }
   ]
+});
+
+const publicRoutePaths = new Set(["/login", "/supplier-onboarding-register"]);
+const stateRoutePaths = new Set(["/permission-denied"]);
+
+router.beforeEach(async (to) => {
+  if (publicRoutePaths.has(to.path) || stateRoutePaths.has(to.path) || to.matched.some((item) => item.path === "/:pathMatch(.*)*")) {
+    return true;
+  }
+
+  const session = useSessionStore();
+  if (to.path === "/role-switch") {
+    await session.loadAuthProviders().catch(() => undefined);
+    return session.mode !== "production" && session.mockAuthEnabled ? true : "/login";
+  }
+  if (!session.user) {
+    const loaded = await session.loadMe();
+    if (!loaded) return "/login";
+  }
+
+  if (!session.roleId) return "/login";
+  if (session.passwordChangeRequired && supplierRoles.includes(session.roleId as (typeof supplierRoles)[number]) && to.path !== "/account-security") {
+    return "/account-security";
+  }
+
+  if (supplierRoles.includes(session.roleId as (typeof supplierRoles)[number]) && to.path.startsWith("/suppliers/")) {
+    const section = typeof to.params.section === "string" ? to.params.section : "";
+    return section ? `/supplier-portal/${encodeURIComponent(section)}` : "/supplier-portal";
+  }
+
+  if (routeAllowed(to.path, session.roleId, session.mockAuthEnabled)) return true;
+  return "/permission-denied";
 });

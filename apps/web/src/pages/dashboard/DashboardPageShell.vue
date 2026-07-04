@@ -204,8 +204,22 @@ const todoItems = computed(() => {
   }
   if (["buyer", "platform_operator"].includes(session.roleId)) {
     return [
-      ...projects.value.filter(isFormalProject).slice(0, 3).map((item) => ({ title: item.name ?? item.title ?? "采购项目", meta: `预算 ${money(item.budgetAmount)}`, status: labelStatus(item.status), to: "/project-workbench" })),
-      ...products.value.slice(0, 2).map((item) => ({ title: item.name, meta: `${item.supplierName ?? supplierName(item.supplierId)} / ${productPrice(item)}`, status: labelStatus(item.status), to: "/supply-mall" }))
+      ...projects.value.filter(isFormalProject).slice(0, 3).map((item) => ({
+        title: item.name ?? item.title ?? "采购项目",
+        meta: `预算 ${money(item.budgetAmount)}`,
+        status: labelStatus(item.status),
+        due: item.dueAt ? formatDateTime(item.dueAt) : "按项目节点推进",
+        risk: ["document_published", "bidding_open"].includes(item.status) ? "关注报价截止" : "按计划",
+        to: "/project-workbench"
+      })),
+      ...products.value.slice(0, 2).map((item) => ({
+        title: item.name,
+        meta: `${item.supplierName ?? supplierName(item.supplierId)} / ${productPrice(item)}`,
+        status: labelStatus(item.status),
+        due: item.activePrice?.deliveryDays ? `${item.activePrice.deliveryDays} 天交付` : "目录维护",
+        risk: "商品目录",
+        to: "/supply-mall"
+      }))
     ].slice(0, 5);
   }
   return [
@@ -253,12 +267,23 @@ const activityLink = computed(() => {
 
 const summaryItems = computed<SummaryCardItem[]>(() => summaryCards.value.map((item) => ({ label: item.label, value: item.value })));
 
-const todoColumns: DataTableColumn[] = [
-  { key: "status", label: "状态" },
-  { key: "title", label: "事项" },
-  { key: "meta", label: "业务信息" },
-  { key: "action", label: "操作" }
-];
+const todoColumns = computed<DataTableColumn[]>(() => {
+  if (["buyer", "platform_operator"].includes(session.roleId)) {
+    return [
+      { key: "title", label: "项目 / 事项" },
+      { key: "status", label: "当前节点" },
+      { key: "due", label: "时限" },
+      { key: "risk", label: "风险" },
+      { key: "action", label: "操作" }
+    ];
+  }
+  return [
+    { key: "status", label: "状态" },
+    { key: "title", label: "事项" },
+    { key: "meta", label: "业务信息" },
+    { key: "action", label: "操作" }
+  ];
+});
 
 const activityColumns: DataTableColumn[] = [
   { key: "title", label: "动态" },
@@ -316,7 +341,7 @@ watch(
 
 <template>
   <section class="eds-section">
-    <PageHeader :title="roleTitle" eyebrow="今日事项" description="按当前角色汇总待处理采购、履约、结算与监督事项。">
+    <PageHeader :title="roleTitle" eyebrow="工作台" :description="roleWorkbench.description">
       <template #actions>
         <StatusTag :tone="health === '正常' ? 'success' : 'warning'">服务{{ health }}</StatusTag>
       </template>
@@ -326,22 +351,26 @@ watch(
 
     <DashboardMetricsSection :items="summaryItems" />
 
-    <DashboardRoleWorkbenchSection :workbench="roleWorkbench" />
+    <div class="eds-workbench-layout">
+      <div class="eds-workbench-main">
+        <DashboardTodoSection
+          :items="todoItems"
+          :columns="todoColumns"
+          :entry-link="todoEntryLink"
+          :show-entry="session.roleId !== 'admin'"
+          :empty-text="roleWorkbench.emptyTodoText"
+        />
 
-    <DashboardTodoSection
-      :items="todoItems"
-      :columns="todoColumns"
-      :entry-link="todoEntryLink"
-      :show-entry="session.roleId !== 'admin'"
-      :empty-text="roleWorkbench.emptyTodoText"
-    />
+        <DashboardActivitySection
+          :rows="recentActivities"
+          :columns="activityColumns"
+          :activity-link="activityLink"
+          :empty-text="roleWorkbench.emptyActivityText"
+        />
+      </div>
 
-    <DashboardActivitySection
-      :rows="recentActivities"
-      :columns="activityColumns"
-      :activity-link="activityLink"
-      :empty-text="roleWorkbench.emptyActivityText"
-    />
+      <DashboardRoleWorkbenchSection :workbench="roleWorkbench" />
+    </div>
   </section>
 </template>
 

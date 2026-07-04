@@ -1,6 +1,6 @@
 # Sprint 2 Role Menu Snapshot
 
-- Generated at: 2026-07-03T15:12:48.776Z
+- Generated at: 2026-07-04T15:45:30.201Z
 - Frontend source: apps/web/src/permissions/role-model.ts
 - Backend source: apps/api/src/seed/data.ts rolePermissions
 

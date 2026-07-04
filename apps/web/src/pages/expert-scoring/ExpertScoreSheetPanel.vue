@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DataTable, EnterpriseButton, FormSection, SubmitPanel, SummaryCards } from "../../components/base";
+import { DataTable, EnterpriseButton, FormSection, SubmitPanel } from "../../components/base";
 import { SCORE_ITEM_COLUMNS } from "./display";
 import type { ScoreInputValue, ScoreTotals, ScoringItem, ScoringSheet } from "./types";
 
@@ -42,39 +42,51 @@ const emit = defineEmits<{
       <input :value="sheetStatusLabel(selectedSheetDetail.status)" disabled />
     </label>
 
-    <SummaryCards
-      :items="[
-        { label: '技术分', value: categoryTotals.technical, meta: '逐项汇总' },
-        { label: '商务分', value: categoryTotals.service, meta: '逐项汇总' },
-        { label: '价格分', value: categoryTotals.price, meta: '逐项汇总' },
-        { label: '总分', value: categoryTotals.total, meta: '当前评分' }
-      ]"
-    />
+    <div class="eds-ledger-strip eds-form-full-row">
+      <div>
+        <span>技术分</span>
+        <strong>{{ categoryTotals.technical }}</strong>
+      </div>
+      <div>
+        <span>商务分</span>
+        <strong>{{ categoryTotals.service }}</strong>
+      </div>
+      <div>
+        <span>价格分</span>
+        <strong>{{ categoryTotals.price }}</strong>
+      </div>
+      <div>
+        <span>总分</span>
+        <strong>{{ categoryTotals.total }}</strong>
+      </div>
+    </div>
 
-    <DataTable :columns="SCORE_ITEM_COLUMNS" :rows="scoringItems" row-key="id" empty-text="当前评分单暂无评分项。">
-      <template #item="{ row }">
-        <strong>{{ row.categoryLabel }}</strong>
-        <p class="eds-meta">{{ row.label }}</p>
-      </template>
-      <template #score="{ row }">
-        <input
-          v-model.number="scoreInputs[row.id].score"
-          type="number"
-          min="0"
-          :max="row.maxScore"
-          :disabled="!canEditSheet(selectedSheetDetail)"
-          class="eds-compact-input"
-        />
-      </template>
-      <template #comment="{ row }">
-        <textarea
-          v-model="scoreInputs[row.id].comment"
-          rows="2"
-          :disabled="!canEditSheet(selectedSheetDetail)"
-          placeholder="填写扣分、加分或风险说明"
-        />
-      </template>
-    </DataTable>
+    <div class="eds-score-table eds-form-full-row">
+      <DataTable :columns="SCORE_ITEM_COLUMNS" :rows="scoringItems" row-key="id" empty-text="当前评分单暂无评分项。">
+        <template #item="{ row }">
+          <strong>{{ row.categoryLabel }}</strong>
+          <p class="eds-meta">{{ row.label }}</p>
+        </template>
+        <template #score="{ row }">
+          <input
+            v-model.number="scoreInputs[row.id].score"
+            type="number"
+            min="0"
+            :max="row.maxScore"
+            :disabled="!canEditSheet(selectedSheetDetail)"
+            class="eds-compact-input"
+          />
+        </template>
+        <template #comment="{ row }">
+          <textarea
+            v-model="scoreInputs[row.id].comment"
+            rows="2"
+            :disabled="!canEditSheet(selectedSheetDetail)"
+            placeholder="填写扣分、加分或风险说明"
+          />
+        </template>
+      </DataTable>
+    </div>
 
     <label class="eds-form-full-row">
       评审总意见

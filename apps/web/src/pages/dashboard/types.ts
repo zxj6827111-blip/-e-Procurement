@@ -10,6 +10,7 @@ export interface ProjectRow {
   supplierId?: string;
   createdAt?: string;
   updatedAt?: string;
+  dueAt?: string;
 }
 
 export interface SupplierRow {
@@ -68,6 +69,8 @@ export interface DashboardTodoItem {
   meta: string;
   status: string;
   to: string;
+  due?: string;
+  risk?: string;
 }
 
 export interface WorkbenchListItem {

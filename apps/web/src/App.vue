@@ -40,8 +40,12 @@ const environmentLabel = computed(() => {
   return "试用环境";
 });
 
+const roleSwitchEnabled = computed(() => session.mode !== "production" && session.mockAuthEnabled);
+
 const isLoginRoute = computed(() => route.path === "/login");
 const isPublicSupplierRegisterRoute = computed(() => route.path === "/supplier-onboarding-register");
+const isPermissionDeniedRoute = computed(() => route.path === "/permission-denied");
+const isNotFoundRoute = computed(() => route.matched.some((item) => item.path === "/:pathMatch(.*)*"));
 const isHiddenUtilityRoute = computed(() => route.path === "/role-switch");
 const supplierPasswordChangeRequired = computed(
   () => session.passwordChangeRequired && ["supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId)
@@ -57,6 +61,7 @@ function fallbackRoute() {
 
 function enforceCurrentRoute() {
   if (isLoginRoute.value || isPublicSupplierRegisterRoute.value) return;
+  if (isPermissionDeniedRoute.value || isNotFoundRoute.value) return;
   if (isHiddenUtilityRoute.value && session.mockAuthEnabled) return;
   if (!session.roleId) {
     void router.replace("/login");
@@ -73,7 +78,7 @@ function enforceCurrentRoute() {
     return;
   }
   if (routeAllowed(route.path)) return;
-  void router.replace(fallbackRoute());
+  void router.replace("/permission-denied");
 }
 
 async function logout() {
@@ -107,6 +112,7 @@ watch(
   () => {
     if (!bootstrapped.value || isLoginRoute.value) return;
     if (isPublicSupplierRegisterRoute.value) return;
+    if (isPermissionDeniedRoute.value || isNotFoundRoute.value) return;
     enforceCurrentRoute();
   },
   { immediate: true }
@@ -120,7 +126,7 @@ watch(
 
   <AppShell
     v-else-if="bootstrapped && session.user && routeAllowed(route.path)"
-    brand-mark="采"
+    brand-mark=""
     brand-title="酒店供应链采购平台"
     brand-subtitle="准入、集采、履约、结算"
     context-label="酒店连锁供应链采购平台"
@@ -130,6 +136,43 @@ watch(
     :utility-items="visibleUtilityItems"
     :environment-label="environmentLabel"
     :role-label="currentRoleLabel"
+    :role-switch-enabled="roleSwitchEnabled"
+    @logout="logout"
+  >
+    <RouterView />
+  </AppShell>
+
+  <AppShell
+    v-else-if="bootstrapped && session.user && isPermissionDeniedRoute"
+    brand-mark=""
+    brand-title="酒店供应链采购平台"
+    brand-subtitle="准入、集采、履约、结算"
+    context-label="酒店连锁供应链采购平台"
+    page-title="无权限访问"
+    :user-label="appShellUserLabel"
+    :nav-items="visibleItems"
+    :utility-items="visibleUtilityItems"
+    :environment-label="environmentLabel"
+    :role-label="currentRoleLabel"
+    :role-switch-enabled="roleSwitchEnabled"
+    @logout="logout"
+  >
+    <RouterView />
+  </AppShell>
+
+  <AppShell
+    v-else-if="bootstrapped && session.user && isNotFoundRoute"
+    brand-mark=""
+    brand-title="酒店供应链采购平台"
+    brand-subtitle="准入、集采、履约、结算"
+    context-label="酒店连锁供应链采购平台"
+    page-title="页面无法加载"
+    :user-label="appShellUserLabel"
+    :nav-items="visibleItems"
+    :utility-items="visibleUtilityItems"
+    :environment-label="environmentLabel"
+    :role-label="currentRoleLabel"
+    :role-switch-enabled="roleSwitchEnabled"
     @logout="logout"
   >
     <RouterView />

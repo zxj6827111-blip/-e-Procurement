@@ -1,6 +1,6 @@
 # Sprint 1 UI Copy Scan
 
-- Generated at: 2026-07-03T15:12:05.459Z
+- Generated at: 2026-07-04T15:42:59.364Z
 - Scope: apps/web/src visible Vue copy and apps/api/src user-facing string literals.
 - Result: PASS
 - Blockers: 0
@@ -62,7 +62,7 @@
 | INFO | 治理 | apps/web/src/pages/permissions/display.ts:93 | 版本治理 |
 | INFO | R8/Process/BPMN display | apps/web/src/pages/permissions/usePermissionsPage.ts:45 | BPMN 试点 |
 | WARN | 治理 | apps/web/src/pages/supplier-management/SupplierActionPanel.vue:66 | 这里保存的基础信息、资质附件会同步到集团供应商治理页，用于资质初审和准入评审。 |
-| INFO | Mock customer message | apps/web/src/router/page-classification.ts:23 | Mock role switch is a controlled system form. |
+| INFO | Mock customer message | apps/web/src/router/page-classification.ts:30 | Mock role switch is a controlled system form. |
 | INFO | R8/Process/BPMN display | apps/web/src/utils/status-labels.ts:72 | 影子试点 |
 | INFO | 本地模拟 | apps/web/src/utils/status-labels.ts:73 | 模拟异常 |
 

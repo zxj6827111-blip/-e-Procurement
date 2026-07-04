@@ -18,7 +18,7 @@ const columns: DataTableColumn[] = [
 </script>
 
 <template>
-  <EnterpriseSurface title="执行步骤" description="前半段招采事项按阶段拆入独立详情页，项目主页面只保留阶段入口。">
+  <EnterpriseSurface title="执行步骤" description="按采购文件、公告报名、报价、评审和定标推进，当前阶段优先处理。">
     <DataTable :columns="columns" :rows="steps" row-key="label">
       <template #index="{ index }">{{ index + 1 }}</template>
       <template #label="{ row }">

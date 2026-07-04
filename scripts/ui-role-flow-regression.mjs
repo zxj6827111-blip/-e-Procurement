@@ -336,11 +336,14 @@ async function checkRoleMenu(browser) {
       utilityText,
       directForbiddenPath: role.directForbiddenPath ?? "",
       directForbiddenRedirected: direct?.redirected ?? true,
+      directForbiddenFinalPath: direct?.finalPath ?? "",
+      directForbiddenTextMatched: direct?.textMatched ?? true,
       passed:
         role.navIncludes.every((text) => navText.includes(text)) &&
         role.navExcludes.every((text) => !navText.includes(text)) &&
         role.utilityIncludes.every((text) => utilityText.includes(text)) &&
-        (direct?.redirected ?? true)
+        (direct?.redirected ?? true) &&
+        (direct ? direct.finalPath === "/permission-denied" && direct.textMatched : true)
     };
     await page.screenshot({ path: join(outDir, `menu-${role.userId}.png`), fullPage: true });
     await context.close();
@@ -351,9 +354,14 @@ async function checkRoleMenu(browser) {
 
 async function checkForbiddenRoute(page, path) {
   await page.goto(`${webBaseUrl}${path}`, { waitUntil: "commit", timeout: 15000 });
-  await page.waitForTimeout(500);
+  await page.waitForFunction(
+    (forbiddenPath) => window.location.pathname !== forbiddenPath,
+    path,
+    { timeout: 3000 }
+  ).catch(() => undefined);
   const finalPath = new URL(page.url()).pathname;
-  return { path, finalPath, redirected: finalPath !== path };
+  const bodyText = await page.locator("body").innerText().catch(() => "");
+  return { path, finalPath, redirected: finalPath !== path, textMatched: bodyText.includes("当前角色不可访问") };
 }
 
 async function checkFlowPages(browser, flow) {

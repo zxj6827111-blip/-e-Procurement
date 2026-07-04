@@ -4,7 +4,6 @@ import ErrorAlert from "../../components/ErrorAlert.vue";
 import { FeedbackMessage, StatusTag } from "../../components/base";
 import DemoAccountTable from "./DemoAccountTable.vue";
 import PasswordLoginPanel from "./PasswordLoginPanel.vue";
-import SupplierEntryPanel from "./SupplierEntryPanel.vue";
 import { useLoginPage } from "./useLoginPage";
 
 const state = useLoginPage();
@@ -13,26 +12,33 @@ const state = useLoginPage();
 <template>
   <section class="enterprise-login-layout">
     <div class="enterprise-login-brand">
-      <StatusTag tone="warning">{{ state.environmentLabel.value }}</StatusTag>
-      <h1>集团阳光采购与供应链协同平台</h1>
-      <p>覆盖需求、采购、评审、履约、结算和审计追溯，面向集团、酒店、供应商、专家、财务与审计岗位提供统一业务入口。</p>
+      <StatusTag tone="primary">{{ state.environmentLabel.value }}</StatusTag>
+      <h1>酒店供应链采购平台</h1>
+      <p v-if="state.showLocalAccess.value">面向酒店集团采购、评审、履约与结算的内部协同入口。正式环境接入统一身份认证，本地和 UAT 环境用于岗位验证。</p>
+      <p v-else>面向酒店集团采购、评审、履约与结算的内部协同入口。正式环境接入统一身份认证，请通过集团身份系统进入。</p>
       <div class="enterprise-login-proof">
         <div class="enterprise-login-proof-item">
-          <strong>全流程</strong>
-          <span>采购闭环和责任人可追溯</span>
+          <strong>采购申请</strong>
+          <span>需求、预算、审批、立项</span>
         </div>
         <div class="enterprise-login-proof-item">
-          <strong>强隔离</strong>
-          <span>供应商、专家、审计边界清晰</span>
+          <strong>供应商报价</strong>
+          <span>报名、报价、截标、履约</span>
         </div>
         <div class="enterprise-login-proof-item">
-          <strong>可审计</strong>
-          <span>关键操作留痕并可复核</span>
+          <strong>专家评审</strong>
+          <span>抽取、评分、定标、追溯</span>
         </div>
       </div>
     </div>
 
     <div class="enterprise-login-card">
+      <div class="eds-login-card-title eds-page-header">
+        <h2>登录采购平台</h2>
+        <p v-if="state.showLocalAccess.value">正式环境使用统一身份认证；本地和 UAT 可选择验证角色。</p>
+        <p v-else>正式环境使用统一身份认证，岗位权限由集团身份系统下发。</p>
+      </div>
+
       <PasswordLoginPanel
         v-model:password="state.password.value"
         v-model:username="state.username.value"
@@ -40,10 +46,8 @@ const state = useLoginPage();
         @login="state.login"
       />
 
-      <SupplierEntryPanel />
-
       <FeedbackMessage v-if="state.showLocalAccess.value" tone="warning">
-        本地验证入口仅用于试用和流程检查，生产环境不会展示角色快捷进入。
+        本地和 UAT 环境提供岗位验证入口，用于检查首页、菜单和权限边界。
       </FeedbackMessage>
 
       <DemoAccountTable
@@ -59,7 +63,6 @@ const state = useLoginPage();
       <AuditLogRef :audit-log-id="state.auditLogId.value" />
 
       <footer class="enterprise-login-footer">
-        <span>版本：local-build</span>
         <span>{{ state.environmentLabel.value }}</span>
         <span>技术支持：集团信息中心</span>
       </footer>

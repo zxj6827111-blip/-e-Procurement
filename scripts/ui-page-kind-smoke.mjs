@@ -49,6 +49,10 @@ const requiredSelectors = {
   FORM_PAGE: [".eds-form-section", ".eds-submit-panel"],
   DASHBOARD_PAGE: [".eds-page-header", ".eds-summary-grid", ".eds-table"]
 };
+const stateRouteExpectations = new Map([
+  ["/permission-denied", { finalPath: "/permission-denied", text: "当前角色不可访问", selector: ".eds-state-warning" }],
+  ["/:pathMatch(.*)*", { finalPath: "/not-found-visual-check", text: "页面暂时无法加载", selector: ".eds-state-error" }]
+]);
 
 function pageClassifications() {
   return [...classificationText.matchAll(/\{\s*path:\s*"([^"]+)",\s*domain:\s*"([^"]+)",\s*kind:\s*"([^"]+)",\s*component:\s*"([^"]+)"([^}]*)\}/g)]
@@ -62,6 +66,7 @@ function pageClassifications() {
 }
 
 function samplePath(path) {
+  if (path === "/:pathMatch(.*)*") return "/not-found-visual-check";
   const section = path.startsWith("/supply-mall") ? "orders" : "basic";
   return path
     .replace(":supplierId", "sup-1")
@@ -127,13 +132,16 @@ for (const entry of pageClassifications()) {
   await applyUser(page, userId);
   await page.goto(`${baseUrl}${path}`, { waitUntil: "commit", timeout: 15000 });
 
-  const selectors = entry.exceptionReason ? [".eds-page-header"] : requiredSelectors[entry.kind] ?? [];
+  const stateExpectation = stateRouteExpectations.get(entry.path);
+  const selectors = stateExpectation ? [".eds-page-header", stateExpectation.selector] : entry.exceptionReason ? [".eds-page-header"] : requiredSelectors[entry.kind] ?? [];
   await waitForPageEvidence(page, selectors);
   const counts = {};
   for (const selector of selectors) counts[selector] = await page.locator(selector).count();
   const bodyText = await page.locator("body").innerText();
   const redirected = !page.url().endsWith(path);
-  const passed = !redirected && bodyText.length > 120 && Object.values(counts).every((count) => count > 0);
+  const finalPath = new URL(page.url()).pathname;
+  const stateMatched = !stateExpectation || (finalPath === stateExpectation.finalPath && bodyText.includes(stateExpectation.text));
+  const passed = !redirected && bodyText.length > 120 && Object.values(counts).every((count) => count > 0) && stateMatched;
 
   results.push({
     route: entry.path,
@@ -141,9 +149,11 @@ for (const entry of pageClassifications()) {
     kind: entry.kind,
     userId,
     finalUrl: page.url(),
+    finalPath,
     redirected,
     bodyLength: bodyText.length,
     counts,
+    stateMatched,
     passed
   });
 }

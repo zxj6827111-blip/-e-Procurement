@@ -31,9 +31,19 @@ const emit = defineEmits<{
       <label>主营品类<input :value="profileForm.category" @input="profileForm.category = ($event.target as HTMLInputElement).value" /></label>
       <label>服务区域<input :value="profileForm.region" @input="profileForm.region = ($event.target as HTMLInputElement).value" /></label>
       <label>门店 / 服务点<input :value="profileForm.storeName" @input="profileForm.storeName = ($event.target as HTMLInputElement).value" /></label>
-      <label>追加资质附件<input type="file" multiple @change="emit('fileChange', $event)" /></label>
+      <label class="eds-field-wide eds-file-field">
+        <span>追加资质附件</span>
+        <span class="eds-file-picker">
+          <span class="eds-file-picker-main">
+            <strong>选择资质文件</strong>
+            <small>{{ qualificationFileName || "营业执照、质量体系、检测报告等可多选上传" }}</small>
+          </span>
+          <span class="eds-button eds-button-accent">选择文件</span>
+          <input type="file" multiple @change="emit('fileChange', $event)" />
+        </span>
+      </label>
       <label class="eds-field-wide">经营范围<textarea :value="profileForm.businessScope" rows="4" @input="profileForm.businessScope = ($event.target as HTMLTextAreaElement).value" /></label>
-      <p class="eds-meta eds-field-wide">{{ qualificationFileName || "可一次选择营业执照、质量体系、检测报告等多份文件。" }}</p>
+      <p class="eds-meta eds-field-wide">资质文件会进入集团采购侧准入审核记录，请上传清晰、有效版本。</p>
     </FormSection>
 
     <SubmitPanel>

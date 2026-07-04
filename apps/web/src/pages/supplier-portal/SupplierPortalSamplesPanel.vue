@@ -27,8 +27,17 @@ const emit = defineEmits<{
     <FormSection title="上传封样" description="封样用于集团侧验收、比对和后续履约留痕。">
       <label>封样名称<input :value="sealSampleName" @input="emit('updateSealSampleName', ($event.target as HTMLInputElement).value)" /></label>
       <label>规格说明<input :value="sealSampleSpec" @input="emit('updateSealSampleSpec', ($event.target as HTMLInputElement).value)" /></label>
-      <label>封样附件<input type="file" accept="image/*" multiple @change="emit('fileChange', $event)" /></label>
-      <p class="eds-meta">{{ sealSampleFileName || "可上传一张或多张封样图片。" }}</p>
+      <label class="eds-field-wide eds-file-field">
+        <span>封样附件</span>
+        <span class="eds-file-picker">
+          <span class="eds-file-picker-main">
+            <strong>选择封样图片</strong>
+            <small>{{ sealSampleFileName || "可上传一张或多张封样图片" }}</small>
+          </span>
+          <span class="eds-button eds-button-accent">选择图片</span>
+          <input type="file" accept="image/*" multiple @change="emit('fileChange', $event)" />
+        </span>
+      </label>
     </FormSection>
     <SubmitPanel>
       <EnterpriseButton type="primary" :disabled="sampleSaving || !sealSampleName.trim()" @click="emit('submitSealSample')">上传封样</EnterpriseButton>

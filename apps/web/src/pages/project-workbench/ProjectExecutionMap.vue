@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
-import { DataTable, EnterpriseSurface, StatusTag, SummaryCards, type DataTableColumn } from "../../components/base";
+import { DataTable, EnterpriseSurface, StatusTag, type DataTableColumn } from "../../components/base";
 import type { ProjectOperationLink, WorkbenchStage } from "./types";
 
 const props = defineProps<{
@@ -23,14 +23,21 @@ const columns: DataTableColumn[] = [
 </script>
 
 <template>
-  <EnterpriseSurface :title="title" eyebrow="项目进度">
-    <SummaryCards
-      :items="[
-        { label: '当前状态', value: projectStatusText },
-        { label: '进度概览', value: progressOverview },
-        { label: '完成步骤', value: `${completedOperationCount} / ${totalOperationCount}` }
-      ]"
-    />
+  <EnterpriseSurface :title="title" eyebrow="项目进度" class="eds-business-panel">
+    <div class="eds-ledger-strip">
+      <div>
+        <span>当前状态</span>
+        <strong>{{ projectStatusText }}</strong>
+      </div>
+      <div>
+        <span>进度概览</span>
+        <strong>{{ progressOverview }}</strong>
+      </div>
+      <div>
+        <span>完成步骤</span>
+        <strong>{{ completedOperationCount }} / {{ totalOperationCount }}</strong>
+      </div>
+    </div>
 
     <DataTable :columns="columns" :rows="props.projectOperationLinks" row-key="label">
       <template #index="{ index }">{{ index + 1 }}</template>

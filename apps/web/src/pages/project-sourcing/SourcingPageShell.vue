@@ -32,12 +32,18 @@ defineProps<{
 </script>
 
 <template>
-  <PageHeader title="招采执行详情" eyebrow="项目工作台" :description="description">
-    <template #actions>
-      <RouterLink class="eds-button eds-button-text" :to="`/project-workbench/${encodeURIComponent(projectId)}`">返回项目详情</RouterLink>
-      <StatusTag v-if="hasWorkbench">{{ projectStatusText }}</StatusTag>
-    </template>
-  </PageHeader>
+  <header class="eds-page-header eds-business-context">
+    <div class="eds-business-context-main">
+      <p class="eds-business-eyebrow">项目工作台 / 招采执行</p>
+      <h2>招采执行详情</h2>
+      <p>{{ description }}</p>
+    </div>
+    <div class="eds-business-context-aside">
+      <span class="eds-meta">当前节点</span>
+      <strong>{{ hasWorkbench ? projectStatusText : "未加载" }}</strong>
+      <RouterLink class="eds-action-link" :to="`/project-workbench/${encodeURIComponent(projectId)}`">返回项目详情 <span>→</span></RouterLink>
+    </div>
+  </header>
 
   <ErrorAlert v-if="errorMessage" :message="errorMessage" />
   <FeedbackMessage v-if="loading">正在加载招采执行详情...</FeedbackMessage>
@@ -47,7 +53,7 @@ defineProps<{
     <EnterpriseTabs :tabs="detailTabs" active-key="details" />
 
     <SplitDetailLayout>
-      <EnterpriseSurface title="招采推进情况" eyebrow="项目执行">
+      <EnterpriseSurface title="项目推进台账" eyebrow="招采控制">
         <SummaryCards :items="summaryItems" />
       </EnterpriseSurface>
 

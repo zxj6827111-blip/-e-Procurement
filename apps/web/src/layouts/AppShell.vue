@@ -23,6 +23,7 @@ const props = defineProps<{
   utilityItems?: AppShellNavItem[];
   environmentLabel?: string;
   roleLabel?: string;
+  roleSwitchEnabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -64,7 +65,6 @@ const navGroups = computed(() => {
         <section v-for="group in navGroups" :key="group.group" class="enterprise-nav-group">
           <p class="enterprise-nav-group-title">{{ group.group }}</p>
           <RouterLink v-for="item in group.items" :key="`${group.group}-${item.to}-${item.label}`" :to="item.to">
-            <span class="enterprise-nav-icon" aria-hidden="true">{{ item.icon ?? item.label.slice(0, 1) }}</span>
             <span class="enterprise-nav-copy">
               <span class="enterprise-nav-label">{{ item.label }}</span>
               <span v-if="item.description" class="enterprise-nav-description">{{ item.description }}</span>
@@ -88,9 +88,16 @@ const navGroups = computed(() => {
           <RouterLink v-for="item in utilityItems" :key="item.to" class="enterprise-utility-link" :to="item.to">
             {{ item.label }}
           </RouterLink>
-          <span v-if="roleLabel" class="enterprise-role-badge">{{ roleLabel }}</span>
-          <span class="enterprise-user-pill">{{ userLabel }}</span>
-          <EnterpriseButton @click="emit('logout')">退出</EnterpriseButton>
+          <details class="enterprise-account-menu">
+            <summary class="enterprise-user-pill">{{ userLabel }}</summary>
+            <div class="enterprise-account-popover">
+              <span v-if="roleLabel" class="enterprise-role-badge">{{ roleLabel }}</span>
+              <RouterLink v-if="roleSwitchEnabled" class="enterprise-utility-link" to="/role-switch">
+                切换验证角色
+              </RouterLink>
+              <EnterpriseButton @click="emit('logout')">退出登录</EnterpriseButton>
+            </div>
+          </details>
         </div>
       </header>
 

@@ -18,8 +18,17 @@ defineProps<{
       <RouterLink v-if="showEntry" class="eds-button" :to="entryLink.to">{{ entryLink.label }}</RouterLink>
     </template>
     <DataTable :columns="columns" :rows="items" :empty-text="emptyText">
+      <template #title="{ row }">
+        <div class="eds-table-primary-cell">
+          <strong>{{ row.title }}</strong>
+          <span v-if="row.meta">{{ row.meta }}</span>
+        </div>
+      </template>
       <template #status="{ row }">
         <StatusTag tone="warning">{{ row.status }}</StatusTag>
+      </template>
+      <template #risk="{ row }">
+        <span class="eds-table-muted">{{ row.risk ?? "按计划" }}</span>
       </template>
       <template #action="{ row }">
         <RouterLink class="eds-button eds-button-text" :to="row.to">处理</RouterLink>

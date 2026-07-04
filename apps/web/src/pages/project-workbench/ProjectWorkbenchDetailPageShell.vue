@@ -2,7 +2,6 @@
 import AuditLogRef from "../../components/AuditLogRef.vue";
 import ErrorAlert from "../../components/ErrorAlert.vue";
 import EnterpriseTabs from "../../components/base/EnterpriseTabs.vue";
-import PageHeader from "../../components/base/PageHeader.vue";
 import FeedbackMessage from "../../components/base/FeedbackMessage.vue";
 import RiskAlertPanel from "../../components/base/RiskAlertPanel.vue";
 import SplitDetailLayout from "../../components/base/SplitDetailLayout.vue";
@@ -51,11 +50,18 @@ const detailTabs = [
 
 <template>
   <section class="eds-section">
-    <PageHeader title="采购项目执行" eyebrow="项目工作台" :description="currentProjectLabel">
-      <template #actions>
+    <header class="eds-page-header eds-business-context">
+      <div class="eds-business-context-main">
+        <p class="eds-business-eyebrow">采购项目 / 执行总览</p>
+        <h2>采购项目执行</h2>
+        <p>{{ currentProjectLabel }}</p>
+      </div>
+      <div class="eds-business-context-aside">
+        <span class="eds-meta">当前节点</span>
+        <strong>{{ projectStatusText }}</strong>
         <StatusTag>{{ projectStatusText }}</StatusTag>
-      </template>
-    </PageHeader>
+      </div>
+    </header>
 
     <ProjectSelectorSummary
       v-model:selected-project-id="selectedProjectId"

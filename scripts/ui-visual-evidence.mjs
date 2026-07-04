@@ -101,6 +101,7 @@ async function capture(page, entry, viewport) {
   const filePath = path.join(screenshotDir, fileName);
   const buffer = await page.screenshot({ path: filePath, fullPage: true });
   const metrics = await page.evaluate(() => ({
+    bodyText: document.body?.innerText ?? "",
     bodyLength: document.body?.innerText.trim().length ?? 0,
     surfaces: document.querySelectorAll(".eds-surface").length,
     pageHeaders: document.querySelectorAll(".eds-page-header").length,
@@ -126,7 +127,11 @@ async function capture(page, entry, viewport) {
     passed:
       buffer.length > 10000 &&
       metrics.bodyLength > 80 &&
-      (entry.path === "/login" ? metrics.authShell > 0 : metrics.shell > 0 && metrics.pageHeaders > 0)
+      (entry.path === "/login"
+        ? metrics.authShell > 0
+        : entry.expectState
+          ? metrics.shell > 0 && metrics.stateBlocks > 0 && metrics.bodyText.includes(entry.expectText)
+          : metrics.shell > 0 && metrics.pageHeaders > 0)
   };
 }
 
@@ -172,10 +177,14 @@ try {
     { key: "bidding", title: "报价响应", path: "/bidding", userId: "u11" },
     { key: "expert-scoring", title: "专家评分", path: "/expert-scoring", userId: "u7" },
     { key: "settlement", title: "结算材料", path: "/settlement-materials", userId: "u9" },
-    { key: "audit", title: "审计日志", path: "/audit", userId: "u5" }
+    { key: "audit", title: "审计日志", path: "/audit", userId: "u5" },
+    { key: "permission-denied", title: "无权限页", path: "/approval-rules", userId: "u2", expectState: true, expectText: "当前角色不可访问" },
+    { key: "error-state", title: "错误状态", path: "/not-found-visual-check", userId: "u2", expectState: true, expectText: "页面暂时无法加载" },
+    { key: "empty-state", title: "空状态", path: "/file-center", userId: "u2" }
   ];
   const viewports = [
-    { width: 1440, height: 960 },
+    { width: 1366, height: 768 },
+    { width: 1440, height: 900 },
     { width: 390, height: 844 }
   ];
 
@@ -211,7 +220,7 @@ try {
   };
   fs.writeFileSync(path.join(outputDir, "visual-evidence.json"), JSON.stringify(payload, null, 2), "utf8");
 
-  const report = `# Sprint 8 UI Visual Evidence
+  const report = `# UI Visual Redesign Evidence
 
 - Generated at: ${payload.generatedAt}
 - Result: ${payload.status}
@@ -237,7 +246,7 @@ ${mdTable(
 
 ## Evidence Boundary
 
-These screenshots prove local Sprint 4-8 visual behavior across desktop and narrow mobile viewports. They are not customer UAT signoff and do not prove Production Go.`;
+These screenshots prove local second-pass visual behavior across 1366x768, 1440x900 and narrow mobile viewports. They are not customer UAT signoff and do not prove Production Go. The visual review pack command provides the curated manual review screenshots under docs/sellable-readiness/visual-review-pack.`;
 
   fs.writeFileSync(path.join(docsDir, "04_VISUAL_REDESIGN_REPORT.md"), report.trimEnd() + "\n", "utf8");
   console.log(JSON.stringify({ status: payload.status, captures: captures.length, report: "docs/sellable-readiness/04_VISUAL_REDESIGN_REPORT.md" }, null, 2));

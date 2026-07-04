@@ -4,7 +4,6 @@ import ErrorAlert from "../../components/ErrorAlert.vue";
 import {
   EnterpriseSurface,
   EnterpriseTabs,
-  PageHeader,
   RiskAlertPanel,
   SplitDetailLayout,
   StatusTag,
@@ -34,12 +33,19 @@ defineProps<{
 </script>
 
 <template>
-  <PageHeader title="履约结算与归档" eyebrow="项目工作台" :description="description">
-    <template #actions>
-      <RouterLink class="eds-button" :to="`/project-workbench/${encodeURIComponent(projectId)}`">返回项目详情</RouterLink>
+  <header class="eds-page-header eds-business-context">
+    <div class="eds-business-context-main">
+      <p class="eds-business-eyebrow">项目工作台 / 履约结算</p>
+      <h2>履约结算与归档</h2>
+      <p>{{ description }}</p>
+    </div>
+    <div class="eds-business-context-aside">
+      <span class="eds-meta">当前节点</span>
+      <strong>{{ statusLabel }}</strong>
       <StatusTag :tone="statusTone">{{ statusLabel }}</StatusTag>
-    </template>
-  </PageHeader>
+      <RouterLink class="eds-action-link" :to="`/project-workbench/${encodeURIComponent(projectId)}`">返回项目详情 <span>→</span></RouterLink>
+    </div>
+  </header>
 
   <ErrorAlert v-if="errorMessage" :message="errorMessage" />
   <p v-if="auditLogId" class="eds-meta">审计日志：{{ auditLogId }}</p>
@@ -49,7 +55,7 @@ defineProps<{
     <EnterpriseTabs :tabs="detailTabs" active-key="details" />
 
     <SplitDetailLayout>
-      <EnterpriseSurface title="履约概览">
+      <EnterpriseSurface title="履约证据链">
         <SummaryCards :items="summaryItems" />
       </EnterpriseSurface>
 
