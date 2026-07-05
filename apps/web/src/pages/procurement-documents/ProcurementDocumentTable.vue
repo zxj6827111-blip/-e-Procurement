@@ -26,8 +26,8 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="采购文件列表" description="锁定后的采购文件可进入公告与邀请环节。">
-    <DataTable :columns="DOCUMENT_COLUMNS" :rows="documents" row-key="id" empty-text="暂无采购文件">
+  <EnterpriseSurface title="采购文件列表" description="锁定后的版本才能进入公告与邀请，列表保留全部版本和停用留痕。">
+    <DataTable :columns="DOCUMENT_COLUMNS" :rows="documents" row-key="id" empty-text="暂无采购文件" empty-mode="compact">
       <template #project="{ row }">{{ projectLabel(row.projectId) }}</template>
       <template #version="{ row }">v{{ row.versionNo }}</template>
       <template #status="{ row }">
@@ -45,17 +45,17 @@ const emit = defineEmits<{
       </template>
       <template #lockedAt="{ row }">{{ formatDateTime(row.lockedAt) }}</template>
       <template #actions="{ row }">
-        <div class="eds-actions">
-          <EnterpriseButton v-if="canPublishDocument(row)" type="primary" @click="emit('publishDocument', row)">发布并锁定</EnterpriseButton>
+        <div class="eds-actions-table">
+          <EnterpriseButton v-if="canPublishDocument(row)" type="primary" size="sm" @click="emit('publishDocument', row)">发布并锁定</EnterpriseButton>
           <RouterLink
             v-if="row.status === 'locked'"
-            class="eds-button eds-button-text"
+            class="eds-button eds-button-text eds-button-sm"
             :to="{ path: '/announcements-invitations', query: { projectId: row.projectId } }"
           >
             创建公告
           </RouterLink>
-          <EnterpriseButton v-if="canVoidDocument(row)" @click="emit('voidDocument', row)">停用</EnterpriseButton>
-          <EnterpriseButton v-if="canReviseDocument(row)" @click="emit('reviseDocument', row)">修订文件</EnterpriseButton>
+          <EnterpriseButton v-if="canVoidDocument(row)" size="sm" @click="emit('voidDocument', row)">停用</EnterpriseButton>
+          <EnterpriseButton v-if="canReviseDocument(row)" size="sm" @click="emit('reviseDocument', row)">修订版本</EnterpriseButton>
           <span v-if="!hasAvailableAction(row)" class="eds-meta">无可用操作</span>
         </div>
       </template>

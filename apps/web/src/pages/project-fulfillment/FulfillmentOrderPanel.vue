@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { DataTable, EnterpriseButton, EnterpriseSurface, FormSection, StatusTag, SubmitPanel } from "../../components/base";
+import { DataTable, EnterpriseButton, EnterpriseSurface, StatusTag } from "../../components/base";
 import { ORDER_COLUMNS } from "./constants";
 import type { PurchaseOrder, StatusTone } from "./types";
 
@@ -49,63 +49,89 @@ function lineProgress(order: PurchaseOrder) {
 </script>
 
 <template>
-  <FormSection v-if="canRecordReceipt" title="收货与订单变更参数" description="先维护本次收货、异常或订单变更信息，再在下方订单行执行对应动作。">
-    <label>
-      收货类型
-      <select v-model="receiptType">
-        <option value="full">全部收货</option>
-        <option value="partial">部分收货</option>
-        <option value="exception">异常收货</option>
-      </select>
-    </label>
-    <label>
-      异常类型
-      <select v-model="receiptExceptionType">
-        <option value="quantity_mismatch">数量差异</option>
-        <option value="quality_issue">质量问题</option>
-        <option value="delivery_delay">交付延期</option>
-        <option value="missing_documents">资料缺失</option>
-        <option value="other">其他</option>
-      </select>
-    </label>
-    <label>
-      收货时间
-      <input v-model="receiptAt" type="datetime-local" />
-    </label>
-    <label>
-      收货摘要
-      <input v-model="receiptSummary" />
-    </label>
-    <label>
-      收货明细
-      <textarea v-model="receiptItems" rows="3" placeholder="物资名|数量|单位|是"></textarea>
-    </label>
-    <label>
-      变更计划到货
-      <input v-model="changeExpectedDeliveryAt" type="date" />
-    </label>
-    <label>
-      变更收货地点
-      <input v-model="changeReceivingLocation" />
-    </label>
-    <label>
-      变更说明
-      <input v-model="changeRemark" />
-    </label>
-  </FormSection>
-  <SubmitPanel v-if="canRecordReceipt">
-    <span class="eds-meta">收货明细格式：物资名|数量|单位|是否合格。数量为空或格式错误时不会提交该行。</span>
-  </SubmitPanel>
+  <EnterpriseSurface title="采购订单与收货控制" description="先设置本次收货或订单变更参数，再在订单台账上执行确认、收货、变更与关闭。">
+    <template #actions>
+      <EnterpriseButton v-if="canGenerateOrder" type="primary" :disabled="Boolean(actionBusy)" @click="emit('generateOrder')">生成采购订单</EnterpriseButton>
+    </template>
 
-  <EnterpriseSurface title="采购订单">
-    <div v-if="canGenerateOrder" class="eds-form-section">
-      <div>
-        <span class="eds-meta">订单生成</span>
-        <strong>定标审批已通过，生成采购订单后进入供应商确认与收货业务。</strong>
+    <div v-if="canRecordReceipt" class="eds-page-section">
+      <div class="eds-process-reference">
+        <article class="eds-process-reference-item">
+          <span>收货方式</span>
+          <strong>{{ label(receiptType) }}</strong>
+        </article>
+        <article class="eds-process-reference-item">
+          <span>异常类型</span>
+          <strong>{{ label(receiptExceptionType) }}</strong>
+        </article>
+        <article class="eds-process-reference-item">
+          <span>计划到货调整</span>
+          <strong>{{ changeExpectedDeliveryAt || "保持订单原计划" }}</strong>
+        </article>
+        <article class="eds-process-reference-item">
+          <span>收货地点</span>
+          <strong>{{ changeReceivingLocation || "按订单地点执行" }}</strong>
+        </article>
       </div>
-      <EnterpriseButton type="primary" :disabled="Boolean(actionBusy)" @click="emit('generateOrder')">生成采购订单</EnterpriseButton>
+
+      <div class="eds-form-section">
+        <label>
+          收货类型
+          <select v-model="receiptType">
+            <option value="full">全部收货</option>
+            <option value="partial">部分收货</option>
+            <option value="exception">异常收货</option>
+          </select>
+        </label>
+        <label>
+          异常类型
+          <select v-model="receiptExceptionType">
+            <option value="quantity_mismatch">数量差异</option>
+            <option value="quality_issue">质量问题</option>
+            <option value="delivery_delay">交付延期</option>
+            <option value="missing_documents">资料缺失</option>
+            <option value="other">其他</option>
+          </select>
+        </label>
+        <label>
+          收货时间
+          <input v-model="receiptAt" type="datetime-local" />
+        </label>
+        <label>
+          收货摘要
+          <input v-model="receiptSummary" />
+        </label>
+        <label>
+          收货明细
+          <textarea v-model="receiptItems" rows="3" placeholder="物资名|数量|单位|是"></textarea>
+        </label>
+        <label>
+          变更计划到货
+          <input v-model="changeExpectedDeliveryAt" type="date" />
+        </label>
+        <label>
+          变更收货地点
+          <input v-model="changeReceivingLocation" />
+        </label>
+        <label>
+          变更说明
+          <input v-model="changeRemark" />
+        </label>
+      </div>
+
+      <footer class="eds-submit-panel">
+        <span class="eds-meta">收货明细格式：物资名|数量|单位|是否合格。数量为空或格式错误时不会提交该行。</span>
+        <span class="eds-meta">带入变更后会直接复用当前参数，避免在订单行重复输入。</span>
+      </footer>
     </div>
-    <DataTable :columns="ORDER_COLUMNS" :rows="orders" row-key="id" empty-text="尚未生成采购订单">
+
+    <DataTable
+      :columns="ORDER_COLUMNS"
+      :rows="orders"
+      row-key="id"
+      empty-mode="compact"
+      empty-text="定标通过并生成订单后，在这里持续推进供应商确认、收货和变更处理。"
+    >
       <template #supplier="{ row }">{{ supplierName(row.supplierId) }}</template>
       <template #lineItems="{ row }">{{ lineProgress(row) }}</template>
       <template #status="{ row }">
@@ -114,12 +140,13 @@ function lineProgress(order: PurchaseOrder) {
       </template>
       <template #totalAmount="{ row }">{{ currency(row.totalAmount) }}</template>
       <template #actions="{ row }">
-        <div class="eds-actions">
-          <EnterpriseButton v-if="canConfirmOrder" :disabled="row.status !== 'pending_confirmation' || Boolean(actionBusy)" @click="emit('confirmOrder', row.id)">
+        <div class="eds-actions eds-actions-table">
+          <EnterpriseButton v-if="canConfirmOrder" size="sm" :disabled="row.status !== 'pending_confirmation' || Boolean(actionBusy)" @click="emit('confirmOrder', row.id)">
             供应商确认
           </EnterpriseButton>
           <EnterpriseButton
             v-if="canRecordReceipt"
+            size="sm"
             :disabled="!['supplier_confirmed', 'performing', 'partially_received', 'exception'].includes(row.status) || Boolean(actionBusy)"
             @click="emit('recordReceipt', row.id, 'full')"
           >
@@ -127,6 +154,8 @@ function lineProgress(order: PurchaseOrder) {
           </EnterpriseButton>
           <EnterpriseButton
             v-if="canRecordReceipt"
+            size="sm"
+            type="accent"
             :disabled="!['supplier_confirmed', 'performing', 'partially_received', 'exception'].includes(row.status) || Boolean(actionBusy)"
             @click="emit('primeReceipt', row.id)"
           >
@@ -134,6 +163,8 @@ function lineProgress(order: PurchaseOrder) {
           </EnterpriseButton>
           <EnterpriseButton
             v-if="canRecordReceipt"
+            size="sm"
+            type="danger"
             :disabled="!['supplier_confirmed', 'performing', 'partially_received', 'exception'].includes(row.status) || Boolean(actionBusy)"
             @click="emit('recordReceipt', row.id, 'exception')"
           >
@@ -141,13 +172,21 @@ function lineProgress(order: PurchaseOrder) {
           </EnterpriseButton>
           <EnterpriseButton
             v-if="canRecordReceipt"
+            size="sm"
+            type="text"
             :disabled="['received', 'closed'].includes(row.status) || Boolean(actionBusy)"
             @click="emit('primeChange', row.id)"
           >
             带入变更
           </EnterpriseButton>
-          <EnterpriseButton v-if="canRecordReceipt" :disabled="['received', 'closed'].includes(row.status) || Boolean(actionBusy)" @click="emit('changeOrder', row.id)">提交变更</EnterpriseButton>
-          <EnterpriseButton v-if="canRecordReceipt" :disabled="row.status === 'closed' || Boolean(actionBusy)" @click="emit('closeOrder', row.id)">关闭</EnterpriseButton>
+          <EnterpriseButton v-if="canRecordReceipt" size="sm" type="accent" :disabled="['received', 'closed'].includes(row.status) || Boolean(actionBusy)" @click="emit('changeOrder', row.id)">提交变更</EnterpriseButton>
+          <EnterpriseButton v-if="canRecordReceipt" size="sm" type="text" :disabled="row.status === 'closed' || Boolean(actionBusy)" @click="emit('closeOrder', row.id)">关闭</EnterpriseButton>
+        </div>
+      </template>
+      <template #orderNo="{ row }">
+        <div class="eds-table-primary-cell">
+          <strong>{{ row.orderNo }}</strong>
+          <span>{{ row.expectedDeliveryAt || "待安排到货计划" }}</span>
         </div>
       </template>
     </DataTable>

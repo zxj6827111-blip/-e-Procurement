@@ -5,9 +5,7 @@ import {
   EnterpriseSurface,
   FeedbackMessage,
   FilterBar,
-  PageHeader,
   RiskAlertPanel,
-  SplitDetailLayout,
   StatusTag,
   SummaryCards,
   type SummaryCardItem
@@ -25,41 +23,73 @@ defineProps<{
 </script>
 
 <template>
-  <PageHeader title="结算与发票审核" eyebrow="结算材料" description="集中处理结算单、送货验收材料、发票核验和金额核对记录。">
-    <template #actions>
+  <header class="eds-page-header eds-business-context">
+    <div class="eds-business-context-main">
+      <p class="eds-business-eyebrow">结算材料 / 批量审核</p>
+      <h2>结算与发票审核</h2>
+      <p>集中处理结算单、送货验收材料、发票核验和金额核对记录，强调批量审核与列表处理。</p>
+    </div>
+    <div class="eds-business-context-aside">
+      <span class="eds-meta">当前视图</span>
+      <strong>{{ loading ? "正在同步结算数据" : "批量审核与核对" }}</strong>
       <StatusTag v-if="loading" tone="warning">加载中</StatusTag>
       <StatusTag v-else tone="success">数据已同步</StatusTag>
-    </template>
-  </PageHeader>
+    </div>
+  </header>
 
-  <SplitDetailLayout>
-    <EnterpriseSurface title="结算概览">
+  <div class="eds-process-hero">
+    <EnterpriseSurface title="审核快照" eyebrow="结算概览" description="不展示空洞大数字，只保留审核和流转判断所需信息。">
       <SummaryCards :items="summaryItems" />
     </EnterpriseSurface>
 
-    <FilterBar>
-      <label>
-        结算范围
-        <select value="visible" disabled>
-          <option value="visible">当前角色可见结算材料</option>
-        </select>
-      </label>
-    </FilterBar>
+    <RiskAlertPanel title="审核规则" description="结算单、资料、发票和核对差异必须按同一套口径处理。">
+      <div class="eds-process-reference">
+        <article class="eds-process-reference-item">
+          <span>结算记录</span>
+          <strong>{{ selectedSettlementBillId || "暂无" }}</strong>
+        </article>
+        <article class="eds-process-reference-item">
+          <span>发票记录</span>
+          <strong>{{ selectedInvoiceId || "暂无" }}</strong>
+        </article>
+      </div>
+      <ul class="eds-process-checklist">
+        <li>
+          <strong>先看结算单与资料是否配齐</strong>
+          <span>结算单、送货验收材料和发票要能互相映射，避免孤立审核。</span>
+        </li>
+        <li>
+          <strong>先看金额差异是否解释清楚</strong>
+          <span>金额核对表不是附属信息，而是决定是否付款的重要判定依据。</span>
+        </li>
+        <li>
+          <strong>先看驳回意见是否可追溯</strong>
+          <span>所有驳回与复核都应留下原因，便于供应商重传与财务复核。</span>
+        </li>
+      </ul>
+    </RiskAlertPanel>
+  </div>
 
-    <FeedbackMessage v-if="message">{{ message }}</FeedbackMessage>
-    <FeedbackMessage v-if="loading">正在加载结算数据...</FeedbackMessage>
+  <div class="eds-review-shell">
+    <section class="eds-review-main">
+      <EnterpriseSurface title="审核范围" description="只展示当前角色权限范围内的结算材料与审核操作。">
+        <FilterBar>
+          <label>
+            结算范围
+            <select value="visible" disabled>
+              <option value="visible">当前角色可见结算材料</option>
+            </select>
+          </label>
+        </FilterBar>
+      </EnterpriseSurface>
 
-    <slot />
+      <FeedbackMessage v-if="message">{{ message }}</FeedbackMessage>
+      <FeedbackMessage v-if="loading">正在加载结算数据...</FeedbackMessage>
 
-    <template #aside>
-      <RiskAlertPanel title="结算审核关注" description="结算单、验收记录和发票审核应保持一致。">
-        <ul class="eds-meta-list">
-          <li>供应商提交材料后进入财务核验。</li>
-          <li>发票状态与付款状态不得脱节。</li>
-          <li>异常材料需要保留驳回原因和复核记录。</li>
-        </ul>
-      </RiskAlertPanel>
+      <slot />
+    </section>
 
+    <aside class="eds-review-aside">
       <EnterpriseSurface v-if="selectedSettlementBillId" title="结算记录">
         <ActivityRecordPanel
           business-type="settlement"
@@ -77,8 +107,8 @@ defineProps<{
           :refresh-key="processRefreshKey"
         />
       </EnterpriseSurface>
-    </template>
-  </SplitDetailLayout>
+    </aside>
+  </div>
 
   <ErrorAlert v-if="error" :message="error" />
 </template>

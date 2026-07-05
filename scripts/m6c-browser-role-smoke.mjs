@@ -31,7 +31,7 @@ const roles = [
     label: "酒店采购",
     userId: "u8",
     expectedRole: "酒店采购",
-    routes: ["/supply-mall", "/procurement-requests", "/order-fulfillment", "/my-tasks"],
+    routes: ["/procurement-requests", "/supply-mall", "/order-fulfillment", "/my-tasks"],
     forbiddenRoutes: ["/permissions", "/integration-boundary"]
   },
   {
@@ -45,7 +45,7 @@ const roles = [
     label: "供应商报价人员",
     userId: "u12",
     expectedRole: "供应商报价人员",
-    routes: ["/", "/bidding", "/supplier-registration", "/order-fulfillment", "/my-tasks"],
+    routes: ["/bidding", "/supplier-portal", "/supplier-registration", "/order-fulfillment", "/my-tasks"],
     forbiddenRoutes: ["/procurement-requests", "/permissions"]
   },
   {

@@ -12,8 +12,8 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="金额核对">
-    <DataTable :columns="reconciliationColumns" :rows="rows" empty-text="暂无金额差异记录。">
+  <EnterpriseSurface title="金额核对差异" description="付款前只保留真正影响结算判断的差异记录和原因说明。">
+    <DataTable :columns="reconciliationColumns" :rows="rows" empty-mode="compact" empty-text="暂无金额差异记录。">
       <template #supplier="{ row }">{{ supplierName(row.supplierId) }}</template>
       <template #expectedAmount="{ row }">{{ money(row.expectedAmount) }}</template>
       <template #actualAmount="{ row }">{{ money(row.actualAmount) }}</template>

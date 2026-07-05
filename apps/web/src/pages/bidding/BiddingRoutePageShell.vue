@@ -52,48 +52,54 @@ const {
   <section class="eds-section">
     <BiddingPageShell :selected-project="selectedProject" :selected-project-id="selectedProjectId" :summary-items="summaryItems" />
 
-    <BiddingDraftPanel
-      v-model:selected-project-id="selectedProjectId"
-      v-model:amount="amount"
-      v-model:tax-rate="taxRate"
-      v-model:delivery-days="deliveryDays"
-      v-model:tax-note="taxNote"
-      v-model:response-summary="responseSummary"
-      v-model:service-commitment="serviceCommitment"
-      v-model:tax-inclusive="taxInclusive"
-      :projects="projects"
-      :response-file-name="responseFileName"
-      :empty-project-hint="emptyProjectHint"
-      @project-change="onProjectChange"
-      @file-change="onFileChange"
-      @save-draft="saveDraft"
-    />
+    <div class="eds-template-c-quotation-shell">
+      <section class="eds-quotation-requirement-band">
+        <BiddingListPanel
+          :bids="bids"
+          :project-label="projectLabel"
+          :supplier-name="supplierName"
+          :label-status="labelStatus"
+          :bid-status-tone="bidStatusTone"
+        />
 
-    <BiddingListPanel
-      :bids="bids"
-      :project-label="projectLabel"
-      :supplier-name="supplierName"
-      :label-status="labelStatus"
-      :bid-status-tone="bidStatusTone"
-    />
+        <BiddingActivityRecordPanel
+          :selected-project-id="selectedProjectId"
+          :process-refresh-key="processRefreshKey"
+          :project-process-type="projectProcessType"
+        />
+      </section>
 
-    <BiddingActivityRecordPanel
-      :selected-project-id="selectedProjectId"
-      :process-refresh-key="processRefreshKey"
-      :project-process-type="projectProcessType"
-    />
+      <section class="eds-quotation-submit-band">
+        <BiddingDraftPanel
+          v-model:selected-project-id="selectedProjectId"
+          v-model:amount="amount"
+          v-model:tax-rate="taxRate"
+          v-model:delivery-days="deliveryDays"
+          v-model:tax-note="taxNote"
+          v-model:response-summary="responseSummary"
+          v-model:service-commitment="serviceCommitment"
+          v-model:tax-inclusive="taxInclusive"
+          :projects="projects"
+          :response-file-name="responseFileName"
+          :empty-project-hint="emptyProjectHint"
+          @project-change="onProjectChange"
+          @file-change="onFileChange"
+          @save-draft="saveDraft"
+        />
 
-    <BiddingActionPanel
-      v-model:selected-bid-id="selectedBidId"
-      :bids="bids"
-      :selected-bid="selectedBid"
-      :bid-label="bidLabel"
-      :label-status="labelStatus"
-      @update-draft="updateDraft"
-      @submit-bid="submitBid"
-      @withdraw-bid="withdrawBid"
-      @resubmit-bid="resubmitBid"
-    />
+        <BiddingActionPanel
+          v-model:selected-bid-id="selectedBidId"
+          :bids="bids"
+          :selected-bid="selectedBid"
+          :bid-label="bidLabel"
+          :label-status="labelStatus"
+          @update-draft="updateDraft"
+          @submit-bid="submitBid"
+          @withdraw-bid="withdrawBid"
+          @resubmit-bid="resubmitBid"
+        />
+      </section>
+    </div>
 
     <AuditLogRef :audit-log-id="auditLogId" />
     <ErrorAlert v-if="error" :message="error" />

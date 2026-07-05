@@ -1,6 +1,6 @@
 # Sprint 3 Sellable Check Report
 
-- Generated at: 2026-07-04T18:52:51.058Z
+- Generated at: 2026-07-05T09:49:58.834Z
 - Overall status: CONDITIONAL_GO
 - Blocking/failed commands: 0
 - Fail-closed production gates: 1
@@ -21,6 +21,7 @@
 | npm run ui:smoke | PASS | 0 | - |
 | npm run ui:role-flow | PASS | 0 | - |
 | npm run role:menu-snapshot | PASS | 0 | - |
+| npm run role:rbac-audit | PASS | 0 | - |
 | npm run permission:align | PASS | 0 | - |
 | npm run status:inventory | PASS | 0 | - |
 | npm run production:gate -- --mode=production | FAIL_CLOSED | 1 | - |
@@ -78,8 +79,8 @@
 
  Test Files  49 passed (49)
       Tests  306 passed (306)
-   Start at  02:43:52
-   Duration  309.22s (transform 7.24s, setup 0ms, import 33.46s, tests 1171.47s, environment 6ms)
+   Start at  17:42:11
+   Duration  251.23s (transform 5.64s, setup 0ms, import 26.37s, tests 954.97s, environment 5ms)
 ```
 
 - stderr tail:
@@ -87,63 +88,63 @@
 ```
 nd might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:25828) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:42792) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:14428) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:20668) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:60592) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:30080) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:36992) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:15984) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:21940) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:29656) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:24392) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:14268) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:10976) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:51456) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:2396) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:45564) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:52304) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:17952) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:55120) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:46420) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:63752) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:25256) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:62380) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:41252) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:40952) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:51568) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:51864) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:50256) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:34912) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:3348) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:51828) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:51204) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:53312) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:47936) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:39652) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:48448) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:46316) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:42548) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:40352) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:46048) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:15424) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:48284) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:15308) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:51528) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:22212) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:42024) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:58880) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:45508) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:47012) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:47692) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:54284) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:51556) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:64296) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:29924) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:59232) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:27232) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:54380) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:16620) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 ```
 
@@ -354,69 +355,26 @@ UI compliance scan passed.
 - stdout tail:
 
 ```
--trade",
-      "redirected": false,
-      "bodyLength": 969,
-      "counts": {
-        ".eds-page-header": 7,
-        ".eds-summary-grid": 1,
-        ".eds-tabs": 1
-      },
-      "stateMatched": true,
-      "passed": true
-    },
-    {
-      "route": "/integration-boundary",
-      "sampledPath": "/integration-boundary",
-      "kind": "LIST_PAGE",
-      "userId": "u5",
-      "finalUrl": "http://127.0.0.1:5174/integration-boundary",
-      "finalPath": "/integration-boundary",
-      "redirected": false,
-      "bodyLength": 18384,
-      "counts": {
-        ".eds-page-header": 4,
-        ".eds-filter-bar": 1,
-        ".eds-table": 2,
-        ".eds-pagination": 1
-      },
-      "stateMatched": true,
-      "passed": true
-    },
-    {
-      "route": "/file-center",
-      "sampledPath": "/file-center",
-      "kind": "LIST_PAGE",
-      "userId": "u2",
-      "finalUrl": "http://127.0.0.1:5174/file-center",
-      "finalPath": "/file-center",
-      "redirected": false,
-      "bodyLength": 10049,
-      "counts": {
-        ".eds-page-header": 4,
-        ".eds-filter-bar": 1,
-        ".eds-table": 1,
-        ".eds-pagination": 1
-      },
-      "stateMatched": true,
-      "passed": true
-    },
-    {
-      "route": "/supply-mall",
-      "sampledPath": "/supply-mall",
+upply-mall",
       "kind": "LIST_PAGE",
       "userId": "u8",
-      "finalUrl": "http://127.0.0.1:5174/supply-mall",
+      "finalUrl": "http://127.0.0.1:5296/supply-mall",
       "finalPath": "/supply-mall",
-      "redirected": false,
-      "bodyLength": 1016,
+      "routeMatched": true,
+      "bodyLength": 1316,
       "counts": {
+        ".enterprise-shell": 1,
         ".eds-page-header": 3,
-        ".eds-filter-bar": 1,
         ".eds-table": 1,
-        ".eds-pagination": 1
+        ".eds-filter-bar": 1,
+        ".eds-pagination": 1,
+        ".eds-summary-grid": 1,
+        ".eds-tabs": 1,
+        ".eds-form-section": 0
       },
-      "stateMatched": true,
+      "allMatched": true,
+      "anyMatched": true,
+      "textMatched": true,
       "passed": true
     },
     {
@@ -424,16 +382,22 @@ UI compliance scan passed.
       "sampledPath": "/supply-mall/orders",
       "kind": "DETAIL_PAGE",
       "userId": "u8",
-      "finalUrl": "http://127.0.0.1:5174/supply-mall/orders",
+      "finalUrl": "http://127.0.0.1:5296/supply-mall/orders",
       "finalPath": "/supply-mall/orders",
-      "redirected": false,
-      "bodyLength": 619,
+      "routeMatched": true,
+      "bodyLength": 873,
       "counts": {
+        ".enterprise-shell": 1,
         ".eds-page-header": 5,
         ".eds-summary-grid": 1,
-        ".eds-tabs": 1
+        ".eds-tabs": 1,
+        ".eds-form-section": 1,
+        ".eds-table": 1,
+        ".eds-table-wrap": 1
       },
-      "stateMatched": true,
+      "allMatched": true,
+      "anyMatched": true,
+      "textMatched": true,
       "passed": true
     },
     {
@@ -441,17 +405,23 @@ UI compliance scan passed.
       "sampledPath": "/order-fulfillment",
       "kind": "LIST_PAGE",
       "userId": "u2",
-      "finalUrl": "http://127.0.0.1:5174/order-fulfillment",
+      "finalUrl": "http://127.0.0.1:5296/order-fulfillment",
       "finalPath": "/order-fulfillment",
-      "redirected": false,
-      "bodyLength": 890,
+      "routeMatched": true,
+      "bodyLength": 1479,
       "counts": {
+        ".enterprise-shell": 1,
         ".eds-page-header": 6,
-        ".eds-filter-bar": 1,
         ".eds-table": 3,
-        ".eds-pagination": 1
+        ".eds-filter-bar": 1,
+        ".eds-pagination": 1,
+        ".eds-summary-grid": 1,
+        ".eds-tabs": 0,
+        ".eds-form-section": 1
       },
-      "stateMatched": true,
+      "allMatched": true,
+      "anyMatched": true,
+      "textMatched": true,
       "passed": true
     },
     {
@@ -459,17 +429,23 @@ UI compliance scan passed.
       "sampledPath": "/settlement-materials",
       "kind": "LIST_PAGE",
       "userId": "u13",
-      "finalUrl": "http://127.0.0.1:5174/settlement-materials",
+      "finalUrl": "http://127.0.0.1:5296/settlement-materials",
       "finalPath": "/settlement-materials",
-      "redirected": false,
-      "bodyLength": 1948,
+      "routeMatched": true,
+      "bodyLength": 2580,
       "counts": {
-        ".eds-page-header": 12,
-        ".eds-filter-bar": 1,
+        ".enterprise-shell": 1,
+        ".eds-page-header": 13,
         ".eds-table": 4,
-        ".eds-pagination": 1
+        ".eds-filter-bar": 1,
+        ".eds-pagination": 1,
+        ".eds-summary-grid": 1,
+        ".eds-tabs": 0,
+        ".eds-form-section": 1
       },
-      "stateMatched": true,
+      "allMatched": true,
+      "anyMatched": true,
+      "textMatched": true,
       "passed": true
     },
     {
@@ -477,35 +453,47 @@ UI compliance scan passed.
       "sampledPath": "/payment-status",
       "kind": "LIST_PAGE",
       "userId": "u13",
-      "finalUrl": "http://127.0.0.1:5174/payment-status",
+      "finalUrl": "http://127.0.0.1:5296/payment-status",
       "finalPath": "/payment-status",
-      "redirected": false,
-      "bodyLength": 969,
+      "routeMatched": true,
+      "bodyLength": 1271,
       "counts": {
+        ".enterprise-shell": 1,
         ".eds-page-header": 7,
-        ".eds-filter-bar": 1,
         ".eds-table": 3,
-        ".eds-pagination": 1
+        ".eds-filter-bar": 1,
+        ".eds-pagination": 1,
+        ".eds-summary-grid": 1,
+        ".eds-tabs": 0,
+        ".eds-form-section": 1
       },
-      "stateMatched": true,
+      "allMatched": true,
+      "anyMatched": true,
+      "textMatched": true,
       "passed": true
     },
     {
       "route": "/archive-audit",
       "sampledPath": "/archive-audit",
       "kind": "LIST_PAGE",
-      "userId": "u2",
-      "finalUrl": "http://127.0.0.1:5174/archive-audit",
+      "userId": "u5",
+      "finalUrl": "http://127.0.0.1:5296/archive-audit",
       "finalPath": "/archive-audit",
-      "redirected": false,
-      "bodyLength": 11539,
+      "routeMatched": true,
+      "bodyLength": 1415,
       "counts": {
+        ".enterprise-shell": 1,
         ".eds-page-header": 10,
-        ".eds-filter-bar": 1,
         ".eds-table": 4,
-        ".eds-pagination": 2
+        ".eds-filter-bar": 1,
+        ".eds-pagination": 2,
+        ".eds-summary-grid": 2,
+        ".eds-tabs": 0,
+        ".eds-form-section": 2
       },
-      "stateMatched": true,
+      "allMatched": true,
+      "anyMatched": true,
+      "textMatched": true,
       "passed": true
     },
     {
@@ -513,17 +501,23 @@ UI compliance scan passed.
       "sampledPath": "/audit",
       "kind": "LIST_PAGE",
       "userId": "u5",
-      "finalUrl": "http://127.0.0.1:5174/audit",
+      "finalUrl": "http://127.0.0.1:5296/audit",
       "finalPath": "/audit",
-      "redirected": false,
-      "bodyLength": 529,
+      "routeMatched": true,
+      "bodyLength": 1349,
       "counts": {
-        ".eds-page-header": 2,
-        ".eds-filter-bar": 1,
+        ".enterprise-shell": 1,
+        ".eds-page-header": 4,
         ".eds-table": 1,
-        ".eds-pagination": 1
+        ".eds-filter-bar": 1,
+        ".eds-pagination": 1,
+        ".eds-summary-grid": 0,
+        ".eds-tabs": 0,
+        ".eds-form-section": 0
       },
-      "stateMatched": true,
+      "allMatched": true,
+      "anyMatched": true,
+      "textMatched": true,
       "passed": true
     },
     {
@@ -531,15 +525,17 @@ UI compliance scan passed.
       "sampledPath": "/not-found-visual-check",
       "kind": "DETAIL_PAGE",
       "userId": "u2",
-      "finalUrl": "http://127.0.0.1:5174/not-found-visual-check",
+      "finalUrl": "http://127.0.0.1:5296/not-found-visual-check",
       "finalPath": "/not-found-visual-check",
-      "redirected": false,
-      "bodyLength": 306,
+      "routeMatched": true,
+      "bodyLength": 592,
       "counts": {
         ".eds-page-header": 1,
         ".eds-state-error": 1
       },
-      "stateMatched": true,
+      "allMatched": true,
+      "anyMatched": true,
+      "textMatched": true,
       "passed": true
     }
   ],
@@ -560,66 +556,71 @@ UI compliance scan passed.
 - stdout tail:
 
 ```
-e-procurement-mvp@0.1.0 ui:role-flow
-> node scripts/ui-role-flow-regression.mjs
 
-{
-  "passed": true,
-  "flowTrace": [
-    "酒店采购:发起采购申请",
-    "酒店采购:提交审批",
-    "集团审批:需求审批通过",
-    "采购经办:判定采购方式",
-    "采购经办:生成采购项目",
-    "采购经办:编制采购文件",
-    "采购经办:发布锁定采购文件",
-    "采购经办:创建公告",
-    "采购经办:发布公告并邀请供应商(sup-3)",
-    "供应商报价:报名应标",
-    "采购经办:报名资格审核通过",
-    "供应商报价:提交报价草稿",
-    "供应商报价:正式提交报价",
-    "采购经办:截标并锁定报价",
-    "采购经办:抽取专家",
-    "专家评审:确认回避纪律保密",
-    "专家评审:评分并锁定",
-    "采购经办:生成并冻结评审报告",
-    "采购经办:创建定标审批",
-    "采购经办:提交定标审批",
-    "集团审批:定标审批通过",
-    "采购经办:发送中标结果"
-  ],
-  "menuChecks": [
-    {
-      "label": "采购经办",
-      "userId": "u2",
-      "navText": "工作\n\n工作台\n今日事项\n我的待办\n业务任务\n\n采购\n\n采购申请\n需求发起\n采购项目\n执行进度\n商品目录\n集采商品\n评审定标\n专家与评审\n定标审批\n结果审批\n\n履约结算\n\n订单履约\n发货验收\n\n审计与配置\n\n档案审计\n归档追溯",
-      "utilityText": "消息\n账号安全\n刘明 / 采购经办人",
-      "directForbiddenPath": "/approval-rules",
-      "directForbiddenRedirected": true,
-      "directForbiddenFinalPath": "/permission-denied",
-      "directForbiddenTextMatched": true,
-      "passed": true
-    },
-    {
-      "label": "平台运营",
-      "userId": "u10",
-      "navText": "工作\n\n工作台\n今日事项\n我的待办\n业务任务\n\n采购\n\n采购申请\n需求发起\n采购项目\n执行进度\n商品目录\n集采商品\n评审定标\n专家与评审\n评分模板\n评分规则\n定标审批\n结果审批\n\n履约结算\n\n订单履约\n发货验收\n\n审计与配置\n\n档案审计\n归档追溯",
-      "utilityText": "消息\n账号安全\n平台运营 / 运营维护",
-      "directForbiddenPath": "/approval-rules",
-      "directForbiddenRedirected": true,
-      "directForbiddenFinalPath": "/permission-denied",
-      "directForbiddenTextMatched": true,
-      "passed": true
-    },
-    {
-      "label": "集团采购管理",
-      "userId": "u1",
-      "navText": "工作\n\n工作台\n今日事项\n我的待办\n业务任务\n\n采购\n\n需求审批\n需求准入\n采购项目\n执行进度\n商品目录\n集采商品\n报价进度\n截止与保密\n评审定标\n专家与评审\n评分模板\n评分规则\n定标审批\n结果审批\n\n供应商\n\n供应商\n准入档案\n\n审计与配置\n\n档案审计\n归档追溯\n审批规则\n规则配置",
-      "utilityText": "消息\n账号安全\n陈静 / 集团采购管理人",
+        "报价进度",
+        "评审定标",
+        "评分模板",
+        "定标审批",
+        "供应商",
+        "商品目录",
+        "档案审计"
+      ],
+      "expectedNav": [
+        "我的待办",
+        "审批规则",
+        "需求审批",
+        "采购项目",
+        "报价进度",
+        "评审定标",
+        "评分模板",
+        "定标审批",
+        "供应商",
+        "商品目录",
+        "档案审计"
+      ],
+      "bellVisible": true,
+      "expectedBell": true,
+      "accountSecurityVisible": true,
+      "expectedAccountSecurity": true,
       "directForbiddenPath": "",
       "directForbiddenRedirected": true,
       "directForbiddenFinalPath": "",
+      "directForbiddenTextMatched": true,
+      "passed": true
+    },
+    {
+      "label": "纪检审计",
+      "userId": "u5",
+      "roleId": "auditor",
+      "navLabels": [
+        "工作台",
+        "我的待办",
+        "审批规则",
+        "档案审计",
+        "采购监督",
+        "定标监督",
+        "供应商监督",
+        "操作日志",
+        "集成配置"
+      ],
+      "expectedNav": [
+        "工作台",
+        "我的待办",
+        "审批规则",
+        "档案审计",
+        "采购监督",
+        "定标监督",
+        "供应商监督",
+        "操作日志",
+        "集成配置"
+      ],
+      "bellVisible": true,
+      "expectedBell": true,
+      "accountSecurityVisible": true,
+      "expectedAccountSecurity": true,
+      "directForbiddenPath": "/permissions",
+      "directForbiddenRedirected": true,
+      "directForbiddenFinalPath": "/permission-denied",
       "directForbiddenTextMatched": true,
       "passed": true
     }
@@ -641,9 +642,9 @@ e-procurement-mvp@0.1.0 ui:role-flow
     {
       "userId": "u1",
       "label": "集团需求审批详情",
-      "path": "/procurement-requests/req-51",
+      "path": "/procurement-requests/req-5",
       "requiredText": "需求",
-      "finalPath": "/procurement-requests/req-51",
+      "finalPath": "/procurement-requests/req-5",
       "passed": true,
       "pathLoaded": true,
       "contentLoaded": true,
@@ -654,9 +655,9 @@ e-procurement-mvp@0.1.0 ui:role-flow
     {
       "userId": "u2",
       "label": "采购项目执行详情",
-      "path": "/project-workbench/p-new-43",
-      "requiredText": "酒店食材供应补采项目-1783191051611",
-      "finalPath": "/project-workbench/p-new-43",
+      "path": "/project-workbench/p-new-5",
+      "requiredText": "酒店客房布草补采项目-1783244894979",
+      "finalPath": "/project-workbench/p-new-5",
       "passed": true,
       "pathLoaded": true,
       "contentLoaded": true,
@@ -667,9 +668,9 @@ e-procurement-mvp@0.1.0 ui:role-flow
     {
       "userId": "u2",
       "label": "招采执行详情",
-      "path": "/project-workbench/p-new-43/sourcing",
+      "path": "/project-workbench/p-new-5/sourcing",
       "requiredText": "招采",
-      "finalPath": "/project-workbench/p-new-43/sourcing",
+      "finalPath": "/project-workbench/p-new-5/sourcing",
       "passed": true,
       "pathLoaded": true,
       "contentLoaded": true,
@@ -678,7 +679,33 @@ e-procurement-mvp@0.1.0 ui:role-flow
       "httpErrors": []
     },
     {
-      "userId": "u17",
+      "userId": "u2",
+      "label": "消息中心",
+      "path": "/messages",
+      "requiredText": "消息中心",
+      "finalPath": "/messages",
+      "passed": true,
+      "pathLoaded": true,
+      "contentLoaded": true,
+      "blocked": false,
+      "consoleErrors": [],
+      "httpErrors": []
+    },
+    {
+      "userId": "u2",
+      "label": "账号安全",
+      "path": "/account-security",
+      "requiredText": "账号安全",
+      "finalPath": "/account-security",
+      "passed": true,
+      "pathLoaded": true,
+      "contentLoaded": true,
+      "blocked": false,
+      "consoleErrors": [],
+      "httpErrors": []
+    },
+    {
+      "userId": "u12",
       "label": "供应商报名页",
       "path": "/supplier-registration",
       "requiredText": "报名",
@@ -691,7 +718,7 @@ e-procurement-mvp@0.1.0 ui:role-flow
       "httpErrors": []
     },
     {
-      "userId": "u17",
+      "userId": "u12",
       "label": "供应商报价页",
       "path": "/bidding",
       "requiredText": "报价",
@@ -704,7 +731,7 @@ e-procurement-mvp@0.1.0 ui:role-flow
       "httpErrors": []
     },
     {
-      "userId": "u4",
+      "userId": "u7",
       "label": "专家评分页",
       "path": "/expert-scoring",
       "requiredText": "评分",
@@ -719,9 +746,9 @@ e-procurement-mvp@0.1.0 ui:role-flow
     {
       "userId": "u2",
       "label": "采购经办定标详情",
-      "path": "/award-result/p-new-43",
+      "path": "/award-result/p-new-5",
       "requiredText": "定标",
-      "finalPath": "/award-result/p-new-43",
+      "finalPath": "/award-result/p-new-5",
       "passed": true,
       "pathLoaded": true,
       "contentLoaded": true,
@@ -730,11 +757,11 @@ e-procurement-mvp@0.1.0 ui:role-flow
       "httpErrors": []
     },
     {
-      "userId": "u17",
+      "userId": "u12",
       "label": "供应商中标结果",
-      "path": "/award-result/p-new-43",
+      "path": "/award-result/p-new-5",
       "requiredText": "结果",
-      "finalPath": "/award-result/p-new-43",
+      "finalPath": "/award-result/p-new-5",
       "passed": true,
       "pathLoaded": true,
       "contentLoaded": true,
@@ -766,6 +793,30 @@ e-procurement-mvp@0.1.0 ui:role-flow
   "status": "PASS",
   "report": "docs/sellable-readiness/02_MENU_SNAPSHOT_REPORT.md",
   "roles": 12
+}
+```
+
+- stderr tail:
+
+```
+(empty)
+```
+
+### npm run role:rbac-audit
+
+- Status: PASS
+- stdout tail:
+
+```
+
+> e-procurement-mvp@0.1.0 role:rbac-audit
+> node scripts/sellable-readiness.mjs rbac-role-audit
+
+{
+  "status": "PASS",
+  "roleFailures": 0,
+  "unknownRoleFailures": 0,
+  "report": "docs/sellable-readiness/09_RBAC_ROLE_AUDIT_REPORT.md"
 }
 ```
 
@@ -882,7 +933,7 @@ e-procurement-mvp@0.1.0 ui:role-flow
 > node scripts/r10-backup-restore-drill.mjs
 
 {
-  "generatedAt": "2026-07-04T18:51:11.418Z",
+  "generatedAt": "2026-07-05T09:48:31.671Z",
   "scope": "M6-B local/UAT backup restore drill",
   "source": {
     "dataRoot": "E:\\Software Development\\‌e-Procurement\\output\\stage5-uat-data",
@@ -890,18 +941,18 @@ e-procurement-mvp@0.1.0 ui:role-flow
     "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\stage5-uat-data\\files"
   },
   "backup": {
-    "backupRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-04T18-51-11-416Z",
-    "sqliteFile": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-04T18-51-11-416Z\\runtime.sqlite",
-    "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-04T18-51-11-416Z\\files",
+    "backupRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-05T09-48-31-669Z",
+    "sqliteFile": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-05T09-48-31-669Z\\runtime.sqlite",
+    "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-05T09-48-31-669Z\\files",
     "copiedCompanionFiles": [
       "runtime.sqlite-wal",
       "runtime.sqlite-shm"
     ]
   },
   "restore": {
-    "restoreRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-04T18-51-11-416Z",
-    "sqliteFile": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-04T18-51-11-416Z\\runtime.sqlite",
-    "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-04T18-51-11-416Z\\files"
+    "restoreRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-05T09-48-31-669Z",
+    "sqliteFile": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-05T09-48-31-669Z\\runtime.sqlite",
+    "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-05T09-48-31-669Z\\files"
   },
   "checks": {
     "sourceSqliteExists": true,
@@ -959,7 +1010,7 @@ e-procurement-mvp@0.1.0 ui:role-flow
 - stderr tail:
 
 ```
-(node:50448) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:28164) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 ```
 
@@ -982,7 +1033,7 @@ e-procurement-mvp@0.1.0 ui:role-flow
 > vite --host 127.0.0.1 --port 5276
 
 [web]
-  [32m[1mVITE[22m v6.4.3[39m  [2mready in [0m[1m810[22m[2m[0m ms[22m
+  [32m[1mVITE[22m v6.4.3[39m  [2mready in [0m[1m597[22m[2m[0m ms[22m
 
 [web]   [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5276[22m/[39m
 [api] e-procurement API listening on http://127.0.0.1:3216
@@ -1042,7 +1093,7 @@ e-procurement-mvp@0.1.0 ui:role-flow
 - stderr tail:
 
 ```
-[api] (node:46748) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+[api] (node:51228) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 ```
 
@@ -1066,13 +1117,13 @@ e-procurement-mvp@0.1.0 ui:role-flow
 
 [36mvite v6.4.3 [32mbuilding for production...[36m[39m
 transforming...
-[32m✓[39m 670 modules transformed.
+[32m✓[39m 672 modules transformed.
 rendering chunks...
 computing gzip size...
 [2mdist/[22m[32mindex.html                 [39m[1m[2m  0.48 kB[22m[1m[22m[2m │ gzip:   0.34 kB[22m
-[2mdist/[22m[35massets/index-Da8J9Wy6.css  [39m[1m[2m 39.09 kB[22m[1m[22m[2m │ gzip:   6.23 kB[22m
-[2mdist/[22m[36massets/index-BJ3jNwF7.js   [39m[1m[33m830.46 kB[39m[22m[2m │ gzip: 226.96 kB[22m
-[32m✓ built in 5.06s[39m
+[2mdist/[22m[35massets/index-BmOwoFVQ.css  [39m[1m[2m 47.08 kB[22m[1m[22m[2m │ gzip:   7.58 kB[22m
+[2mdist/[22m[36massets/index-CFcLIbIh.js   [39m[1m[33m870.03 kB[39m[22m[2m │ gzip: 239.96 kB[22m
+[32m✓ built in 4.07s[39m
 ```
 
 - stderr tail:

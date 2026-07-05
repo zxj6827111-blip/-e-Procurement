@@ -255,6 +255,158 @@ ${mdTable(["Role", "Status", "Frontend menu keys", "Backend menus", "Frontend on
   console.log(JSON.stringify({ status: severe === 0 ? "PASS" : "NEEDS_REVIEW", frontendOnlyRoles: severe, report: rel(reportPath) }, null, 2));
 }
 
+const roleAuditSpec = {
+  group_manager: {
+    label: "集团采购管理人",
+    home: "/",
+    template: "A",
+    bell: true,
+    sidebar: ["我的待办", "审批规则", "需求审批", "采购项目", "报价进度", "评审定标", "评分模板", "定标审批", "供应商", "商品目录", "档案审计"]
+  },
+  buyer: {
+    label: "采购经办人",
+    home: "/",
+    template: "A",
+    bell: true,
+    sidebar: ["我的待办", "采购申请", "采购项目", "商品目录", "评审定标", "定标审批", "订单履约", "档案审计"]
+  },
+  platform_operator: {
+    label: "平台运营",
+    home: "/",
+    template: "A",
+    bell: true,
+    sidebar: ["我的待办", "采购申请", "采购项目", "商品目录", "评审定标", "评分模板", "定标审批", "订单履约", "档案审计"]
+  },
+  hotel_buyer: {
+    label: "酒店采购",
+    home: "/procurement-requests",
+    template: "B",
+    bell: true,
+    sidebar: ["工作台", "我的待办", "采购申请", "商品目录", "订单履约"]
+  },
+  hotel_finance: {
+    label: "酒店财务",
+    home: "/",
+    template: "B",
+    bell: true,
+    sidebar: ["工作台", "我的待办", "结算付款", "付款进度"]
+  },
+  finance_reviewer: {
+    label: "财务审核",
+    home: "/",
+    template: "B",
+    bell: true,
+    sidebar: ["工作台", "我的待办", "结算付款", "付款进度"]
+  },
+  supplier: {
+    label: "供应商",
+    home: "/",
+    template: "C",
+    bell: true,
+    sidebar: ["我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
+  },
+  supplier_admin: {
+    label: "供应商管理员",
+    home: "/",
+    template: "C",
+    bell: true,
+    sidebar: ["我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
+  },
+  supplier_quotation: {
+    label: "供应商报价人员",
+    home: "/bidding",
+    template: "C",
+    bell: true,
+    sidebar: ["我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
+  },
+  expert: {
+    label: "专家",
+    home: "/expert-scoring",
+    template: "C",
+    bell: true,
+    sidebar: ["工作台", "我的待办"]
+  },
+  auditor: {
+    label: "纪检审计",
+    home: "/",
+    template: "D",
+    bell: true,
+    sidebar: ["工作台", "我的待办", "审批规则", "档案审计", "采购监督", "定标监督", "供应商监督", "操作日志", "集成配置"]
+  },
+  admin: {
+    label: "系统管理员",
+    home: "/permissions",
+    template: "D",
+    bell: false,
+    sidebar: ["审批规则", "系统管理", "系统设置"]
+  }
+};
+
+function sameItems(left, right) {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
+async function rbacRoleAudit() {
+  ensureDirs();
+  const roleModel = await loadRoleModel();
+  const rows = [];
+  let failures = 0;
+  for (const roleId of roleModel.allRoleIds) {
+    const spec = roleAuditSpec[roleId];
+    const actualLabel = roleModel.roleLabels[roleId] ?? "";
+    const actualHome = roleModel.roleHome(roleId);
+    const actualTemplate = roleModel.roleTemplate(roleId);
+    const actualBell = roleModel.roleHasMessageBell(roleId);
+    const actualSidebar = roleModel.visibleNavItems(roleId).map((item) => item.label);
+    const mismatches = [];
+    if (actualLabel !== spec.label) mismatches.push(`label=${actualLabel}`);
+    if (actualHome !== spec.home) mismatches.push(`home=${actualHome}`);
+    if (actualTemplate !== spec.template) mismatches.push(`template=${actualTemplate}`);
+    if (actualBell !== spec.bell) mismatches.push(`bell=${actualBell}`);
+    if (!sameItems(actualSidebar, spec.sidebar)) mismatches.push(`sidebar=${actualSidebar.join(" / ")}`);
+    if (mismatches.length) failures += 1;
+    rows.push([
+      roleId,
+      mismatches.length === 0 ? "PASS" : "FAIL",
+      actualLabel,
+      actualHome,
+      actualTemplate,
+      actualBell ? "show" : "hide",
+      actualSidebar.join("<br>"),
+      mismatches.join("; ") || "-"
+    ]);
+  }
+
+  const unknownRoleChecks = [
+    ["unknown-role-home", roleModel.roleHome("unknown-role") === "/permission-denied", `actual=${roleModel.roleHome("unknown-role")}`],
+    ["unknown-role-nav", roleModel.visibleNavItems("unknown-role").length === 0, `count=${roleModel.visibleNavItems("unknown-role").length}`],
+    ["unknown-role-utility", roleModel.visibleUtilityItems("unknown-role").length === 0, `count=${roleModel.visibleUtilityItems("unknown-role").length}`],
+    ["unknown-role-route-denied", roleModel.routeAllowed("/", "unknown-role", true) === false, `allowed=${roleModel.routeAllowed("/", "unknown-role", true)}`],
+    ["unknown-role-bell-hidden", roleModel.roleHasMessageBell("unknown-role") === false, `show=${roleModel.roleHasMessageBell("unknown-role")}`]
+  ];
+  const unknownFailures = unknownRoleChecks.filter(([, passed]) => !passed).length;
+  const status = failures === 0 && unknownFailures === 0 ? "PASS" : "FAIL";
+  const report = `# RBAC Role Audit Report
+
+- Generated at: ${nowIso()}
+- Step: 5 / 9
+- Result: ${status}
+- Scope: 12 角色默认着陆页、版式映射、消息铃铛显隐、侧栏菜单，以及未知角色 fail-closed 审计。
+
+${mdTable(["Role", "Status", "Label", "Home", "Template", "Bell", "Sidebar", "Mismatch"], rows)}
+
+## Unknown Role Hardening
+
+${mdTable(["Check", "Status", "Evidence"], unknownRoleChecks.map(([name, passed, evidence]) => [name, passed ? "PASS" : "FAIL", evidence]))}
+
+## Boundary
+
+This audit treats apps/web/src/permissions/role-model.ts as the single source of truth for role home, role template, sidebar labels and message-bell visibility. It does not replace backend authorization or data-scope enforcement.`;
+  const reportPath = writeReport("09_RBAC_ROLE_AUDIT_REPORT.md", report);
+  console.log(JSON.stringify({ status, roleFailures: failures, unknownRoleFailures: unknownFailures, report: rel(reportPath) }, null, 2));
+  if (status !== "PASS") process.exitCode = 1;
+}
+
 function parseEnvFile(file) {
   const result = {};
   if (!fs.existsSync(file)) return result;
@@ -631,6 +783,7 @@ async function sellableCheck() {
     "npm run ui:smoke",
     "npm run ui:role-flow",
     "npm run role:menu-snapshot",
+    "npm run role:rbac-audit",
     "npm run permission:align",
     "npm run status:inventory",
     "npm run production:gate -- --mode=production",
@@ -771,6 +924,7 @@ const handlers = {
   "preflight": preflightReport,
   "ui-copy-scan": uiCopyScan,
   "role-menu-snapshot": roleMenuSnapshot,
+  "rbac-role-audit": rbacRoleAudit,
   "permission-align": permissionAlign,
   "production-gate": productionGate,
   "readiness-strict": readinessStrict,

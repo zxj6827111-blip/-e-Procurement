@@ -85,7 +85,7 @@ export function settlementSummaryItems(overview: Overview): SummaryCardItem[] {
   return [
     { label: "结算单", value: overview.settlementBills.length, meta: "当前角色可见范围" },
     { label: "结算材料", value: overview.settlementMaterials.length, meta: "送货单、验收单、发票等" },
-    { label: "待审发票", value: overview.invoices.filter((item) => item.status === "pending_verification").length, meta: "pending_verification" },
+    { label: "待审发票", value: overview.invoices.filter((item) => item.status === "pending_verification").length, meta: "待核验状态" },
     { label: "应结金额", value: money(amount), meta: "已生成结算单合计" }
   ];
 }

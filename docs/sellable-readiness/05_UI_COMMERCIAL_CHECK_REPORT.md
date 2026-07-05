@@ -1,8 +1,8 @@
 # UI Commercial Check Report
 
-- Generated at: 2026-07-04T18:49:13.075Z
+- Generated at: 2026-07-05T23:53:17.539Z
 - Result: PASS
-- Pass: 68
+- Pass: 51
 - Failures: 0
 - TODO / blocker records: 0
 
@@ -11,25 +11,23 @@
 | token:color.primary | PASS | apps/web/src/design-system/tokens.json -> color.primary |
 | token:color.accent | PASS | apps/web/src/design-system/tokens.json -> color.accent |
 | token:color.sidebar | PASS | apps/web/src/design-system/tokens.json -> color.sidebar |
-| token:color.sidebarActive | PASS | apps/web/src/design-system/tokens.json -> color.sidebarActive |
-| token:color.sidebarText | PASS | apps/web/src/design-system/tokens.json -> color.sidebarText |
-| token:color.panel | PASS | apps/web/src/design-system/tokens.json -> color.panel |
-| token:color.infoSoft | PASS | apps/web/src/design-system/tokens.json -> color.infoSoft |
-| token:color.lockedSoft | PASS | apps/web/src/design-system/tokens.json -> color.lockedSoft |
+| token:color.sidebarActiveBorder | PASS | apps/web/src/design-system/tokens.json -> color.sidebarActiveBorder |
+| token:color.bg | PASS | apps/web/src/design-system/tokens.json -> color.bg |
+| token:color.surface | PASS | apps/web/src/design-system/tokens.json -> color.surface |
+| token:typography.fontFamily | PASS | apps/web/src/design-system/tokens.json -> typography.fontFamily |
 | token:typography.fontFamilyNumber | PASS | apps/web/src/design-system/tokens.json -> typography.fontFamilyNumber |
-| token:typography.cardTitle | PASS | apps/web/src/design-system/tokens.json -> typography.cardTitle |
 | token:shadow.md | PASS | apps/web/src/design-system/tokens.json -> shadow.md |
 | token:layout.sidebarWidth | PASS | apps/web/src/design-system/tokens.json -> layout.sidebarWidth |
+| token:layout.topbarHeight | PASS | apps/web/src/design-system/tokens.json -> layout.topbarHeight |
 | token:density.tableRowHeight | PASS | apps/web/src/design-system/tokens.json -> density.tableRowHeight |
 | token:focus.ring | PASS | apps/web/src/design-system/tokens.json -> focus.ring |
-| token:chinese-b2b-typography | PASS | apps/web/src/design-system/tokens.json prioritizes Chinese system fonts and restrained title weight. |
-| token:light-commercial-sidebar | PASS | apps/web/src/design-system/tokens.json sets white sidebar and compact <=260px width. |
-| shell:grouped-navigation | PASS | apps/web/src/layouts/AppShell.vue renders grouped light sidebar navigation and removes single-character nav icon slots. |
-| role-model:navigation-metadata | PASS | apps/web/src/permissions/role-model.ts preserves role entries and grouping metadata without single-character icons. |
-| login:commercial-layout | PASS | apps/web/src/pages/login/LoginPageShell.vue contains branded product login layout. |
-| login:production-hides-local-access | PASS | apps/web/src/pages/login/useLoginPage.ts hides local role quick entry when mode is production. |
-| login:compact-role-selector | PASS | apps/web/src/pages/login/DemoAccountTable.vue uses a compact role selector instead of a tall account table. |
-| login:required-local-roles | PASS | apps/web/src/pages/login/display.ts includes all required Local/UAT validation roles. |
+| token:rbac-shell-palette | PASS | Design tokens lock the cloud-spruce shell, restrained primary action, sand-gold micro accent, neutral background and fixed shell dimensions. |
+| token:restrained-b2b-typography | PASS | Typography prioritizes Chinese system sans fonts and restrained heading weight. |
+| shell:topbar-sidebar-rbac | PASS | AppShell uses a fixed topbar + green sidebar RBAC shell instead of the old grouped navigation. |
+| role-model:exact-template-matrix | PASS | role-model.ts preserves the role-to-template mapping, per-role bell visibility and supervision-only menus. |
+| login:commercial-layout | PASS | Login page keeps the branded split portal layout. |
+| login:production-hides-local-access | PASS | Local role quick entry stays hidden in production mode. |
+| login:compact-role-selector | PASS | Mock role switching uses a compact selector instead of a tall test table. |
 | component:EmptyState | PASS | apps/web/src/components/base/EmptyState.vue exported from base index. |
 | component:ErrorState | PASS | apps/web/src/components/base/ErrorState.vue exported from base index. |
 | component:PermissionState | PASS | apps/web/src/components/base/PermissionState.vue exported from base index. |
@@ -42,34 +40,19 @@
 | component:SplitDetailLayout | PASS | apps/web/src/components/base/SplitDetailLayout.vue exported from base index. |
 | component:EnvironmentBadge | PASS | apps/web/src/components/base/EnvironmentBadge.vue exported from base index. |
 | component:RoleBadge | PASS | apps/web/src/components/base/RoleBadge.vue exported from base index. |
-| component:ActivityRecordPanel | PASS | apps/web/src/components/ActivityRecordPanel.vue exposes task-first product language. |
-| component:TaskInboxSummary | PASS | apps/web/src/components/TaskInboxSummary.vue exposes task-first product language. |
-| state-pages:routed | PASS | Dedicated permission denied and not-found/error state pages are routed through AppShell. |
-| dashboard:role-workbench | PASS | apps/web/src/pages/dashboard/DashboardRoleWorkbenchSection.vue contains 风险提醒, 常用操作, eds-workbench-side. |
-| dashboard:information-architecture | PASS | apps/web/src/pages/dashboard/DashboardPageShell.vue contains eds-workbench-layout, DashboardTodoSection, DashboardActivitySection, DashboardRoleWorkbenchSection. |
-| request-detail:split-layout | PASS | apps/web/src/pages/procurement-requests/ProcurementRequestDetailShell.vue contains SplitDetailLayout, RiskAlertPanel, 审批进度. |
-| project-detail:split-layout | PASS | apps/web/src/pages/project-workbench/ProjectWorkbenchDetailPageShell.vue contains SplitDetailLayout, RiskAlertPanel, 下一步关注. |
-| sourcing:control-panel | PASS | apps/web/src/pages/project-sourcing/SourcingPageShell.vue contains SplitDetailLayout, RiskAlertPanel, 招采控制点. |
-| fulfillment:control-panel | PASS | apps/web/src/pages/project-fulfillment/FulfillmentPageShell.vue contains SplitDetailLayout, RiskAlertPanel, 履约与结算关注. |
-| settlement:review-sidebar | PASS | apps/web/src/pages/settlement-materials/SettlementPageShell.vue contains SplitDetailLayout, RiskAlertPanel, 结算审核关注. |
-| supplier-portal:status-summary | PASS | apps/web/src/pages/supplier-portal/SupplierPortalPageShell.vue contains 供应商门户, eds-business-context, eds-ledger-strip, StatusTag. |
-| expert-scoring:status-summary | PASS | apps/web/src/pages/expert-scoring/ExpertScoringPageShell.vue contains 评分工作台, 评分台账, StatusTag. |
-| archive:audit-summary | PASS | apps/web/src/pages/archive-audit/ArchiveAuditPageShell.vue contains 项目档案与审计, SummaryCards, 只读. |
-| audit:table-state | PASS | apps/web/src/pages/audit/AuditPageShell.vue contains 审计日志, DataTable, StatusTag. |
-| dashboard:not-function-matrix | PASS | DashboardRoleWorkbenchSection no longer renders the old four-card function matrix. |
-| sellable:commercial-gate | PASS | scripts/sellable-readiness.mjs includes ui:commercial-check in sellable aggregation. |
-| sellable:terminology-gate | PASS | Task-first terminology check script exists, is registered and is included in sellable aggregation. |
-| terminology-check:rule-coverage | PASS | scripts/ui-terminology-check.mjs covers key task-first forbidden terms and scans base components. |
-| visual-evidence:script | PASS | scripts/ui-visual-evidence.mjs and package.json script exist. |
-| third-pass:plan-exists | PASS | Third-pass visual correction plan records the human-review gap and stricter acceptance rules. |
-| third-pass:portal-login | PASS | Login is constrained as a portal-style panel instead of a floating marketing card. |
-| third-pass:workbench-anti-template | PASS | Workbench uses a business summary strip, task list and project list instead of a KPI card matrix. |
-| third-pass:active-project-source | PASS | Dashboard activity section is sourced from active projects instead of product catalog or audit log filler items. |
-| third-pass:layout-gate-strengthened | PASS | ui:layout-check now blocks obvious AI-template regressions. |
-| fourth-pass:plan-exists | PASS | Fourth-pass productization plan records key business-page scope and human-review acceptance. |
-| fourth-pass:business-context | PASS | Fourth-pass key project pages use business context and ledger-style summaries. |
-| fourth-pass:expert-supplier-productized | PASS | Expert scoring and supplier portal now expose real business context instead of generic card scaffolding. |
-| fourth-pass:visual-pack-key-business-pages | PASS | Visual review pack captures project detail, sourcing detail and fulfillment detail pages. |
+| component:EnterpriseDialog | PASS | apps/web/src/components/base/EnterpriseDialog.vue exported from base index. |
+| state-pages:routed | PASS | Permission denied and not-found state pages stay inside the AppShell flow. |
+| dashboard:template-routing | PASS | Dashboard routes through A/B/C/D templates instead of one shared workbench layout. |
+| dashboard:quick-action-center | PASS | Dashboard quick-action center combines primary actions with restrained risk reminders. |
+| dashboard:gantt-and-shell-styles | PASS | enterprise.css contains the new A/B/C/D template scaffolding, gantt and waterfall patterns. |
+| procurement:business-shell | PASS | Procurement requests use a B-template list workspace with compact ledger context and processing rail. |
+| bidding:portal-shell | PASS | Supplier bidding exposes a portal-style context shell instead of a generic dashboard card. |
+| expert:avoidance-gate | PASS | Expert scoring forces avoidance confirmation before entering the scoring flow. |
+| audit:waterfall-view | PASS | Audit landing combines waterfall trace and dense detail table. |
+| permissions:matrix-shell | PASS | System settings page frames the permission matrix inside the D-template shell. |
+| sellable:commercial-gate | PASS | sellable-readiness aggregation still includes ui:commercial-check. |
+| sellable:layout-gate | PASS | sellable-readiness aggregation still includes ui:layout-check. |
+| layout-check:script-present | PASS | ui-second-pass-checks.mjs still exposes the browser layout-check entry points for follow-up visual automation. |
 | script:ui:terminology-check | PASS | package.json registers ui:terminology-check via scripts/ui-terminology-check.mjs. |
 | script:ui:login-role-smoke | PASS | package.json registers ui:login-role-smoke via scripts/ui-second-pass-checks.mjs. |
 | script:ui:layout-check | PASS | package.json registers ui:layout-check via scripts/ui-second-pass-checks.mjs. |
@@ -79,4 +62,4 @@
 
 ## Scope Boundary
 
-This check validates Sprint 4-8 UI productization evidence only. It does not convert Production NO_GO to Production GO, and it does not weaken role navigation, route access, copy scan, sellable readiness, production gate, Process Layer, Workflow, BPMN shadow or API tests.
+This check validates the RBAC shell, low-saturation enterprise token system, the four landing templates, and key page-shell evidence only. It does not weaken production readiness, route access, API tests, sellable readiness gates, or process-layer evidence.

@@ -60,6 +60,7 @@ export interface WorkbenchPayload {
 export interface SummaryCard {
   label: string;
   value: string | number;
+  meta?: string;
   tone: "blue" | "green" | "amber" | "red";
   to?: string;
 }

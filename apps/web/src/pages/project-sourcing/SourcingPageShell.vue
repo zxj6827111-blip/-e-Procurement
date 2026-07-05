@@ -5,10 +5,7 @@ import {
   EnterpriseSurface,
   EnterpriseTabs,
   FeedbackMessage,
-  PageHeader,
   RiskAlertPanel,
-  SplitDetailLayout,
-  StatusTag,
   SummaryCards,
   type SummaryCardItem
 } from "../../components/base";
@@ -50,22 +47,38 @@ defineProps<{
   <FeedbackMessage v-else-if="!hasWorkbench" align="center">当前项目暂无可访问的招采执行数据。</FeedbackMessage>
 
   <template v-if="hasWorkbench">
-    <EnterpriseTabs :tabs="detailTabs" active-key="details" />
-
-    <SplitDetailLayout>
-      <EnterpriseSurface title="项目推进台账" eyebrow="招采控制">
+    <div class="eds-process-hero">
+      <EnterpriseSurface title="项目推进台账" eyebrow="招采控制" description="把需求、报名、报价、评审与定标放在同一条执行主线上查看。">
         <SummaryCards :items="summaryItems" />
       </EnterpriseSurface>
 
-      <template #aside>
-        <RiskAlertPanel title="招采控制点" description="报价、开标和评审安排需要同时满足时限、保密和审批要求。">
-          <ul class="eds-meta-list">
-            <li>报价截止前不得暴露供应商报价明细。</li>
-            <li>评审材料和专家评分需按项目留痕。</li>
-            <li>定标依据应与评审记录和审批记录一致。</li>
-          </ul>
-        </RiskAlertPanel>
-      </template>
-    </SplitDetailLayout>
+      <RiskAlertPanel title="招采控制点" description="只保留当前阶段最有业务价值的控制提醒，不做无意义装饰。">
+        <ul class="eds-process-checklist">
+          <li>
+            <strong>报价阶段先看保密边界</strong>
+            <span>报价截止和锁定前只允许看提交进度，不提前暴露金额、明细和响应文件。</span>
+          </li>
+          <li>
+            <strong>评审阶段先看留痕完整性</strong>
+            <span>专家评分、评审结论和评审报告必须按项目留痕，后续定标才能成立。</span>
+          </li>
+          <li>
+            <strong>定标阶段先看依据一致性</strong>
+            <span>推荐结果、审批记录和价格报告要能互相印证，避免形成孤立结论。</span>
+          </li>
+        </ul>
+      </RiskAlertPanel>
+    </div>
+
+    <EnterpriseTabs :tabs="detailTabs" active-key="details" />
+
+    <div class="eds-process-shell">
+      <section class="eds-panel-stack">
+        <slot name="primary" />
+      </section>
+      <aside class="eds-panel-stack">
+        <slot name="secondary" />
+      </aside>
+    </div>
   </template>
 </template>

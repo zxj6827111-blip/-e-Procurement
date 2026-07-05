@@ -13,24 +13,18 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="待办事项" class="eds-workbench-todos">
+  <EnterpriseSurface title="高优先待办" description="按截止时间、业务阶段和风险信号排列，优先处理最影响项目推进的事项。">
     <template #actions>
       <RouterLink v-if="showEntry" class="eds-button" :to="entryLink.to">{{ entryLink.label }}</RouterLink>
     </template>
-    <div v-if="items.length" class="eds-task-list">
-      <article v-for="item in items" :key="`${item.title}-${item.to}`" class="eds-task-item">
-        <div class="eds-task-item-main">
-          <strong>{{ item.title }}</strong>
-          <span>{{ item.meta }}</span>
-        </div>
-        <div class="eds-task-item-meta">
-          <StatusTag tone="warning">{{ item.status }}</StatusTag>
-          <span>{{ item.due ?? "按项目阶段推进" }}</span>
-          <span>{{ item.risk ?? "按计划" }}</span>
-        </div>
-        <RouterLink class="eds-action-link" :to="item.to">处理</RouterLink>
-      </article>
-    </div>
-    <DataTable v-else :columns="columns" :rows="items" :empty-text="emptyText" />
+
+    <DataTable :columns="columns" :rows="items" row-key="title" empty-title="暂无高优先待办" :empty-text="emptyText">
+      <template #status="{ row }">
+        <StatusTag tone="warning">{{ row.status }}</StatusTag>
+      </template>
+      <template #action="{ row }">
+        <RouterLink class="eds-button eds-button-text" :to="row.to">处理</RouterLink>
+      </template>
+    </DataTable>
   </EnterpriseSurface>
 </template>

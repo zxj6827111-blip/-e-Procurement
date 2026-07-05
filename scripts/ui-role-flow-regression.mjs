@@ -1,29 +1,24 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { join } from "node:path";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 
-const apiBaseUrl = process.env.UI_ROLE_FLOW_API_BASE_URL ?? process.env.VITE_API_BASE_URL ?? "http://127.0.0.1:3000";
-async function resolveWebBaseUrl() {
-  const configured = process.env.UI_ROLE_FLOW_WEB_BASE_URL ?? process.env.UI_SMOKE_BASE_URL;
-  if (configured) return configured;
-  for (const candidate of ["http://127.0.0.1:5173", "http://127.0.0.1:5174"]) {
-    try {
-      const response = await fetch(candidate);
-      if (response.ok) return candidate;
-    } catch {
-      // Try the next common Vite port.
-    }
-  }
-  return "http://127.0.0.1:5173";
-}
-
-const webBaseUrl = await resolveWebBaseUrl();
-const outDir = join(process.cwd(), "output", "ui-role-flow");
+const root = process.cwd();
+const outDir = join(root, "output", "ui-role-flow");
+const runtimeDataDir = join(outDir, "runtime-data", String(Date.now()));
+const npmCommand = process.platform === "win32" ? "cmd.exe" : "npm";
+const apiPort = Number(process.env.UI_ROLE_FLOW_API_PORT ?? 3346);
+const webPort = Number(process.env.UI_ROLE_FLOW_WEB_PORT ?? 5306);
+const apiBaseUrl = process.env.UI_ROLE_FLOW_API_BASE_URL ?? `http://127.0.0.1:${apiPort}`;
+const webBaseUrl = process.env.UI_ROLE_FLOW_WEB_BASE_URL ?? `http://127.0.0.1:${webPort}`;
+const externalMode = process.env.UI_ROLE_FLOW_EXTERNAL_SERVICES === "true";
 
 const actors = {
   groupManager: { label: "集团审批", userId: "u1" },
   buyer: { label: "采购经办", userId: "u2" },
-  expert: { label: "专家评审", userId: "u4" },
+  expert: { label: "专家评审", userId: "u7", expertId: "exp-4" },
   hotelBuyer: { label: "酒店采购", userId: "u8" },
   platformOperator: { label: "平台运营", userId: "u10" },
   auditor: { label: "监督审计", userId: "u5" }
@@ -35,7 +30,77 @@ const supplierQuotationUsers = new Map([
   ["sup-3", "u17"]
 ]);
 
+const roleIdByUserId = {
+  u1: "group_manager",
+  u2: "buyer",
+  u5: "auditor",
+  u7: "expert",
+  u8: "hotel_buyer",
+  u10: "platform_operator",
+  u12: "supplier_quotation",
+  u15: "supplier_quotation",
+  u17: "supplier_quotation"
+};
+
 mkdirSync(outDir, { recursive: true });
+
+function npmArgs(args) {
+  return process.platform === "win32" ? ["/d", "/s", "/c", "npm.cmd", ...args] : args;
+}
+
+function spawnService(name, args, extraEnv = {}) {
+  const child = spawn(npmCommand, npmArgs(args), {
+    cwd: root,
+    env: { ...process.env, ...extraEnv },
+    windowsHide: true,
+    detached: process.platform !== "win32"
+  });
+  child.stdout.pipe(createWriteStream(path.join(outDir, `${name}.out.log`), { flags: "a" }));
+  child.stderr.pipe(createWriteStream(path.join(outDir, `${name}.err.log`), { flags: "a" }));
+  return child;
+}
+
+function stopProcessTree(child) {
+  if (!child?.pid) return;
+  try {
+    if (process.platform === "win32") {
+      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    } else {
+      process.kill(-child.pid, "SIGTERM");
+    }
+  } catch {
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      // best-effort cleanup
+    }
+  }
+}
+
+async function waitForUrl(url, timeoutMs = 60000) {
+  const startedAt = Date.now();
+  let lastError = "";
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return;
+      lastError = `${response.status} ${response.statusText}`;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 700));
+  }
+  throw new Error(`Timed out waiting for ${url}: ${lastError}`);
+}
+
+async function loadRoleModel() {
+  const moduleUrl = pathToFileURL(path.join(root, "apps/web/src/permissions/role-model.ts")).href;
+  return import(moduleUrl);
+}
+
+function sameItems(left, right) {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
+}
 
 function jsonHeaders(userId) {
   return {
@@ -217,7 +282,12 @@ async function runApiFlow() {
   await postAs(actors.buyer, `/api/projects/${projectId}/bids/lock`);
   trace.push("采购经办:截标并锁定报价");
 
-  const assignment = await postAs(actors.buyer, `/api/projects/${projectId}/expert-assignments/appoint`, { expertId: "exp-1", reason: `${selectedSupplier.category}品类评审` }, 201);
+  const assignment = await postAs(
+    actors.buyer,
+    `/api/projects/${projectId}/expert-assignments/appoint`,
+    { expertId: actors.expert.expertId, reason: `${selectedSupplier.category}品类评审` },
+    201
+  );
   const assignmentId = assignment.assignment.id;
   trace.push("采购经办:抽取专家");
 
@@ -277,6 +347,7 @@ async function runApiFlow() {
 async function applyUser(page, userId) {
   await page.goto(`${webBaseUrl}/login`, { waitUntil: "commit", timeout: 15000 });
   await page.evaluate((nextUserId) => {
+    window.sessionStorage.clear();
     window.sessionStorage.setItem("demoAuthActive", "true");
     window.sessionStorage.setItem("demoUserId", nextUserId);
     window.localStorage.setItem("mockAuthEnabled", "true");
@@ -289,34 +360,42 @@ async function bodyText(page) {
   return page.locator("body").innerText();
 }
 
-async function checkRoleMenu(browser) {
+async function openAccountMenu(page) {
+  const menu = page.locator(".enterprise-account-menu");
+  if ((await menu.count()) === 0) return;
+  await menu.evaluate((node) => node.setAttribute("open", ""));
+}
+
+async function checkRoleMenu(browser, roleModel) {
   const checks = [];
   const roles = [
     {
       userId: "u2",
+      roleId: "buyer",
       label: "采购经办",
       path: "/procurement-requests",
-      navIncludes: ["工作台", "我的待办", "采购申请", "采购项目"],
-      navExcludes: ["审批规则", "消息中心", "账号安全"],
-      utilityIncludes: ["消息", "账号安全"],
       directForbiddenPath: "/approval-rules"
     },
     {
       userId: "u10",
+      roleId: "platform_operator",
       label: "平台运营",
       path: "/procurement-requests",
-      navIncludes: ["工作台", "我的待办", "采购申请", "采购项目"],
-      navExcludes: ["审批规则", "消息中心", "账号安全"],
-      utilityIncludes: ["消息", "账号安全"],
       directForbiddenPath: "/approval-rules"
     },
     {
       userId: "u1",
+      roleId: "group_manager",
       label: "集团采购管理",
       path: "/approval-rules",
-      navIncludes: ["工作台", "我的待办", "审批规则"],
-      navExcludes: ["消息中心", "账号安全"],
-      utilityIncludes: ["消息", "账号安全"]
+      directForbiddenPath: ""
+    },
+    {
+      userId: "u5",
+      roleId: "auditor",
+      label: "纪检审计",
+      path: "/audit",
+      directForbiddenPath: "/permissions"
     }
   ];
 
@@ -326,22 +405,32 @@ async function checkRoleMenu(browser) {
     await applyUser(page, role.userId);
     await page.goto(`${webBaseUrl}${role.path}`, { waitUntil: "commit", timeout: 15000 });
     await page.waitForSelector(".enterprise-shell", { timeout: 10000 });
-    const navText = await page.locator(".enterprise-nav").innerText();
-    const utilityText = await page.locator(".enterprise-topbar-actions").innerText();
+    await openAccountMenu(page);
+    const navLabels = await page.locator(".enterprise-nav-label").allInnerTexts();
+    const expectedNav = roleModel.visibleNavItems(role.roleId).map((item) => item.label);
+    const bellVisible = (await page.locator('.enterprise-bell-button[aria-label="消息中心"]').count()) > 0;
+    const expectedBell = roleModel.roleHasMessageBell(role.roleId);
+    const accountSecurityVisible = (await page.locator('.enterprise-account-popover a[href="/account-security"]').count()) > 0;
+    const expectedAccountSecurity = roleModel.visibleUtilityItems(role.roleId).some((item) => item.to === "/account-security");
     const direct = role.directForbiddenPath ? await checkForbiddenRoute(page, role.directForbiddenPath) : null;
     const result = {
       label: role.label,
       userId: role.userId,
-      navText,
-      utilityText,
+      roleId: role.roleId,
+      navLabels,
+      expectedNav,
+      bellVisible,
+      expectedBell,
+      accountSecurityVisible,
+      expectedAccountSecurity,
       directForbiddenPath: role.directForbiddenPath ?? "",
       directForbiddenRedirected: direct?.redirected ?? true,
       directForbiddenFinalPath: direct?.finalPath ?? "",
       directForbiddenTextMatched: direct?.textMatched ?? true,
       passed:
-        role.navIncludes.every((text) => navText.includes(text)) &&
-        role.navExcludes.every((text) => !navText.includes(text)) &&
-        role.utilityIncludes.every((text) => utilityText.includes(text)) &&
+        sameItems(navLabels, expectedNav) &&
+        bellVisible === expectedBell &&
+        accountSecurityVisible === expectedAccountSecurity &&
         (direct?.redirected ?? true) &&
         (direct ? direct.finalPath === "/permission-denied" && direct.textMatched : true)
     };
@@ -370,9 +459,11 @@ async function checkFlowPages(browser, flow) {
     { userId: "u1", label: "集团需求审批详情", path: `/procurement-requests/${encodeURIComponent(flow.requestId)}`, requiredText: "需求" },
     { userId: "u2", label: "采购项目执行详情", path: `/project-workbench/${encodeURIComponent(flow.projectId)}`, requiredText: flow.projectName },
     { userId: "u2", label: "招采执行详情", path: `/project-workbench/${encodeURIComponent(flow.projectId)}/sourcing`, requiredText: "招采" },
+    { userId: "u2", label: "消息中心", path: "/messages", requiredText: "消息中心" },
+    { userId: "u2", label: "账号安全", path: "/account-security", requiredText: "账号安全" },
     { userId: flow.supplierQuotationUserId, label: "供应商报名页", path: "/supplier-registration", requiredText: "报名" },
     { userId: flow.supplierQuotationUserId, label: "供应商报价页", path: "/bidding", requiredText: "报价" },
-    { userId: "u4", label: "专家评分页", path: "/expert-scoring", requiredText: "评分" },
+    { userId: "u7", label: "专家评分页", path: "/expert-scoring", requiredText: "评分" },
     { userId: "u2", label: "采购经办定标详情", path: `/award-result/${encodeURIComponent(flow.projectId)}`, requiredText: "定标" },
     { userId: flow.supplierQuotationUserId, label: "供应商中标结果", path: `/award-result/${encodeURIComponent(flow.projectId)}`, requiredText: "结果" }
   ];
@@ -404,7 +495,6 @@ async function checkFlowPages(browser, flow) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: true });
   const evidence = {
     generatedAt: new Date().toISOString(),
     apiBaseUrl,
@@ -414,13 +504,37 @@ async function main() {
     flowPageChecks: [],
     passed: false
   };
+  const roleModel = await loadRoleModel();
+  let apiProcess;
+  let webProcess;
+  let browser;
   try {
-    evidence.menuChecks = await checkRoleMenu(browser);
+    if (!externalMode) {
+      apiProcess = spawnService("api", ["--workspace", "@eprocurement/api", "run", "dev"], {
+        APP_ENV: "local",
+        APP_DATA_DIR: runtimeDataDir,
+        APP_SEED_ON_BOOT: "true",
+        DISABLE_MOCK_AUTH: "false",
+        PORT: String(apiPort),
+        HOST: "127.0.0.1"
+      });
+      webProcess = spawnService("web", ["--workspace", "@eprocurement/web", "run", "dev", "--", "--host", "127.0.0.1", "--port", String(webPort), "--strictPort"], {
+        VITE_API_BASE_URL: apiBaseUrl
+      });
+    }
+    await waitForUrl(`${apiBaseUrl}/health`);
+    await waitForUrl(`${webBaseUrl}/login`);
+    browser = await chromium.launch({ headless: true });
+    evidence.menuChecks = await checkRoleMenu(browser, roleModel);
     evidence.flow = await runApiFlow();
     evidence.flowPageChecks = await checkFlowPages(browser, evidence.flow);
     evidence.passed = evidence.menuChecks.every((item) => item.passed) && evidence.flowPageChecks.every((item) => item.passed);
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
+    if (!externalMode) {
+      stopProcessTree(webProcess);
+      stopProcessTree(apiProcess);
+    }
   }
   writeFileSync(join(outDir, "ui-role-flow-regression.json"), JSON.stringify(evidence, null, 2));
   console.log(JSON.stringify({ passed: evidence.passed, flowTrace: evidence.flow?.trace, menuChecks: evidence.menuChecks, flowPageChecks: evidence.flowPageChecks }, null, 2));

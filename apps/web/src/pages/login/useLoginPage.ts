@@ -1,22 +1,8 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { roleHome } from "../../permissions/role-model";
 import { useSessionStore } from "../../stores/session";
 import { demoUsers } from "./display";
-
-const roleDefaultRoutes: Record<string, string> = {
-  group_manager: "/",
-  buyer: "/",
-  hotel_buyer: "/procurement-requests",
-  supplier: "/",
-  platform_operator: "/supply-mall",
-  supplier_admin: "/",
-  supplier_quotation: "/bidding",
-  expert: "/expert-scoring",
-  hotel_finance: "/",
-  finance_reviewer: "/",
-  auditor: "/",
-  admin: "/permissions"
-};
 
 function passwordForUser(userId: string) {
   return `pass-${userId}`;
@@ -31,7 +17,7 @@ function loginErrorMessage(err: unknown, fallback: string) {
 }
 
 function defaultRoute(roleId: string) {
-  return roleDefaultRoutes[roleId] ?? "/";
+  return roleHome(roleId);
 }
 
 function postLoginRoute(roleId: string, passwordChangeRequired?: boolean) {

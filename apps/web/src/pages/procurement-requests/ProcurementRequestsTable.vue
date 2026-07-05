@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
-import AttachmentList from "../../components/AttachmentList.vue";
 import { DataTable, EnterpriseButton, EnterpriseSurface, PaginationBar, StatusTag } from "../../components/base";
 import { labelStatus } from "../../utils/status-labels";
 import {
@@ -40,43 +39,44 @@ defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="申请流转台账">
+  <EnterpriseSurface class="eds-procurement-list-surface" title="申请流转台账">
     <DataTable :columns="requestColumns" :rows="requests" empty-text="暂无采购申请">
-      <template #code="{ row }">
-        {{ row.code || row.id }}
+      <template #request="{ row }">
+        <div class="eds-table-primary-cell">
+          <strong>{{ row.title }}</strong>
+          <span>{{ row.code || row.id }}</span>
+          <RouterLink v-if="row.projectId" class="eds-action-link" :to="projectExecutionLink(row.projectId)">
+            {{ projectName(row.projectId) }}
+          </RouterLink>
+        </div>
       </template>
-      <template #title="{ row }">
-        <strong>{{ row.title }}</strong>
+
+      <template #owner="{ row }">
+        <div class="eds-stack-tight">
+          <span>{{ row.requestDepartment || "-" }} / {{ row.requesterName || "-" }}</span>
+          <span class="eds-table-muted">{{ labelStatus(row.methodSuggestion) }}</span>
+        </div>
       </template>
-      <template #department="{ row }">
-        {{ row.requestDepartment || "-" }} / {{ row.requesterName || "-" }}
+
+      <template #state="{ row }">
+        <div class="eds-stack-tight">
+          <StatusTag tone="primary">{{ labelStatus(row.status || "draft") }}</StatusTag>
+          <StatusTag :tone="row.approvalStatus === 'submitted' ? 'warning' : row.approvalStatus === 'approved' ? 'success' : 'default'">
+            {{ labelStatus(row.approvalStatus) }}
+          </StatusTag>
+        </div>
       </template>
-      <template #status="{ row }">
-        <StatusTag tone="primary">{{ labelStatus(row.status || "draft") }}</StatusTag>
+
+      <template #amount="{ row }">
+        <div class="eds-stack-tight">
+          <strong>{{ money(row.budgetAmount) }}</strong>
+          <span class="eds-table-muted">附件 {{ row.attachments?.length ?? 0 }} 份</span>
+        </div>
       </template>
-      <template #approval="{ row }">
-        <StatusTag :tone="row.approvalStatus === 'submitted' ? 'warning' : row.approvalStatus === 'approved' ? 'success' : 'default'">
-          {{ labelStatus(row.approvalStatus) }}
-        </StatusTag>
-      </template>
-      <template #method="{ row }">
-        {{ labelStatus(row.methodSuggestion) }}
-      </template>
-      <template #budget="{ row }">
-        {{ money(row.budgetAmount) }}
-      </template>
-      <template #attachments="{ row }">
-        <AttachmentList :attachments="row.attachments" compact />
-      </template>
-      <template #project="{ row }">
-        <RouterLink v-if="row.projectId" class="eds-button eds-button-text" :to="projectExecutionLink(row.projectId)">
-          {{ projectName(row.projectId) }}
-        </RouterLink>
-        <span v-else class="eds-meta">{{ projectName(row.projectId) }}</span>
-      </template>
+
       <template #actions="{ row }">
-        <div class="eds-actions">
-          <RouterLink class="eds-button" :to="`/procurement-requests/${encodeURIComponent(row.id)}`">查看详情</RouterLink>
+        <div class="eds-actions eds-actions-table">
+          <RouterLink class="eds-button" :to="`/procurement-requests/${encodeURIComponent(row.id)}`">查看</RouterLink>
           <EnterpriseButton v-if="canSubmitRequestRow(row, actionContext)" type="primary" @click="$emit('submit', row)">提交审批</EnterpriseButton>
           <EnterpriseButton v-if="canApproveRequestRow(row, actionContext)" type="primary" @click="$emit('approve', row, true)">
             审批通过

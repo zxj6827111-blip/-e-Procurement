@@ -145,7 +145,7 @@ function formatTokenValue(path, value) {
   const key = path[path.length - 1] ?? "";
   if (typeof value === "number") {
     if (["spacing", "radius", "layout", "density"].includes(path[0])) return `${value}px`;
-    if (path[0] === "typography" && /^(pageTitle|sectionTitle|body|meta)$/.test(key)) return `${value}px`;
+    if (path[0] === "typography" && /^(pageTitle|sectionTitle|cardTitle|body|meta)$/.test(key)) return `${value}px`;
     return String(value);
   }
   if (path[0] === "border" && key === "base") return "1px solid var(--ep-color-border)";

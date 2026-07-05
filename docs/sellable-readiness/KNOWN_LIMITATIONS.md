@@ -1,6 +1,6 @@
 # Known Limitations
 
-- Generated at: 2026-07-04T18:52:51.067Z
+- Generated at: 2026-07-05T09:49:58.841Z
 - Production is NO_GO until real customer external-system and production-infrastructure evidence is attached.
 - Local/test mock capability remains available by design and must stay isolated by production gates.
 - production:gate FAIL_CLOSED is expected in this local branch while real production evidence is absent; it must not be re-labeled as Production Go.

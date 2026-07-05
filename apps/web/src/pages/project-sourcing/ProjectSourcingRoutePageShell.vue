@@ -48,49 +48,52 @@ const {
       :has-workbench="Boolean(workbench)"
       :description="pageDescription"
       :summary-items="summaryItems"
-    />
+    >
+      <template v-if="workbench" #primary>
+        <SourcingDemandPanel v-if="workbench.procurementRequest" :request="workbench.procurementRequest" :demand-summary="demandSummary" :currency="currency" />
+        <SourcingSupplierPanel
+          :rows="supplierEngagementRows"
+          :can-read-bid-body="canReadBidBody"
+          :status-tone="statusTone"
+          :label="label"
+          :format-date-time="formatDateTime"
+          :currency="currency"
+        />
+        <SourcingQuotePanel :can-read-bid-body="canReadBidBody" :quote-rows="quoteRows" :currency="currency" />
+        <SourcingRequirementsPanel
+          :project="workbench.project"
+          :bid-attachment-rows="bidAttachmentRows"
+          :can-read-bid-body="canReadBidBody"
+          :status-tone="statusTone"
+          :label="label"
+          :currency="currency"
+        />
+      </template>
 
-    <template v-if="workbench">
-      <SourcingDemandPanel v-if="workbench.procurementRequest" :request="workbench.procurementRequest" :demand-summary="demandSummary" :currency="currency" />
-      <SourcingStepPanel :steps="sourcingSteps" :step-tone="stepTone" />
-      <SourcingSupplierPanel
-        :rows="supplierEngagementRows"
-        :can-read-bid-body="canReadBidBody"
-        :status-tone="statusTone"
-        :label="label"
-        :format-date-time="formatDateTime"
-        :currency="currency"
-      />
-      <SourcingQuotePanel :can-read-bid-body="canReadBidBody" :quote-rows="quoteRows" :currency="currency" />
-      <SourcingScoringPanel
-        :scoring-summary="scoringSummary"
-        :latest-review-report="latestReviewReport"
-        :sheets="workbench.scoringSheets ?? []"
-        :supplier-name="supplierName"
-        :status-tone="statusTone"
-        :label="label"
-        :format-date-time="formatDateTime"
-      />
-      <SourcingAwardPanel
-        :comparison-rows="comparisonRows"
-        :comparison-report="workbench.comparisonReport"
-        :latest-award-approval="latestAwardApproval"
-        :latest-pricing-report="latestPricingReport"
-        :sent-notification-count="sentNotificationCount"
-        :supplier-name="supplierName"
-        :label="label"
-        :currency="currency"
-      />
-      <SourcingRequirementsPanel
-        :project="workbench.project"
-        :bid-attachment-rows="bidAttachmentRows"
-        :can-read-bid-body="canReadBidBody"
-        :status-tone="statusTone"
-        :label="label"
-        :currency="currency"
-      />
-      <SourcingNextStepPanel :project-id="projectId" />
-    </template>
+      <template v-if="workbench" #secondary>
+        <SourcingStepPanel :steps="sourcingSteps" :step-tone="stepTone" />
+        <SourcingScoringPanel
+          :scoring-summary="scoringSummary"
+          :latest-review-report="latestReviewReport"
+          :sheets="workbench.scoringSheets ?? []"
+          :supplier-name="supplierName"
+          :status-tone="statusTone"
+          :label="label"
+          :format-date-time="formatDateTime"
+        />
+        <SourcingAwardPanel
+          :comparison-rows="comparisonRows"
+          :comparison-report="workbench.comparisonReport"
+          :latest-award-approval="latestAwardApproval"
+          :latest-pricing-report="latestPricingReport"
+          :sent-notification-count="sentNotificationCount"
+          :supplier-name="supplierName"
+          :label="label"
+          :currency="currency"
+        />
+        <SourcingNextStepPanel :project-id="projectId" />
+      </template>
+    </SourcingPageShell>
   </section>
 </template>
 

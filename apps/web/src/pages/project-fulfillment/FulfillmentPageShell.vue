@@ -5,7 +5,6 @@ import {
   EnterpriseSurface,
   EnterpriseTabs,
   RiskAlertPanel,
-  SplitDetailLayout,
   StatusTag,
   SummaryCards,
   type SummaryCardItem
@@ -52,22 +51,48 @@ defineProps<{
   <p v-if="loading" class="eds-meta">正在加载履约数据...</p>
 
   <template v-if="hasWorkbench">
-    <EnterpriseTabs :tabs="detailTabs" active-key="details" />
-
-    <SplitDetailLayout>
-      <EnterpriseSurface title="履约证据链">
+    <div class="eds-process-hero">
+      <EnterpriseSurface title="履约证据链" description="订单、收货、结算、评价和归档围绕同一项目持续收口。">
         <SummaryCards :items="summaryItems" />
       </EnterpriseSurface>
 
-      <template #aside>
-        <RiskAlertPanel title="履约与结算关注" description="收货、验收、结算和归档需要形成连续证据链。">
-          <ul class="eds-meta-list">
-            <li>收货数量、验收结果和异常处理需要一致。</li>
-            <li>结算资料应关联订单、发票和验收记录。</li>
-            <li>归档前确认关键附件和审计日志完整。</li>
-          </ul>
-        </RiskAlertPanel>
-      </template>
-    </SplitDetailLayout>
+      <RiskAlertPanel title="履约收口条件" description="先确认事实，再进入结算和归档，不做脱节流转。">
+        <div class="eds-process-reference">
+          <article class="eds-process-reference-item">
+            <span>当前阶段</span>
+            <strong>{{ statusLabel }}</strong>
+          </article>
+          <article class="eds-process-reference-item">
+            <span>审计流水</span>
+            <strong>{{ auditLogId || "待形成" }}</strong>
+          </article>
+        </div>
+        <ul class="eds-process-checklist">
+          <li>
+            <strong>先看订单是否完成确认</strong>
+            <span>订单状态、供应商确认和实际收货必须前后连贯，不能跳步进入结算。</span>
+          </li>
+          <li>
+            <strong>先看异常是否闭环</strong>
+            <span>异常收货、差异处理和补充说明需要在同页形成处置记录，避免后置补写。</span>
+          </li>
+          <li>
+            <strong>先看归档证据是否完整</strong>
+            <span>结算资料、履约评价和审计日志完整后，再推进项目归档和后续检查。</span>
+          </li>
+        </ul>
+      </RiskAlertPanel>
+    </div>
+
+    <EnterpriseTabs :tabs="detailTabs" active-key="details" />
+
+    <div class="eds-process-shell">
+      <section class="eds-panel-stack">
+        <slot name="primary" />
+      </section>
+      <aside class="eds-panel-stack">
+        <slot name="secondary" />
+      </aside>
+    </div>
   </template>
 </template>

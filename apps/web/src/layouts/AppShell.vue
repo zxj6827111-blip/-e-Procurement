@@ -4,18 +4,22 @@ import { RouterLink } from "vue-router";
 import { EnterpriseButton } from "../components/base";
 
 export interface AppShellNavItem {
+  id?: string;
   label: string;
   to: string;
-  group?: string;
-  icon?: string;
   description?: string;
-  priority?: number;
+}
+
+export interface RoleSwitchOption {
+  id: string;
+  label: string;
 }
 
 const props = defineProps<{
   brandTitle: string;
   brandSubtitle: string;
   brandMark: string;
+  homeTo: string;
   pageTitle: string;
   contextLabel: string;
   userLabel: string;
@@ -24,53 +28,104 @@ const props = defineProps<{
   environmentLabel?: string;
   roleLabel?: string;
   roleSwitchEnabled?: boolean;
+  roleSwitchOptions?: RoleSwitchOption[];
+  selectedRoleSwitchId?: string;
+  showMessageBell?: boolean;
+  messageRoute?: string;
 }>();
 
 const emit = defineEmits<{
   logout: [];
+  "update:selectedRoleSwitchId": [value: string];
+  "switch-role": [value: string];
 }>();
 
-const navGroups = computed(() => {
-  const order = ["工作", "采购", "供应商", "履约结算", "审计与配置"];
-  const grouped = new Map<string, AppShellNavItem[]>();
-  for (const item of props.navItems) {
-    const group = item.group ?? "工作";
-    grouped.set(group, [...(grouped.get(group) ?? []), item]);
-  }
-  return [...grouped.entries()]
-    .map(([group, items]) => ({
-      group,
-      items: [...items].sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999) || a.label.localeCompare(b.label))
-    }))
-    .sort((a, b) => {
-      const left = order.indexOf(a.group);
-      const right = order.indexOf(b.group);
-      return (left < 0 ? 999 : left) - (right < 0 ? 999 : right);
-    });
-});
+const activeRoleSwitchId = computed(() => props.selectedRoleSwitchId ?? props.roleSwitchOptions?.[0]?.id ?? "");
+const accountUtilityItems = computed(() => props.utilityItems ?? []);
+
+function onRoleSwitchChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value;
+  emit("update:selectedRoleSwitchId", value);
+  emit("switch-role", value);
+}
 </script>
 
 <template>
   <div class="enterprise-shell">
-    <aside class="enterprise-sidebar">
-      <div class="enterprise-brand">
-        <span class="enterprise-brand-mark">{{ brandMark }}</span>
-        <div>
-          <strong>{{ brandTitle }}</strong>
-          <small>{{ brandSubtitle }}</small>
-        </div>
+    <header class="enterprise-topbar">
+      <div class="enterprise-topbar-brand-group">
+        <RouterLink class="enterprise-topbar-brand" :to="homeTo">
+          <span class="enterprise-brand-mark">{{ brandMark }}</span>
+          <span class="enterprise-brand-copy">
+            <strong>{{ brandTitle }}</strong>
+            <small>{{ brandSubtitle }}</small>
+          </span>
+        </RouterLink>
       </div>
 
-      <nav class="enterprise-nav" aria-label="业务导航">
-        <section v-for="group in navGroups" :key="group.group" class="enterprise-nav-group">
-          <p class="enterprise-nav-group-title">{{ group.group }}</p>
-          <RouterLink v-for="item in group.items" :key="`${group.group}-${item.to}-${item.label}`" :to="item.to">
-            <span class="enterprise-nav-copy">
-              <span class="enterprise-nav-label">{{ item.label }}</span>
-              <span v-if="item.description" class="enterprise-nav-description">{{ item.description }}</span>
+      <div class="enterprise-topbar-context">
+        <span class="enterprise-context-chip">{{ contextLabel }}</span>
+        <strong>{{ pageTitle }}</strong>
+      </div>
+
+      <div class="enterprise-topbar-actions">
+        <label v-if="roleSwitchEnabled && roleSwitchOptions?.length" class="enterprise-role-switch">
+          <span>角色切换</span>
+          <select :value="activeRoleSwitchId" @change="onRoleSwitchChange">
+            <option v-for="option in roleSwitchOptions" :key="option.id" :value="option.id">
+              {{ option.label }}
+            </option>
+          </select>
+        </label>
+
+        <RouterLink v-if="showMessageBell && messageRoute" class="enterprise-bell-button" :to="messageRoute" aria-label="消息中心">
+          <span class="enterprise-bell-dot" aria-hidden="true"></span>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 3.5a4.25 4.25 0 0 0-4.25 4.25v1.2c0 1.72-.63 3.38-1.77 4.66l-.91 1.02a1 1 0 0 0 .75 1.67h12.36a1 1 0 0 0 .75-1.67l-.91-1.02a7 7 0 0 1-1.77-4.66v-1.2A4.25 4.25 0 0 0 12 3.5Zm0 17.25a2.63 2.63 0 0 0 2.35-1.45H9.65A2.63 2.63 0 0 0 12 20.75Z"
+              fill="currentColor"
+            />
+          </svg>
+        </RouterLink>
+
+        <details class="enterprise-account-menu">
+          <summary class="enterprise-user-pill">
+            <span class="enterprise-avatar">{{ userLabel.slice(0, 1) }}</span>
+            <span class="enterprise-user-copy">
+              <strong>{{ userLabel }}</strong>
+              <small>{{ roleLabel }}</small>
             </span>
-          </RouterLink>
-        </section>
+          </summary>
+
+          <div class="enterprise-account-popover">
+            <span v-if="roleLabel" class="enterprise-role-badge">{{ roleLabel }}</span>
+
+            <RouterLink
+              v-for="item in accountUtilityItems"
+              :key="item.to"
+              class="enterprise-account-link"
+              :to="item.to"
+            >
+              {{ item.label }}
+            </RouterLink>
+
+            <EnterpriseButton @click="emit('logout')">退出登录</EnterpriseButton>
+          </div>
+        </details>
+      </div>
+    </header>
+
+    <aside class="enterprise-sidebar">
+      <nav class="enterprise-nav" aria-label="业务导航">
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.id ?? `${item.to}-${item.label}`"
+          class="enterprise-nav-item"
+          :to="item.to"
+        >
+          <span class="enterprise-nav-label">{{ item.label }}</span>
+          <span v-if="item.description" class="enterprise-nav-description">{{ item.description }}</span>
+        </RouterLink>
       </nav>
 
       <footer class="enterprise-sidebar-footer">
@@ -79,28 +134,6 @@ const navGroups = computed(() => {
     </aside>
 
     <section class="enterprise-main">
-      <header class="enterprise-topbar">
-        <div class="enterprise-topbar-copy">
-          <p class="enterprise-breadcrumb">{{ contextLabel }} / {{ pageTitle }}</p>
-          <h1>{{ pageTitle }}</h1>
-        </div>
-        <div class="enterprise-topbar-actions">
-          <RouterLink v-for="item in utilityItems" :key="item.to" class="enterprise-utility-link" :to="item.to">
-            {{ item.label }}
-          </RouterLink>
-          <details class="enterprise-account-menu">
-            <summary class="enterprise-user-pill">{{ userLabel }}</summary>
-            <div class="enterprise-account-popover">
-              <span v-if="roleLabel" class="enterprise-role-badge">{{ roleLabel }}</span>
-              <RouterLink v-if="roleSwitchEnabled" class="enterprise-utility-link" to="/role-switch">
-                切换验证角色
-              </RouterLink>
-              <EnterpriseButton @click="emit('logout')">退出登录</EnterpriseButton>
-            </div>
-          </details>
-        </div>
-      </header>
-
       <main class="enterprise-content">
         <slot />
       </main>

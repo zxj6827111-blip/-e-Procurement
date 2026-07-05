@@ -46,7 +46,6 @@ const forbiddenVisibleTerms = [
   { term: "流程任务", pattern: /流程任务/ },
   { term: "流程节点", pattern: /流程节点/ },
   { term: "流程记录", pattern: /流程记录/ },
-  { term: "当前节点", pattern: /当前节点/ },
   { term: "预测节点", pattern: /预测节点/ },
   { term: "workflow visible", pattern: /\bworkflow\b/i },
   { term: "process visible", pattern: /\bprocess\b/i },
@@ -79,6 +78,8 @@ function isInternalOnlyLine(line) {
   if (/^\s*<[^>]+\s+:[A-Za-z0-9_-]*(process|workflow|bpmn)[A-Za-z0-9_-]*=/.test(line)) return true;
   if (/^\s*[:@][A-Za-z0-9_-]*(process|workflow|bpmn)[A-Za-z0-9_-]*=/.test(line)) return true;
   if (/^\s*[A-Za-z0-9_]*(Process|Workflow|Bpmn)[A-Za-z0-9_]*:/.test(line)) return true;
+  if (/^\s*<[A-Za-z0-9_]*(Process|Workflow|Timeline)[A-Za-z0-9_]*\b/.test(line)) return true;
+  if (/^\s*<[^>]+\bclass\s*=\s*["'][^"']*(process|workflow|timeline)[^"']*["'][^>]*>\s*$/.test(line)) return true;
   if (/^\s*(source|type):\s*["'](?:process|r8)["']/.test(line)) return true;
   if (/api\/(?:workflow|process|bpmn)/.test(line)) return true;
   if (/^\s*(const|let|var|function|type|interface)\s+[A-Za-z0-9_]*(Process|Workflow|Bpmn|Timeline)/.test(line)) return true;

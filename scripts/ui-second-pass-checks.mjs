@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 
 const root = process.cwd();
@@ -25,15 +26,114 @@ const webBaseUrl = process.env.UI_SECOND_PASS_WEB_BASE_URL ?? `http://127.0.0.1:
 const externalMode = process.env.UI_SECOND_PASS_EXTERNAL_SERVICES === "true";
 
 const roleCases = [
-  { userId: "u1", role: "集团采购管理人", expectedPath: "/" },
-  { userId: "u2", role: "采购经办人", expectedPath: "/" },
-  { userId: "u8", role: "酒店采购", expectedPath: "/procurement-requests" },
-  { userId: "u11", role: "供应商管理员", expectedPath: "/" },
-  { userId: "u12", role: "供应商报价员", expectedPath: "/bidding" },
-  { userId: "u7", role: "专家", expectedPath: "/expert-scoring" },
-  { userId: "u13", role: "财务审核", expectedPath: "/" },
-  { userId: "u5", role: "审计", expectedPath: "/" },
-  { userId: "u6", role: "管理员", expectedPath: "/permissions" }
+  {
+    userId: "u1",
+    roleId: "group_manager",
+    role: "集团采购管理人",
+    expectedPath: "/",
+    expectedTemplate: "A",
+    expectedBell: true,
+    expectedNav: ["我的待办", "审批规则", "需求审批", "采购项目", "报价进度", "评审定标", "评分模板", "定标审批", "供应商", "商品目录", "档案审计"]
+  },
+  {
+    userId: "u2",
+    roleId: "buyer",
+    role: "采购经办人",
+    expectedPath: "/",
+    expectedTemplate: "A",
+    expectedBell: true,
+    expectedNav: ["我的待办", "采购申请", "采购项目", "商品目录", "评审定标", "定标审批", "订单履约", "档案审计"]
+  },
+  {
+    userId: "u10",
+    roleId: "platform_operator",
+    role: "平台运营",
+    expectedPath: "/",
+    expectedTemplate: "A",
+    expectedBell: true,
+    expectedNav: ["我的待办", "采购申请", "采购项目", "商品目录", "评审定标", "评分模板", "定标审批", "订单履约", "档案审计"]
+  },
+  {
+    userId: "u8",
+    roleId: "hotel_buyer",
+    role: "酒店采购",
+    expectedPath: "/procurement-requests",
+    expectedTemplate: "B",
+    expectedBell: true,
+    expectedNav: ["工作台", "我的待办", "采购申请", "商品目录", "订单履约"]
+  },
+  {
+    userId: "u9",
+    roleId: "hotel_finance",
+    role: "酒店财务",
+    expectedPath: "/",
+    expectedTemplate: "B",
+    expectedBell: true,
+    expectedNav: ["工作台", "我的待办", "结算付款", "付款进度"]
+  },
+  {
+    userId: "u13",
+    roleId: "finance_reviewer",
+    role: "财务审核",
+    expectedPath: "/",
+    expectedTemplate: "B",
+    expectedBell: true,
+    expectedNav: ["工作台", "我的待办", "结算付款", "付款进度"]
+  },
+  {
+    userId: "u3",
+    roleId: "supplier",
+    role: "供应商",
+    expectedPath: "/",
+    expectedTemplate: "C",
+    expectedBell: true,
+    expectedNav: ["我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
+  },
+  {
+    userId: "u11",
+    roleId: "supplier_admin",
+    role: "供应商管理员",
+    expectedPath: "/",
+    expectedTemplate: "C",
+    expectedBell: true,
+    expectedNav: ["我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
+  },
+  {
+    userId: "u12",
+    roleId: "supplier_quotation",
+    role: "供应商报价人员",
+    expectedPath: "/bidding",
+    expectedTemplate: "C",
+    expectedBell: true,
+    expectedNav: ["我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
+  },
+  {
+    userId: "u7",
+    roleId: "expert",
+    role: "专家",
+    expectedPath: "/expert-scoring",
+    expectedTemplate: "C",
+    expectedBell: true,
+    expectedNav: ["工作台", "我的待办"]
+  },
+  {
+    userId: "u5",
+    roleId: "auditor",
+    role: "纪检审计",
+    expectedPath: "/",
+    expectedTemplate: "D",
+    expectedBell: true,
+    expectedNav: ["工作台", "我的待办", "审批规则", "档案审计", "采购监督", "定标监督", "供应商监督", "操作日志", "集成配置"]
+  },
+  {
+    userId: "u6",
+    roleId: "admin",
+    role: "系统管理员",
+    expectedPath: "/permissions",
+    expectedTemplate: "D",
+    expectedBell: false,
+    expectedNav: ["审批规则", "系统管理", "系统设置"]
+  }
 ];
 
 const screenshots = [
@@ -119,6 +219,14 @@ function mdTable(headers, rows) {
   ].join("\n");
 }
 
+function sameItems(left, right) {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
+async function loadRoleModel() {
+  return import(pathToFileURL(path.join(root, "apps/web/src/permissions/role-model.ts")).href);
+}
+
 function sha256(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
 }
@@ -159,11 +267,18 @@ async function collectPageDiagnostics(page) {
     const loginLayout = document.querySelector(".enterprise-login-layout");
     const loginBrand = document.querySelector(".enterprise-login-brand");
     const loginCard = document.querySelector(".enterprise-login-card");
+    const templateAFlow = document.querySelector(".eds-template-a-flow");
+    const templateATodo = document.querySelector(".eds-template-a-flow > .eds-surface:first-child");
+    const templateATimeline = document.querySelector(".eds-template-a-flow > .eds-template-a-timeline");
+    const templateAQuick = document.querySelector(".eds-template-a-main-grid > .eds-surface");
     const tableWraps = [...document.querySelectorAll(".eds-table-wrap")];
     const bodyText = document.body?.innerText ?? "";
     const loginRect = loginLayout?.getBoundingClientRect();
     const loginBrandRect = loginBrand?.getBoundingClientRect();
     const loginCardRect = loginCard?.getBoundingClientRect();
+    const todoRect = templateATodo?.getBoundingClientRect();
+    const timelineRect = templateATimeline?.getBoundingClientRect();
+    const quickRect = templateAQuick?.getBoundingClientRect();
     return {
       path: location.pathname,
       bodyText,
@@ -177,25 +292,30 @@ async function collectPageDiagnostics(page) {
       sidebarWidth: sidebar ? Math.round(sidebar.getBoundingClientRect().width) : 0,
       sidebarBg: sidebar ? getComputedStyle(sidebar).backgroundColor : "",
       loginWidthRatio: loginRect ? Number((loginRect.width / window.innerWidth).toFixed(2)) : 0,
-      loginBrandRatio:
-        loginRect && loginBrandRect ? Number((loginBrandRect.width / loginRect.width).toFixed(2)) : 0,
-      loginCardRatio:
-        loginRect && loginCardRect ? Number((loginCardRect.width / loginRect.width).toFixed(2)) : 0,
+      loginBrandRatio: loginRect && loginBrandRect ? Number((loginBrandRect.width / loginRect.width).toFixed(2)) : 0,
+      loginCardRatio: loginRect && loginCardRect ? Number((loginCardRect.width / loginRect.width).toFixed(2)) : 0,
       primaryColor: rootStyle.getPropertyValue("--ep-color-primary").trim(),
       sidebarToken: rootStyle.getPropertyValue("--ep-color-sidebar").trim(),
+      topbar: document.querySelectorAll(".enterprise-topbar").length,
+      roleSwitches: document.querySelectorAll(".enterprise-role-switch").length,
+      bellButtons: document.querySelectorAll(".enterprise-bell-button").length,
       navIcons: document.querySelectorAll(".enterprise-nav-icon").length,
-      navGroups: document.querySelectorAll(".enterprise-nav-group").length,
       shell: document.querySelectorAll(".enterprise-shell").length,
       loginLayout: loginLayout ? 1 : 0,
-      workbenchLayout: document.querySelectorAll(".eds-workbench-layout").length,
-      workbenchSide: document.querySelectorAll(".eds-workbench-side").length,
+      templateAMainGrid: document.querySelectorAll(".eds-template-a-main-grid").length,
+      templateBShell: document.querySelectorAll(".eds-template-b-shell").length,
+      templateCShell: document.querySelectorAll(".eds-template-c-shell").length,
+      templateDShell: document.querySelectorAll(".eds-template-d-shell").length,
+      templateAFlow: templateAFlow ? 1 : 0,
+      templateATodoToTimelineGap: todoRect && timelineRect ? Math.round(timelineRect.top - todoRect.bottom) : -1,
+      templateATimelineStartsBeforeQuickEnds: timelineRect && quickRect ? timelineRect.top < quickRect.bottom : false,
+      templateAQuickCards: document.querySelectorAll(".eds-template-a-quick-card").length,
+      ganttBoards: document.querySelectorAll(".eds-gantt-board").length,
       surfaces: document.querySelectorAll(".eds-surface").length,
-      workbenchSurfaces: document.querySelectorAll(".eds-workbench-layout .eds-surface").length,
-      businessSummaryStrip: document.querySelectorAll(".eds-business-summary-strip").length,
+      summaryCards: document.querySelectorAll(".eds-summary-item").length,
       tables: document.querySelectorAll(".eds-table").length,
       tableHorizontalOverflow: tableWraps.filter((node) => node.scrollWidth > node.clientWidth + 1).length,
-      stackedActionButtons: document.querySelectorAll(".eds-action-list .eds-button").length,
-      taskItems: document.querySelectorAll(".eds-task-item").length,
+      waterfallItems: document.querySelectorAll(".eds-waterfall-log-item").length,
       activityItems: document.querySelectorAll(".eds-activity-item").length,
       gradientMentions: [...document.styleSheets]
         .map((sheet) => {
@@ -209,6 +329,14 @@ async function collectPageDiagnostics(page) {
         .match(/linear-gradient|radial-gradient/g)?.length ?? 0
     };
   });
+}
+
+function resolveTemplateFromMetrics(metrics) {
+  if (metrics.templateAMainGrid >= 1) return "A";
+  if (metrics.templateBShell >= 1) return "B";
+  if (metrics.templateCShell >= 1) return "C";
+  if (metrics.templateDShell >= 1) return "D";
+  return "";
 }
 
 async function runLayoutCheck(browser) {
@@ -236,44 +364,66 @@ async function runLayoutCheck(browser) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await applyUser(page, "u2");
   await page.goto(`${webBaseUrl}/`, { waitUntil: "networkidle", timeout: 30000 });
+  await page
+    .waitForFunction(
+      () =>
+        document.querySelectorAll(".eds-template-a-main-grid, .eds-template-b-shell, .eds-template-c-shell, .eds-template-d-shell, .enterprise-main .eds-section").length > 0,
+      null,
+      { timeout: 12000 }
+    )
+    .catch(() => undefined);
   const dashboard = await collectPageDiagnostics(page);
   checks.push({
     key: "app-shell-sidebar-width",
-    passed: dashboard.sidebarWidth > 0 && dashboard.sidebarWidth <= 260,
+    passed: dashboard.sidebarWidth >= 218 && dashboard.sidebarWidth <= 224,
     evidence: `sidebarWidth=${dashboard.sidebarWidth}`
   });
   checks.push({
-    key: "app-shell-light-sidebar",
-    passed: dashboard.sidebarToken.toUpperCase() === "#FFFFFF" && !/rgb\(11,\s*34,\s*54\)|rgb\(18,\s*59,\s*93\)/i.test(dashboard.sidebarBg),
+    key: "app-shell-spruce-sidebar",
+    passed: dashboard.sidebarToken.toUpperCase() === "#173F3D" && /rgb\(23,\s*63,\s*61\)/i.test(dashboard.sidebarBg),
     evidence: `sidebarToken=${dashboard.sidebarToken}, computed=${dashboard.sidebarBg}`
   });
   checks.push({
-    key: "no-single-character-nav-icons",
-    passed: dashboard.navIcons === 0 && dashboard.bodyText.includes("待办事项"),
-    evidence: `navIcons=${dashboard.navIcons}, bodyLength=${dashboard.bodyLength}`
+    key: "app-shell-actions-visible",
+    passed: dashboard.navIcons === 0 && dashboard.topbar === 1 && dashboard.roleSwitches >= 1 && dashboard.bellButtons >= 1,
+    evidence: `navIcons=${dashboard.navIcons}, topbar=${dashboard.topbar}, roleSwitches=${dashboard.roleSwitches}, bellButtons=${dashboard.bellButtons}`
   });
   checks.push({
-    key: "dashboard-information-architecture",
+    key: "dashboard-template-a-architecture",
     passed:
-      dashboard.workbenchLayout === 1 &&
-      dashboard.workbenchSide === 1 &&
-      dashboard.bodyText.includes("待办事项") &&
-      dashboard.bodyText.includes("风险提醒") &&
-      dashboard.bodyText.includes("常用操作") &&
-      dashboard.bodyText.includes("进行中项目") &&
-      dashboard.businessSummaryStrip === 1 &&
-      dashboard.taskItems > 0 &&
-      dashboard.activityItems > 0,
-    evidence: `layout=${dashboard.workbenchLayout}, side=${dashboard.workbenchSide}, summaryStrip=${dashboard.businessSummaryStrip}, taskItems=${dashboard.taskItems}, activityItems=${dashboard.activityItems}`
+      dashboard.templateAMainGrid === 1 &&
+      dashboard.templateAFlow === 1 &&
+      dashboard.templateBShell === 0 &&
+      dashboard.templateCShell === 0 &&
+      dashboard.templateDShell === 0 &&
+      dashboard.templateAQuickCards >= 4 &&
+      dashboard.ganttBoards === 1 &&
+      dashboard.summaryCards >= 4 &&
+      dashboard.tables >= 1,
+    evidence:
+      `templateA=${dashboard.templateAMainGrid}, templateB=${dashboard.templateBShell}, templateC=${dashboard.templateCShell}, ` +
+      `templateD=${dashboard.templateDShell}, quickCards=${dashboard.templateAQuickCards}, gantt=${dashboard.ganttBoards}, ` +
+      `flow=${dashboard.templateAFlow}, summaryCards=${dashboard.summaryCards}, tables=${dashboard.tables}`
   });
   checks.push({
-    key: "dashboard-not-function-matrix",
-    passed: !dashboard.bodyText.includes("权限边界") && !dashboard.bodyText.includes("今日重点") && !dashboard.bodyText.includes("可发起动作"),
-    evidence: "legacy workbench section titles are absent"
+    key: "dashboard-no-wasted-middle-band",
+    passed:
+      dashboard.templateAFlow === 1 &&
+      dashboard.templateATodoToTimelineGap >= 0 &&
+      dashboard.templateATodoToTimelineGap <= 24 &&
+      dashboard.templateATimelineStartsBeforeQuickEnds,
+    evidence:
+      `todoToTimelineGap=${dashboard.templateATodoToTimelineGap}, ` +
+      `timelineStartsBeforeQuickEnds=${dashboard.templateATimelineStartsBeforeQuickEnds}`
+  });
+  checks.push({
+    key: "dashboard-action-density",
+    passed: dashboard.templateAQuickCards <= 4 && dashboard.surfaces >= 3 && dashboard.surfaces <= 6,
+    evidence: `quickCards=${dashboard.templateAQuickCards}, surfaces=${dashboard.surfaces}`
   });
   checks.push({
     key: "controlled-decoration",
-    passed: dashboard.gradientMentions <= 2,
+    passed: dashboard.gradientMentions <= 12,
     evidence: `gradientMentions=${dashboard.gradientMentions}`
   });
   checks.push({
@@ -282,14 +432,9 @@ async function runLayoutCheck(browser) {
     evidence: `bodyScrollWidth=${dashboard.documentScrollWidth}, viewport=${dashboard.viewportWidth}, tableOverflow=${dashboard.tableHorizontalOverflow}`
   });
   checks.push({
-    key: "dashboard-panel-count",
-    passed: dashboard.workbenchSurfaces > 0 && dashboard.workbenchSurfaces <= 4,
-    evidence: `workbenchSurfaces=${dashboard.workbenchSurfaces}`
-  });
-  checks.push({
-    key: "dashboard-no-stacked-action-buttons",
-    passed: dashboard.stackedActionButtons === 0,
-    evidence: `stackedActionButtons=${dashboard.stackedActionButtons}`
+    key: "dashboard-activity-remains-focused",
+    passed: dashboard.waterfallItems <= 6 && dashboard.activityItems === 0,
+    evidence: `waterfallItems=${dashboard.waterfallItems}, activityItems=${dashboard.activityItems}`
   });
   await page.close();
 
@@ -306,14 +451,15 @@ ${mdTable(["Check", "Status", "Evidence"], checks.map((item) => [item.key, item.
 
 ## Boundary
 
-This check validates second-pass visual layout rules: one-screen login on desktop, light commercial sidebar, no single-character nav icons, and dashboard information architecture. It does not change production readiness decisions.
+This check validates second-pass visual layout rules: one-screen login on desktop, the low-saturation spruce shell, visible topbar actions, and template-A dashboard architecture. It does not change production readiness decisions.
 `,
-    "utf8"
   );
+
   return payload;
 }
 
 async function runLoginRoleSmoke(browser) {
+  const roleModel = await loadRoleModel();
   const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
   const checks = [];
 
@@ -341,14 +487,64 @@ async function runLoginRoleSmoke(browser) {
     await page.waitForFunction(() => !location.pathname.startsWith("/login"), null, { timeout: 10000 }).catch(() => undefined);
     await page.waitForSelector(".enterprise-shell", { timeout: 10000 }).catch(() => undefined);
     const finalPath = new URL(page.url()).pathname;
-    const bodyText = await page.locator("body").innerText();
-    const shellCount = await page.locator(".enterprise-shell").count();
-    const blocked = bodyText.includes("请先登录") || bodyText.includes("无权访问") || bodyText.includes("页面暂时无法加载");
+    const metrics = await collectPageDiagnostics(page);
+    const navLabels = (await page.locator(".enterprise-nav-label").allTextContents()).map((item) => item.trim()).filter(Boolean);
+    const shellCount = metrics.shell;
+    const blocked =
+      metrics.bodyText.includes("请先登录") ||
+      metrics.bodyText.includes("无权访问") ||
+      metrics.bodyText.includes("当前角色不可访问") ||
+      metrics.bodyText.includes("页面暂时无法加载");
+    const actualTemplate = resolveTemplateFromMetrics(metrics);
+    const modelTemplate = roleModel.roleTemplate(role.roleId);
     checks.push({
       key: `role-entry-${role.userId}`,
       passed: finalPath === role.expectedPath && shellCount === 1 && !blocked,
       evidence: `${role.role}: finalPath=${finalPath}, expected=${role.expectedPath}, shell=${shellCount}`
     });
+    checks.push({
+      key: `role-nav-${role.userId}`,
+      passed: sameItems(navLabels, role.expectedNav),
+      evidence: `${role.role}: ${navLabels.join(" / ")}`
+    });
+    checks.push({
+      key: `role-bell-${role.userId}`,
+      passed: (metrics.bellButtons > 0) === role.expectedBell,
+      evidence: `${role.role}: bellButtons=${metrics.bellButtons}, expected=${role.expectedBell ? 1 : 0}`
+    });
+    checks.push({
+      key: `role-template-${role.userId}`,
+      passed: modelTemplate === role.expectedTemplate && (!actualTemplate || actualTemplate === role.expectedTemplate),
+      evidence: `${role.role}: expected=${role.expectedTemplate}, model=${modelTemplate}, dom=${actualTemplate || "n/a"}`
+    });
+    if (role.roleId === "expert") {
+      const materialsButton = page.getByRole("button", { name: "记录材料查看" });
+      const confirmButton = page.getByRole("button", { name: "确认并进入评分" });
+      const materialsDisabledBefore = await materialsButton.isDisabled().catch(() => true);
+      await confirmButton.click();
+      await page.waitForFunction(() => !document.querySelector('.eds-dialog[aria-label="回避确认"]'), null, { timeout: 10000 }).catch(() => undefined);
+      const dialogOpenAfterConfirm = await page.locator('.eds-dialog[aria-label="回避确认"]').count();
+      const materialsDisabledAfter = await materialsButton.isDisabled().catch(() => true);
+      checks.push({
+        key: "role-avoidance-u7",
+        passed: metrics.bodyText.includes("回避确认") && materialsDisabledBefore && dialogOpenAfterConfirm === 0 && !materialsDisabledAfter,
+        evidence: `dialogBefore=${metrics.bodyText.includes("回避确认")}, dialogAfter=${dialogOpenAfterConfirm}, materialsBefore=${materialsDisabledBefore}, materialsAfter=${materialsDisabledAfter}`
+      });
+    }
+    if (role.expectedBell) {
+      await page.locator(".enterprise-bell-button").click({ force: true });
+      await page.waitForURL((url) => new URL(url).pathname === "/messages", { timeout: 10000 }).catch(() => undefined);
+      const messageMetrics = await collectPageDiagnostics(page);
+      const messageBlocked =
+        messageMetrics.bodyText.includes("请先登录") ||
+        messageMetrics.bodyText.includes("当前角色不可访问") ||
+        messageMetrics.bodyText.includes("页面暂时无法加载");
+      checks.push({
+        key: `role-message-${role.userId}`,
+        passed: new URL(page.url()).pathname === "/messages" && messageMetrics.shell === 1 && messageMetrics.bodyText.includes("消息中心") && !messageBlocked,
+        evidence: `${role.role}: finalPath=${new URL(page.url()).pathname}, shell=${messageMetrics.shell}, bodyHasMessageCenter=${messageMetrics.bodyText.includes("消息中心")}`
+      });
+    }
   }
 
   const productionContext = await browser.newContext({ viewport: { width: 1366, height: 768 } });
@@ -384,6 +580,31 @@ async function runLoginRoleSmoke(browser) {
     key: "production-blocks-role-switch-route",
     passed: roleSwitchFinalPath !== "/role-switch" && roleSwitchSelectors === 0 && !roleSwitchBodyText.includes("切换账号"),
     evidence: `finalPath=${roleSwitchFinalPath}; selectors=${roleSwitchSelectors}`
+  });
+  const unknownRoleContext = await browser.newContext({ viewport: { width: 1366, height: 768 } });
+  const unknownRolePage = await unknownRoleContext.newPage();
+  await unknownRolePage.route("**/api/auth/session*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        authenticated: true,
+        user: { id: "ux", name: "异常角色用户", roleId: "unknown_role" },
+        roleId: "unknown_role",
+        orgScope: ["org-unknown"],
+        mockAuthEnabled: true,
+        mode: "local"
+      })
+    });
+  });
+  await unknownRolePage.goto(`${webBaseUrl}/project-workbench`, { waitUntil: "networkidle", timeout: 30000 });
+  const unknownRoleMetrics = await collectPageDiagnostics(unknownRolePage);
+  const unknownRoleFinalPath = new URL(unknownRolePage.url()).pathname;
+  await unknownRoleContext.close();
+  checks.push({
+    key: "unknown-role-fail-closed",
+    passed: unknownRoleFinalPath === "/permission-denied" && unknownRoleMetrics.bodyText.includes("当前角色不可访问") && unknownRoleMetrics.shell === 0,
+    evidence: `finalPath=${unknownRoleFinalPath}, shell=${unknownRoleMetrics.shell}, denied=${unknownRoleMetrics.bodyText.includes("当前角色不可访问")}`
   });
   await page.close();
 

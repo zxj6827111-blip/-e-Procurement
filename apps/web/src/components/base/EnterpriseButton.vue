@@ -2,11 +2,13 @@
 withDefaults(
   defineProps<{
     type?: "primary" | "default" | "text" | "accent" | "danger";
+    size?: "default" | "sm";
     nativeType?: "button" | "submit" | "reset";
     disabled?: boolean;
   }>(),
   {
     type: "default",
+    size: "default",
     nativeType: "button",
     disabled: false
   }
@@ -22,7 +24,8 @@ withDefaults(
       type === 'primary' ? 'eds-button-primary' : '',
       type === 'text' ? 'eds-button-text' : '',
       type === 'accent' ? 'eds-button-accent' : '',
-      type === 'danger' ? 'eds-button-danger' : ''
+      type === 'danger' ? 'eds-button-danger' : '',
+      size === 'sm' ? 'eds-button-sm' : ''
     ]"
   >
     <slot />

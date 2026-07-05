@@ -4,19 +4,19 @@ import { apiGet } from "../../api/http";
 import { loadProcessTasks, type ProcessTaskView } from "../../api/process";
 import PageHeader from "../../components/base/PageHeader.vue";
 import FeedbackMessage from "../../components/base/FeedbackMessage.vue";
+import EnterpriseSurface from "../../components/base/EnterpriseSurface.vue";
 import StatusTag from "../../components/base/StatusTag.vue";
 import type { DataTableColumn, SummaryCardItem } from "../../components/base";
 import DashboardActivitySection from "./DashboardActivitySection.vue";
 import DashboardMetricsSection from "./DashboardMetricsSection.vue";
-import DashboardRoleWorkbenchSection from "./DashboardRoleWorkbenchSection.vue";
+import DashboardQuickActionSection from "./DashboardQuickActionSection.vue";
+import DashboardTimelineSection from "./DashboardTimelineSection.vue";
 import DashboardTodoSection from "./DashboardTodoSection.vue";
 import {
-  auditActivityTarget,
   auditRoles,
   canReadAuditLogs,
   canReadProjects,
   canReadSuppliers,
-  canUseCatalogActivities,
   combineOrders,
   financeRoles,
   isBusinessAuditLog,
@@ -33,6 +33,9 @@ import { getRoleWorkbench } from "./role-workbench";
 import { useSessionStore } from "../../stores/session";
 import { formatDateTime, labelAuditAction, labelObjectType, labelStatus } from "../../utils/status-labels";
 import { loadWorkflowNotifications, loadWorkflowTasks, type R8WorkflowNotificationView, type R8WorkflowTaskView } from "../../api/workflow";
+import { roleTemplate } from "../../permissions/role-model";
+
+type TimelineState = "done" | "current" | "pending";
 
 const session = useSessionStore();
 const health = ref("检查中");
@@ -46,15 +49,44 @@ const workflowTasks = ref<R8WorkflowTaskView[]>([]);
 const workflowMessages = ref<R8WorkflowNotificationView[]>([]);
 const loadError = ref("");
 
+const timelineBuckets = [
+  { label: "需求", statuses: ["project_created"] },
+  { label: "公告", statuses: ["document_preparing", "document_published", "registration_open"] },
+  { label: "报价", statuses: ["bidding_open", "bidding_locked"] },
+  { label: "评审", statuses: ["expert_reviewing", "review_report_frozen"] },
+  { label: "定标", statuses: ["award_approving", "awarded_pending_order", "result_notified"] },
+  { label: "履约", statuses: ["contract_registered", "performing", "evaluated", "archived", "closed"] }
+] as const;
+
 function supplierName(supplierId: string) {
   return resolveSupplierName(supplierId, suppliers.value);
 }
 
-const roleTitle = computed(() => {
-  return resolveRoleTitle(session.roleId);
-});
+function resolveTimelineIndex(status: string) {
+  const index = timelineBuckets.findIndex((bucket) => (bucket.statuses as readonly string[]).includes(status));
+  return index >= 0 ? index : 0;
+}
 
+function buildTimelineStages(status: string) {
+  const currentIndex = resolveTimelineIndex(status);
+  return timelineBuckets.map((bucket, index) => {
+    const state: TimelineState =
+      index < currentIndex
+        ? "done"
+        : index > currentIndex
+          ? "pending"
+          : currentIndex === timelineBuckets.length - 1 && ["archived", "closed"].includes(status)
+            ? "done"
+            : "current";
+    return { label: bucket.label, state };
+  });
+}
+
+const roleTitle = computed(() => resolveRoleTitle(session.roleId));
+const landingTemplate = computed(() => roleTemplate(session.roleId));
 const roleWorkbench = computed(() => getRoleWorkbench(session.roleId));
+const quickActions = computed(() => roleWorkbench.value.primaryActions.slice(0, 4));
+const focusItems = computed(() => roleWorkbench.value.todayFocus.slice(0, 5));
 
 const pendingProcurementRequestCount = computed(() => {
   const seen = new Set<string>();
@@ -108,66 +140,192 @@ const expertTodoItems = computed<DashboardTodoItem[]>(() =>
 
 const todoEntryLink = computed(() => {
   if (session.roleId === "group_manager") return { label: "查看需求审批", to: "/procurement-requests" };
-  return { label: "进入待办中心", to: "/my-tasks" };
+  if (supplierRoles.has(session.roleId)) return { label: "进入报价响应", to: "/bidding" };
+  if (financeRoles.has(session.roleId)) return { label: "进入结算付款", to: "/settlement-materials" };
+  if (auditRoles.has(session.roleId)) return { label: "查看操作日志", to: "/audit" };
+  if (session.roleId === "expert") return { label: "进入专家评分", to: "/expert-scoring" };
+  if (session.roleId === "hotel_buyer") return { label: "查看采购申请", to: "/procurement-requests" };
+  return { label: "进入我的待办", to: "/my-tasks" };
 });
 
 const summaryCards = computed<SummaryCard[]>(() => {
   if (session.roleId === "expert") {
     return [
-      { label: "待处理任务", value: expertPendingTasks.value.length, tone: "blue", to: "/my-tasks" },
-      { label: "待专家评分", value: expertScoringPendingCount.value, tone: "amber", to: "/expert-scoring" },
-      { label: "待专家确认", value: expertConfirmationPendingCount.value, tone: "green", to: "/expert-scoring" },
-      { label: "未读消息", value: expertUnreadMessages.value.length, tone: "red", to: "/messages" }
+      { label: "待处理任务", value: expertPendingTasks.value.length, meta: "当前专家可见", tone: "blue", to: "/my-tasks" },
+      { label: "待专家评分", value: expertScoringPendingCount.value, meta: "未锁定评分单", tone: "amber", to: "/expert-scoring" },
+      { label: "待回避确认", value: expertConfirmationPendingCount.value, meta: "先确认后评分", tone: "green", to: "/expert-scoring" },
+      { label: "未读消息", value: expertUnreadMessages.value.length, meta: "流程提醒", tone: "red", to: "/messages" }
     ];
   }
   if (supplierRoles.has(session.roleId)) {
     return [
-      { label: "待报价", value: projects.value.filter((item) => isFormalProject(item) && ["document_published", "bidding_open"].includes(item.status)).length, tone: "blue" },
-      { label: "待发货订单", value: orders.value.filter((item) => ["submitted", "pending_confirmation", "supplier_confirmed"].includes(item.status)).length, tone: "amber" },
-      { label: "待补资料", value: suppliers.value.filter((item) => (item.risk ?? "").includes("到期") || item.qualification === "即将到期").length, tone: "red" },
-      { label: "待结算", value: orders.value.filter((item) => item.status === "received" || item.paymentStatus === "payment_reserved").length, tone: "green" }
+      {
+        label: "可响应项目",
+        value: projects.value.filter((item) => isFormalProject(item) && ["document_published", "bidding_open"].includes(item.status)).length,
+        meta: "已通过报名资格",
+        tone: "blue"
+      },
+      {
+        label: "待发货订单",
+        value: orders.value.filter((item) => ["submitted", "pending_confirmation", "supplier_confirmed"].includes(item.status)).length,
+        meta: "待确认或待履约",
+        tone: "amber"
+      },
+      {
+        label: "资质临期",
+        value: suppliers.value.filter((item) => (item.risk ?? "").includes("到期") || item.qualification === "即将到期").length,
+        meta: "尽快补齐材料",
+        tone: "red"
+      },
+      {
+        label: "待结算订单",
+        value: orders.value.filter((item) => item.status === "received" || item.paymentStatus === "payment_reserved").length,
+        meta: "可提交结算材料",
+        tone: "green"
+      }
     ];
   }
   if (financeRoles.has(session.roleId)) {
     return [
-      { label: "待审核发票", value: orders.value.filter((item) => item.paymentStatus !== "paid").length, tone: "amber" },
-      { label: "待付款金额", value: money(orders.value.filter((item) => item.paymentStatus !== "paid").reduce((sum, item) => sum + Number(item.totalAmount ?? 0), 0)), tone: "blue" },
-      { label: "异常金额", value: money(orders.value.filter((item) => ["return_requested", "partial"].includes(item.status)).reduce((sum, item) => sum + Number(item.totalAmount ?? 0), 0)), tone: "red" },
-      { label: "可见订单", value: orders.value.length, tone: "green" }
+      { label: "待审核发票", value: orders.value.filter((item) => item.paymentStatus !== "paid").length, meta: "未付款订单", tone: "amber" },
+      {
+        label: "待付款金额",
+        value: money(orders.value.filter((item) => item.paymentStatus !== "paid").reduce((sum, item) => sum + Number(item.totalAmount ?? 0), 0)),
+        meta: "当前可见订单",
+        tone: "blue"
+      },
+      {
+        label: "异常金额",
+        value: money(orders.value.filter((item) => ["return_requested", "partial"].includes(item.status)).reduce((sum, item) => sum + Number(item.totalAmount ?? 0), 0)),
+        meta: "退回或部分收货",
+        tone: "red"
+      },
+      { label: "可见订单", value: orders.value.length, meta: "结算与付款范围", tone: "green" }
     ];
   }
   if (auditRoles.has(session.roleId)) {
     const archived = projects.value.filter((item) => item.status === "archived").length;
     return [
-      { label: "待核查项目", value: projects.value.filter((item) => !["archived", "closed"].includes(item.status)).length, tone: "blue" },
-      { label: "日志异常", value: auditLogs.value.filter((item) => item.result === "denied").length, tone: "red" },
-      { label: "归档完整率", value: projects.value.length ? `${Math.round((archived / projects.value.length) * 100)}%` : "-", tone: "green" },
-      { label: "审计记录", value: auditLogs.value.length, tone: "amber" }
+      {
+        label: "在途项目",
+        value: projects.value.filter((item) => !["archived", "closed"].includes(item.status)).length,
+        meta: "需持续监督",
+        tone: "blue"
+      },
+      {
+        label: "日志异常",
+        value: auditLogs.value.filter((item) => item.result === "denied").length,
+        meta: "拒绝与越权尝试",
+        tone: "red"
+      },
+      {
+        label: "归档完整率",
+        value: projects.value.length ? `${Math.round((archived / projects.value.length) * 100)}%` : "-",
+        meta: "正式项目口径",
+        tone: "green"
+      },
+      { label: "审计记录", value: auditLogs.value.length, meta: "近期可见流水", tone: "amber" }
     ];
   }
   if (session.roleId === "admin") {
     return [
-      { label: "系统服务", value: health.value, tone: "green" },
-      { label: "配置入口", value: "权限", tone: "blue" },
-      { label: "业务菜单", value: "隔离", tone: "amber" },
-      { label: "当前角色", value: "管理员", tone: "green" }
+      { label: "系统服务", value: health.value, meta: "平台基础健康", tone: "green" },
+      { label: "配置入口", value: "权限", meta: "矩阵与规则", tone: "blue" },
+      { label: "业务隔离", value: "启用", meta: "RBAC 菜单裁剪", tone: "amber" },
+      { label: "当前角色", value: "系统管理员", meta: "无业务消息提醒", tone: "green" }
     ];
   }
   if (session.roleId === "group_manager") {
     return [
-      { label: "待审批需求", value: pendingProcurementRequestCount.value, tone: "blue", to: "/procurement-requests" },
-      { label: "进行中项目", value: projects.value.filter((item) => isFormalProject(item) && !["archived", "closed"].includes(item.status)).length, tone: "amber", to: "/project-workbench" },
-      { label: "定标审批中", value: projects.value.filter((item) => item.status === "award_approving").length, tone: "green", to: "/award-result" },
-      { label: "供应商风险", value: suppliers.value.filter((item) => ["pending", "restricted", "suspended"].includes(item.admissionStatus ?? item.status)).length, tone: "red", to: "/suppliers" }
+      { label: "待审需求", value: pendingProcurementRequestCount.value, meta: "集团准入审批", tone: "blue", to: "/procurement-requests" },
+      {
+        label: "进行中项目",
+        value: projects.value.filter((item) => isFormalProject(item) && !["archived", "closed"].includes(item.status)).length,
+        meta: "招采主流程",
+        tone: "amber",
+        to: "/project-workbench"
+      },
+      {
+        label: "定标审批中",
+        value: projects.value.filter((item) => item.status === "award_approving").length,
+        meta: "等待集团批示",
+        tone: "green",
+        to: "/award-result"
+      },
+      {
+        label: "供应商风险",
+        value: suppliers.value.filter((item) => ["pending", "restricted", "suspended"].includes(item.admissionStatus ?? item.status)).length,
+        meta: "准入与资质关注",
+        tone: "red",
+        to: "/suppliers"
+      }
     ];
   }
   return [
-    { label: "待处理采购", value: projects.value.filter((item) => isFormalProject(item) && !["archived", "closed"].includes(item.status)).length, tone: "blue", to: "/my-tasks" },
-    { label: "报价截止提醒", value: projects.value.filter((item) => isFormalProject(item) && ["document_published", "bidding_open"].includes(item.status)).length, tone: "amber", to: "/announcements-invitations" },
-    { label: "待发公告", value: projects.value.filter((item) => isFormalProject(item) && ["document_locked", "document_published"].includes(item.status)).length, tone: "green", to: "/announcements-invitations" },
-    { label: "异常订单", value: orders.value.filter((item) => ["return_requested", "return_rejected", "partial"].includes(item.status)).length, tone: "red", to: "/order-fulfillment" }
+    {
+      label: "待推进项目",
+      value: projects.value.filter((item) => isFormalProject(item) && !["archived", "closed"].includes(item.status)).length,
+      meta: "当前可见项目",
+      tone: "blue",
+      to: "/my-tasks"
+    },
+    {
+      label: "报价截止提醒",
+      value: projects.value.filter((item) => isFormalProject(item) && ["document_published", "bidding_open"].includes(item.status)).length,
+      meta: "关注时效节点",
+      tone: "amber",
+      to: "/announcements-invitations"
+    },
+    {
+      label: "待发公告",
+      value: projects.value.filter((item) => isFormalProject(item) && ["document_locked", "document_published"].includes(item.status)).length,
+      meta: "公告与邀请",
+      tone: "green",
+      to: "/announcements-invitations"
+    },
+    {
+      label: "异常订单",
+      value: orders.value.filter((item) => ["return_requested", "return_rejected", "partial"].includes(item.status)).length,
+      meta: "履约与验收异常",
+      tone: "red",
+      to: "/order-fulfillment"
+    }
   ];
 });
+
+const summaryItems = computed<SummaryCardItem[]>(() =>
+  summaryCards.value.map((item) => ({
+    label: item.label,
+    value: item.value,
+    meta: item.meta,
+    tone: item.tone
+  }))
+);
+
+const todoColumns = computed<DataTableColumn[]>(() => {
+  if (["buyer", "platform_operator"].includes(session.roleId)) {
+    return [
+      { key: "title", label: "项目 / 事项" },
+      { key: "status", label: "当前阶段" },
+      { key: "due", label: "时限" },
+      { key: "risk", label: "关注点" },
+      { key: "action", label: "操作" }
+    ];
+  }
+  return [
+    { key: "status", label: "状态" },
+    { key: "title", label: "事项" },
+    { key: "meta", label: "业务信息" },
+    { key: "action", label: "操作" }
+  ];
+});
+
+const activityColumns: DataTableColumn[] = [
+  { key: "title", label: "动态" },
+  { key: "meta", label: "类型" },
+  { key: "time", label: "时间" },
+  { key: "action", label: "操作" }
+];
 
 const todoItems = computed(() => {
   if (session.roleId === "expert") {
@@ -175,8 +333,18 @@ const todoItems = computed(() => {
   }
   if (supplierRoles.has(session.roleId)) {
     return [
-      ...projects.value.filter(isFormalProject).slice(0, 2).map((item) => ({ title: item.name ?? item.title ?? "采购项目", meta: "报价响应", status: labelStatus(item.status), to: "/bidding" })),
-      ...orders.value.slice(0, 3).map((item) => ({ title: item.orderNo, meta: `${supplierName(item.supplierId)} / ${money(item.totalAmount)}`, status: labelStatus(item.status), to: "/order-fulfillment" }))
+      ...projects.value.filter(isFormalProject).slice(0, 2).map((item) => ({
+        title: item.name ?? item.title ?? "采购项目",
+        meta: "报价响应",
+        status: labelStatus(item.status),
+        to: `/bidding?projectId=${item.id}`
+      })),
+      ...orders.value.slice(0, 3).map((item) => ({
+        title: item.orderNo,
+        meta: `${supplierName(item.supplierId)} / ${money(item.totalAmount)}`,
+        status: labelStatus(item.status),
+        to: "/order-fulfillment"
+      }))
     ].slice(0, 5);
   }
   if (financeRoles.has(session.roleId)) {
@@ -186,8 +354,18 @@ const todoItems = computed(() => {
   }
   if (auditRoles.has(session.roleId)) {
     return [
-      ...projects.value.filter(isFormalProject).slice(0, 3).map((item) => ({ title: item.name ?? item.title ?? "采购项目", meta: "项目档案", status: labelStatus(item.status), to: "/archive-audit" })),
-      ...auditLogs.value.slice(0, 2).map((item) => ({ title: labelAuditAction(item.action), meta: labelObjectType(item.objectType), status: labelStatus(item.result ?? "recorded"), to: "/audit" }))
+      ...projects.value.filter(isFormalProject).slice(0, 3).map((item) => ({
+        title: item.name ?? item.title ?? "采购项目",
+        meta: "项目归档与监督",
+        status: labelStatus(item.status),
+        to: "/archive-audit"
+      })),
+      ...auditLogs.value.slice(0, 2).map((item) => ({
+        title: labelAuditAction(item.action),
+        meta: labelObjectType(item.objectType),
+        status: labelStatus(item.result ?? "recorded"),
+        to: "/audit"
+      }))
     ].slice(0, 5);
   }
   if (session.roleId === "admin") {
@@ -208,8 +386,8 @@ const todoItems = computed(() => {
         title: item.name ?? item.title ?? "采购项目",
         meta: `预算 ${money(item.budgetAmount)}`,
         status: labelStatus(item.status),
-        due: item.dueAt ? formatDateTime(item.dueAt) : "按项目阶段推进",
-        risk: ["document_published", "bidding_open"].includes(item.status) ? "关注报价截止" : "按计划",
+        due: item.dueAt ? formatDateTime(item.dueAt) : "按阶段推进",
+        risk: ["document_published", "bidding_open"].includes(item.status) ? "关注报价截止" : "按计划推进",
         to: "/project-workbench"
       })),
       ...products.value.slice(0, 2).map((item) => ({
@@ -223,13 +401,22 @@ const todoItems = computed(() => {
     ].slice(0, 5);
   }
   return [
-    ...projects.value.filter(isFormalProject).slice(0, 3).map((item) => ({ title: item.name ?? item.title ?? "采购项目", meta: `预算 ${money(item.budgetAmount)}`, status: labelStatus(item.status), to: "/procurement-requests" })),
-    ...products.value.slice(0, 2).map((item) => ({ title: item.name, meta: `${item.supplierName ?? supplierName(item.supplierId)} / ${productPrice(item)}`, status: labelStatus(item.status), to: "/supply-mall" }))
+    ...projects.value.filter(isFormalProject).slice(0, 3).map((item) => ({
+      title: item.name ?? item.title ?? "采购项目",
+      meta: `预算 ${money(item.budgetAmount)}`,
+      status: labelStatus(item.status),
+      to: "/procurement-requests"
+    })),
+    ...products.value.slice(0, 2).map((item) => ({
+      title: item.name,
+      meta: `${item.supplierName ?? supplierName(item.supplierId)} / ${productPrice(item)}`,
+      status: labelStatus(item.status),
+      to: "/supply-mall"
+    }))
   ].slice(0, 5);
 });
 
 const activeProjectItems = computed(() => {
-  const activeProjects = projects.value.filter((item) => isFormalProject(item) && !["archived", "closed"].includes(item.status));
   if (session.roleId === "expert") {
     return expertPendingTasks.value
       .filter((task) => task.businessType === "expert_scoring" || task.businessType === "review_award")
@@ -241,7 +428,43 @@ const activeProjectItems = computed(() => {
         to: task.targetPath
       }));
   }
-  return activeProjects
+  if (supplierRoles.has(session.roleId)) {
+    return [
+      ...projects.value.filter(isFormalProject).slice(0, 3).map((project) => ({
+        title: project.name ?? project.title ?? "采购项目",
+        meta: `${labelStatus(project.status)} / ${money(project.budgetAmount)}`,
+        time: project.updatedAt ? formatDateTime(project.updatedAt) : "等待采购方推进",
+        to: `/bidding?projectId=${project.id}`
+      })),
+      ...orders.value.slice(0, 2).map((order) => ({
+        title: order.orderNo,
+        meta: `${supplierName(order.supplierId)} / ${labelStatus(order.status)}`,
+        time: order.createdAt ? formatDateTime(order.createdAt) : "最近更新",
+        to: "/order-fulfillment"
+      }))
+    ].slice(0, 5);
+  }
+  if (financeRoles.has(session.roleId)) {
+    return orders.value.slice(0, 5).map((order) => ({
+      title: order.orderNo,
+      meta: `${labelStatus(order.paymentStatus ?? order.status)} / ${money(order.totalAmount)}`,
+      time: order.createdAt ? formatDateTime(order.createdAt) : "最近更新",
+      to: "/settlement-materials"
+    }));
+  }
+  if (auditRoles.has(session.roleId)) {
+    return [...auditLogs.value]
+      .sort((left, right) => new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime())
+      .slice(0, 5)
+      .map((item) => ({
+        title: labelAuditAction(item.action),
+        meta: `${labelObjectType(item.objectType)} / ${labelStatus(item.result ?? "recorded")}`,
+        time: item.createdAt ? formatDateTime(item.createdAt) : "最近更新",
+        to: "/audit"
+      }));
+  }
+  return projects.value
+    .filter((item) => isFormalProject(item) && !["archived", "closed"].includes(item.status))
     .slice(0, 5)
     .map((project) => ({
       title: project.name ?? project.title ?? "采购项目",
@@ -252,36 +475,37 @@ const activeProjectItems = computed(() => {
 });
 
 const activityLink = computed(() => {
-  if (session.roleId === "expert") return { label: "进入评审", to: "/expert-scoring" };
-  return { label: "查看项目", to: "/project-workbench" };
+  if (session.roleId === "expert") return { label: "进入评分台", to: "/expert-scoring" };
+  if (supplierRoles.has(session.roleId)) return { label: "进入报价响应", to: "/bidding" };
+  if (financeRoles.has(session.roleId)) return { label: "进入结算付款", to: "/settlement-materials" };
+  if (auditRoles.has(session.roleId)) return { label: "查看操作日志", to: "/audit" };
+  if (session.roleId === "hotel_buyer") return { label: "查看采购申请", to: "/procurement-requests" };
+  return { label: "查看采购项目", to: "/project-workbench" };
 });
 
-const summaryItems = computed<SummaryCardItem[]>(() => summaryCards.value.map((item) => ({ label: item.label, value: item.value })));
+const timelineRows = computed(() =>
+  projects.value
+    .filter((item) => isFormalProject(item))
+    .slice(0, 6)
+    .map((item) => ({
+      id: item.id,
+      title: item.name ?? item.title ?? "采购项目",
+      meta: `${labelStatus(item.status)} / ${money(item.budgetAmount)}`,
+      stages: buildTimelineStages(item.status)
+    }))
+);
 
-const todoColumns = computed<DataTableColumn[]>(() => {
-  if (["buyer", "platform_operator"].includes(session.roleId)) {
-    return [
-      { key: "title", label: "项目 / 事项" },
-      { key: "status", label: "项目阶段" },
-      { key: "due", label: "时限" },
-      { key: "risk", label: "风险" },
-      { key: "action", label: "操作" }
-    ];
-  }
-  return [
-    { key: "status", label: "状态" },
-    { key: "title", label: "事项" },
-    { key: "meta", label: "业务信息" },
-    { key: "action", label: "操作" }
-  ];
-});
-
-const activityColumns: DataTableColumn[] = [
-  { key: "title", label: "动态" },
-  { key: "meta", label: "类型" },
-  { key: "time", label: "时间" },
-  { key: "action", label: "操作" }
-];
+const auditWaterfallRows = computed(() =>
+  [...auditLogs.value]
+    .sort((left, right) => new Date(right.createdAt ?? 0).getTime() - new Date(left.createdAt ?? 0).getTime())
+    .slice(0, 8)
+    .map((item) => ({
+      id: item.id,
+      time: item.createdAt ? formatDateTime(item.createdAt).slice(5, 16) : "最近",
+      title: labelAuditAction(item.action),
+      meta: `${labelObjectType(item.objectType)} / ${labelStatus(item.result ?? "recorded")}`
+    }))
+);
 
 async function loadDashboard() {
   if (!session.roleId) return;
@@ -340,28 +564,147 @@ watch(
 
     <FeedbackMessage v-if="loadError" tone="error">{{ loadError }}</FeedbackMessage>
 
-    <DashboardMetricsSection :items="summaryItems" />
+    <template v-if="landingTemplate === 'A'">
+      <DashboardMetricsSection :items="summaryItems" />
 
-    <div class="eds-workbench-layout">
-      <div class="eds-workbench-main">
-        <DashboardTodoSection
-          :items="todoItems"
-          :columns="todoColumns"
-          :entry-link="todoEntryLink"
-          :show-entry="session.roleId !== 'admin'"
-          :empty-text="roleWorkbench.emptyTodoText"
-        />
+      <div class="eds-template-a-main-grid">
+        <div class="eds-template-a-flow">
+          <DashboardTodoSection
+            :items="todoItems"
+            :columns="todoColumns"
+            :entry-link="todoEntryLink"
+            :show-entry="true"
+            :empty-text="roleWorkbench.emptyTodoText"
+          />
 
-        <DashboardActivitySection
-          :rows="activeProjectItems"
-          :columns="activityColumns"
-          :activity-link="activityLink"
-          :empty-text="roleWorkbench.emptyActivityText"
-        />
+          <DashboardTimelineSection class="eds-template-a-timeline" :rows="timelineRows" />
+        </div>
+
+        <DashboardQuickActionSection :actions="quickActions" :risk-signals="roleWorkbench.riskSignals" />
+      </div>
+    </template>
+
+    <div v-else-if="landingTemplate === 'B'" class="eds-template-b-shell">
+      <DashboardTodoSection
+        :items="todoItems"
+        :columns="todoColumns"
+        :entry-link="todoEntryLink"
+        :show-entry="true"
+        :empty-text="roleWorkbench.emptyTodoText"
+      />
+
+      <EnterpriseSurface title="处理焦点" description="保留列表优先的批量处理视角，不再把首页做成装饰化仪表盘。">
+        <div class="eds-ledger-strip">
+          <div v-for="item in summaryItems" :key="`ledger-${item.label}`">
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+            <small v-if="item.meta" class="eds-meta">{{ item.meta }}</small>
+          </div>
+        </div>
+      </EnterpriseSurface>
+
+      <EnterpriseSurface title="本角色处理策略" description="将首页作为列表处理入口，右手信息只保留真正会影响审批或付款的判断线索。">
+        <div class="eds-waterfall-log">
+          <article v-for="item in focusItems" :key="item" class="eds-waterfall-log-item">
+            <span class="eds-waterfall-log-time">重点</span>
+            <div class="eds-waterfall-log-main">
+              <strong>{{ item }}</strong>
+              <span>{{ roleWorkbench.description }}</span>
+            </div>
+          </article>
+        </div>
+      </EnterpriseSurface>
+    </div>
+
+    <div v-else-if="landingTemplate === 'C'" class="eds-template-c-shell">
+      <div class="eds-template-c-hero">
+        <DashboardQuickActionSection :actions="quickActions" :risk-signals="roleWorkbench.riskSignals" />
+
+        <EnterpriseSurface title="提交规则与时效" description="外部门户保持任务导向，只展示会影响提交、锁定与履约的关键上下文。">
+          <div class="eds-ledger-strip">
+            <div v-for="item in summaryItems" :key="`portal-${item.label}`">
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
+              <small v-if="item.meta" class="eds-meta">{{ item.meta }}</small>
+            </div>
+          </div>
+
+          <div class="eds-waterfall-log">
+            <article v-for="item in focusItems" :key="`portal-focus-${item}`" class="eds-waterfall-log-item">
+              <span class="eds-waterfall-log-time">时效</span>
+              <div class="eds-waterfall-log-main">
+                <strong>{{ item }}</strong>
+                <span>提交前先完成资质、材料和锁定时点核对。</span>
+              </div>
+            </article>
+          </div>
+        </EnterpriseSurface>
       </div>
 
-      <DashboardRoleWorkbenchSection :workbench="roleWorkbench" />
+      <DashboardTodoSection
+        :items="todoItems"
+        :columns="todoColumns"
+        :entry-link="todoEntryLink"
+        :show-entry="true"
+        :empty-text="roleWorkbench.emptyTodoText"
+      />
+    </div>
+
+    <div v-else class="eds-template-d-shell">
+      <div class="eds-template-d-hero">
+        <EnterpriseSurface title="操作日志流水" description="优先暴露真实操作轨迹，避免用大色块和大数字遮蔽监督信息。">
+          <div v-if="auditWaterfallRows.length" class="eds-waterfall-log">
+            <article v-for="item in auditWaterfallRows" :key="item.id" class="eds-waterfall-log-item">
+              <span class="eds-waterfall-log-time">{{ item.time }}</span>
+              <div class="eds-waterfall-log-main">
+                <strong>{{ item.title }}</strong>
+                <span>{{ item.meta }}</span>
+              </div>
+            </article>
+          </div>
+
+          <div v-else class="eds-state">
+            <span class="eds-state-icon" aria-hidden="true"></span>
+            <h3>暂无可见操作流水</h3>
+            <p>待监督的操作发生后，这里会自动按时间瀑布流展开。</p>
+          </div>
+        </EnterpriseSurface>
+
+        <EnterpriseSurface title="监督重点" description="把审计角色真正关心的越权、归档与敏感节点集中到同一视图。">
+          <div class="eds-ledger-strip">
+            <div v-for="item in summaryItems" :key="`audit-${item.label}`">
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
+              <small v-if="item.meta" class="eds-meta">{{ item.meta }}</small>
+            </div>
+          </div>
+
+          <div class="eds-waterfall-log">
+            <article v-for="item in roleWorkbench.riskSignals" :key="`risk-${item}`" class="eds-waterfall-log-item">
+              <span class="eds-waterfall-log-time">风险</span>
+              <div class="eds-waterfall-log-main">
+                <strong>{{ item }}</strong>
+                <span>按权限边界、日志可追溯性和归档完整性进行核查。</span>
+              </div>
+            </article>
+          </div>
+        </EnterpriseSurface>
+      </div>
+
+      <DashboardTodoSection
+        :items="todoItems"
+        :columns="todoColumns"
+        :entry-link="todoEntryLink"
+        :show-entry="true"
+        :empty-text="roleWorkbench.emptyTodoText"
+      />
+
+      <DashboardActivitySection
+        :rows="activeProjectItems"
+        :columns="activityColumns"
+        :activity-link="activityLink"
+        :empty-text="roleWorkbench.emptyActivityText"
+      />
     </div>
   </section>
 </template>
-

@@ -3,15 +3,10 @@ import { labelStatus } from "../../utils/status-labels";
 import type { MethodRule, ProcurementRequest, ProjectRow, RequestActionContext } from "./types";
 
 export const requestColumns: DataTableColumn[] = [
-  { key: "code", label: "编号" },
-  { key: "title", label: "标题" },
-  { key: "department", label: "部门 / 申请人" },
-  { key: "status", label: "状态" },
-  { key: "approval", label: "审批" },
-  { key: "method", label: "方式" },
-  { key: "budget", label: "预算" },
-  { key: "attachments", label: "附件" },
-  { key: "project", label: "项目" },
+  { key: "request", label: "申请信息" },
+  { key: "owner", label: "部门 / 方式" },
+  { key: "state", label: "状态" },
+  { key: "amount", label: "预算 / 附件" },
   { key: "actions", label: "操作" }
 ];
 

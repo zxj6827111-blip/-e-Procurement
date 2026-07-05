@@ -10,6 +10,7 @@ defineProps<{
   rowKey?: string;
   emptyText?: string;
   emptyTitle?: string;
+  emptyMode?: "default" | "compact";
 }>();
 </script>
 
@@ -24,7 +25,7 @@ defineProps<{
       <tbody>
         <tr v-if="rows.length === 0">
           <td :colspan="columns.length">
-            <div class="eds-state">
+            <div :class="['eds-state', emptyMode === 'compact' ? 'eds-state-compact' : '']">
               <span class="eds-state-icon" aria-hidden="true"></span>
               <h3>{{ emptyTitle ?? "暂无业务记录" }}</h3>
               <p>{{ emptyText ?? "当前没有符合条件的业务记录，请调整筛选条件或完成上一业务动作后再查看。" }}</p>

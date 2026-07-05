@@ -35,6 +35,6 @@ const selectedUser = computed(() => props.rows.find((row) => row.id === props.se
       <StatusTag>验证角色</StatusTag>
     </div>
 
-    <EnterpriseButton type="accent" :disabled="loading" @click="emit('enter')">进入该角色工作台</EnterpriseButton>
+    <EnterpriseButton type="primary" :disabled="loading" @click="emit('enter')">进入该角色工作台</EnterpriseButton>
   </section>
 </template>

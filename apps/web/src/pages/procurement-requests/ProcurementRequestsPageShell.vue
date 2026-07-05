@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { apiDelete, apiGet, apiPost } from "../../api/http";
 import { loadWorkflowTasks, type R8WorkflowTaskView } from "../../api/workflow";
 import { useSessionStore } from "../../stores/session";
+import { EnterpriseSurface } from "../../components/base";
 import {
   canCreateRequest,
   defaultProjectName,
@@ -147,24 +148,50 @@ onMounted(async () => {
     :audit-log-id="auditLogId"
     :summary-items="summaryItems"
   >
-    <ProcurementRequestsFilter :page-title="pageTitle" :total="visibleRequests.length" />
+    <div class="eds-template-b-workspace">
+      <section class="eds-template-b-primary">
+        <ProcurementRequestsFilter :page-title="pageTitle" :total="visibleRequests.length" />
 
-    <ProcurementRequestsTable
-      :requests="visibleRequests"
-      :rules="rules"
-      :action-context="actionContext"
-      :project-name="projectName"
-      :project-name-input="projectNameInput"
-      :method-rule-id-for="methodRuleIdFor"
-      @submit="submitRequest"
-      @approve="approveRequest"
-      @set-method-rule="setMethodRule"
-      @decide-method="decideMethod"
-      @set-project-name="setProjectNameInput"
-      @create-project="createProjectFromRequest"
-      @delete="deleteRequest"
-      @cancel="cancelRequest"
-    />
+        <ProcurementRequestsTable
+          :requests="visibleRequests"
+          :rules="rules"
+          :action-context="actionContext"
+          :project-name="projectName"
+          :project-name-input="projectNameInput"
+          :method-rule-id-for="methodRuleIdFor"
+          @submit="submitRequest"
+          @approve="approveRequest"
+          @set-method-rule="setMethodRule"
+          @decide-method="decideMethod"
+          @set-project-name="setProjectNameInput"
+          @create-project="createProjectFromRequest"
+          @delete="deleteRequest"
+          @cancel="cancelRequest"
+        />
+      </section>
+
+      <aside class="eds-template-b-rail">
+        <EnterpriseSurface title="列表处理规则" description="按状态、审批节点和承接条件批量处理，不从仪表盘跳转。">
+          <div class="eds-workflow-rule-list">
+            <article>
+              <span>01</span>
+              <strong>先处理待审批</strong>
+              <p>集团角色先确认需求必要性，避免后续项目承接无依据。</p>
+            </article>
+            <article>
+              <span>02</span>
+              <strong>再判定采购方式</strong>
+              <p>采购经办只在审批通过后选择规则，保持流程可追溯。</p>
+            </article>
+            <article>
+              <span>03</span>
+              <strong>最后承接项目</strong>
+              <p>只有方式已判定且未生成项目时，才允许创建采购项目。</p>
+            </article>
+          </div>
+        </EnterpriseSurface>
+      </aside>
+    </div>
   </ProcurementRequestsShell>
 </template>
 

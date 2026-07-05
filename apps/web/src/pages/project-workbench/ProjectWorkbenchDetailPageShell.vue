@@ -1,11 +1,16 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import AuditLogRef from "../../components/AuditLogRef.vue";
 import ErrorAlert from "../../components/ErrorAlert.vue";
-import EnterpriseTabs from "../../components/base/EnterpriseTabs.vue";
-import FeedbackMessage from "../../components/base/FeedbackMessage.vue";
-import RiskAlertPanel from "../../components/base/RiskAlertPanel.vue";
-import SplitDetailLayout from "../../components/base/SplitDetailLayout.vue";
-import StatusTag from "../../components/base/StatusTag.vue";
+import {
+  EnterpriseSurface,
+  EnterpriseTabs,
+  FeedbackMessage,
+  RiskAlertPanel,
+  StatusTag,
+  SummaryCards,
+  type SummaryCardItem
+} from "../../components/base";
 import DemandSummaryPanel from "./DemandSummaryPanel.vue";
 import ProjectExecutionMap from "./ProjectExecutionMap.vue";
 import ProjectSelectorSummary from "./ProjectSelectorSummary.vue";
@@ -16,7 +21,6 @@ import { useProjectWorkbenchPage } from "./useProjectWorkbenchPage";
 const {
   auditLogId,
   completedOperationCount,
-  currency,
   currentProjectLabel,
   demandSummary,
   errorMessage,
@@ -37,7 +41,8 @@ const {
   showSourcingDetails,
   sourcingMetrics,
   totalOperationCount,
-  workbench
+  workbench,
+  currency
 } = useProjectWorkbenchPage();
 
 const detailTabs = [
@@ -46,6 +51,13 @@ const detailTabs = [
   { key: "attachments", label: "附件" },
   { key: "logs", label: "日志" }
 ];
+
+const executionSummaryItems = computed<SummaryCardItem[]>(() => [
+  { label: "当前阶段", value: projectStatusText.value || "-" },
+  { label: "下一步动作", value: nextAction.value?.title ?? "待识别" },
+  { label: "执行进度", value: `${completedOperationCount.value} / ${totalOperationCount.value}` },
+  { label: "执行模式", value: isExternalTradeProject.value ? "外部采购备案" : "内部招采履约" }
+]);
 </script>
 
 <template>
@@ -79,47 +91,72 @@ const detailTabs = [
     <FeedbackMessage v-else-if="!workbench" align="center">当前角色没有可访问的项目执行数据。</FeedbackMessage>
 
     <template v-else>
+      <div class="eds-process-hero">
+        <EnterpriseSurface title="项目执行总账" eyebrow="版式 D / 高信息密度工作流" description="把项目阶段、下一步动作与关键处理链路固定在同一张执行面板中。">
+          <SummaryCards :items="executionSummaryItems" />
+        </EnterpriseSurface>
+
+        <RiskAlertPanel title="执行关注点" description="只保留当前项目最影响推进和审计追溯的判断点，减少无效装饰。">
+          <div class="eds-process-reference">
+            <article class="eds-process-reference-item">
+              <span>当前阶段</span>
+              <strong>{{ projectStatusText }}</strong>
+            </article>
+            <article class="eds-process-reference-item">
+              <span>下一步</span>
+              <strong>{{ nextAction?.title ?? "待识别" }}</strong>
+            </article>
+          </div>
+          <ul class="eds-process-checklist">
+            <li>
+              <strong>先看阶段与动作是否一致</strong>
+              <span>项目阶段、下一步动作和可进入子页面必须互相印证，避免页面能进但业务链条未到位。</span>
+            </li>
+            <li>
+              <strong>先看采购方式与执行路径是否一致</strong>
+              <span>外部采购项目必须走备案链路，内部项目才进入招采与履约执行页面。</span>
+            </li>
+            <li>
+              <strong>先看留痕是否完整</strong>
+              <span>方式判定、评审、定标、履约和归档都必须能回溯到同一项目主线。</span>
+            </li>
+          </ul>
+        </RiskAlertPanel>
+      </div>
+
       <EnterpriseTabs :tabs="detailTabs" active-key="details" />
 
-      <SplitDetailLayout>
-        <WorkbenchFocusPanel :project-id="workbench.project.id" :next-action="nextAction" />
+      <div class="eds-process-shell">
+        <section class="eds-panel-stack">
+          <WorkbenchFocusPanel :project-id="workbench.project.id" :next-action="nextAction" />
 
-        <ProjectExecutionMap
-          :title="isExternalTradeProject ? '外部采购备案链路' : '采购执行步骤'"
-          :project-status-text="projectStatusText"
-          :progress-overview="progressOverview"
-          :completed-operation-count="completedOperationCount"
-          :total-operation-count="totalOperationCount"
-          :project-operation-links="projectOperationLinks"
-          :operation-state-label="operationStateLabel"
-        />
+          <ProjectExecutionMap
+            :title="isExternalTradeProject ? '外部采购备案链路' : '采购执行步骤'"
+            :project-status-text="projectStatusText"
+            :progress-overview="progressOverview"
+            :completed-operation-count="completedOperationCount"
+            :total-operation-count="totalOperationCount"
+            :project-operation-links="projectOperationLinks"
+            :operation-state-label="operationStateLabel"
+          />
 
-        <DemandSummaryPanel
-          :procurement-request="workbench.procurementRequest"
-          :demand-summary="demandSummary"
-          :line-item-summary="lineItemSummary"
-          :currency="currency"
-        />
+          <DemandSummaryPanel
+            :procurement-request="workbench.procurementRequest"
+            :demand-summary="demandSummary"
+            :line-item-summary="lineItemSummary"
+            :currency="currency"
+          />
+        </section>
 
-        <template #aside>
-          <RiskAlertPanel title="下一步关注" description="优先处理当前项目的下一动作、截止时间和责任人。">
-            <ul class="eds-meta-list">
-              <li>优先确认公告、报价截止和评审安排。</li>
-              <li>涉及外部采购备案时保留完整审批依据。</li>
-              <li>项目状态变化必须与业务记录一致。</li>
-            </ul>
-          </RiskAlertPanel>
-
+        <aside class="eds-panel-stack">
           <WorkbenchSubpageEntrypoints
             :workbench="workbench"
             :show-sourcing-details="showSourcingDetails"
             :sourcing-metrics="sourcingMetrics"
             :fulfillment-metrics="fulfillmentMetrics"
           />
-        </template>
-      </SplitDetailLayout>
-
+        </aside>
+      </div>
     </template>
   </section>
 </template>
-

@@ -28,8 +28,20 @@ export const pageClassifications: PageClassification[] = [
     exceptionReason: "Supplier onboarding is the approved wizard-style complex creation flow."
   },
   { path: "/role-switch", domain: "identity", kind: "FORM_PAGE", component: "RoleSwitchPage", exceptionReason: "Mock role switch is a controlled system form." },
-  { path: "/my-tasks", domain: "workbench", kind: "LIST_PAGE", component: "MyTasksPage" },
-  { path: "/messages", domain: "message", kind: "LIST_PAGE", component: "MessageCenterPage" },
+  {
+    path: "/my-tasks",
+    domain: "workbench",
+    kind: "LIST_PAGE",
+    component: "MyTasksPage",
+    exceptionReason: "Task inbox uses a controlled list-and-guidance shell instead of the generic PageHeader stack."
+  },
+  {
+    path: "/messages",
+    domain: "message",
+    kind: "LIST_PAGE",
+    component: "MessageCenterPage",
+    exceptionReason: "Message center uses a controlled notification-dispatch shell instead of the generic PageHeader stack."
+  },
   { path: "/account-security", domain: "identity", kind: "FORM_PAGE", component: "AccountSecurityPage" },
   { path: "/approval-rules", domain: "approval", kind: "LIST_PAGE", component: "ApprovalRulesPage" },
   { path: "/permissions", domain: "security", kind: "LIST_PAGE", component: "PermissionsPage" },
@@ -53,7 +65,13 @@ export const pageClassifications: PageClassification[] = [
     exceptionReason: "Supplier self-service detail uses a controlled account ledger layout."
   },
   { path: "/procurement-requests", domain: "procurement-request", kind: "LIST_PAGE", component: "ProcurementRequestsPage" },
-  { path: "/procurement-requests/new", domain: "procurement-request", kind: "FORM_PAGE", component: "ProcurementRequestCreatePage" },
+  {
+    path: "/procurement-requests/new",
+    domain: "procurement-request",
+    kind: "FORM_PAGE",
+    component: "ProcurementRequestCreatePage",
+    exceptionReason: "Request creation uses a controlled launch form shell instead of the generic SubmitPanel composition."
+  },
   { path: "/procurement-requests/:requestId", domain: "procurement-request", kind: "DETAIL_PAGE", component: "ProcurementRequestDetailPage" },
   { path: "/project-workbench", domain: "project", kind: "LIST_PAGE", component: "ProjectWorkbenchListPage" },
   { path: "/project-workbench/:projectId", domain: "project", kind: "DETAIL_PAGE", component: "ProjectWorkbenchPage" },
@@ -71,7 +89,13 @@ export const pageClassifications: PageClassification[] = [
     component: "ProjectFulfillmentPage",
     exceptionReason: "Project fulfillment detail uses a controlled business context layout."
   },
-  { path: "/procurement-documents", domain: "procurement-document", kind: "LIST_PAGE", component: "ProcurementDocumentsPage" },
+  {
+    path: "/procurement-documents",
+    domain: "procurement-document",
+    kind: "LIST_PAGE",
+    component: "ProcurementDocumentsPage",
+    exceptionReason: "Procurement document management uses a controlled list and reference shell."
+  },
   { path: "/announcements-invitations", domain: "announcement", kind: "LIST_PAGE", component: "AnnouncementsInvitationsPage" },
   { path: "/supplier-registration", domain: "supplier-registration", kind: "FORM_PAGE", component: "SupplierRegistrationPage" },
   { path: "/bidding", domain: "bidding", kind: "FORM_PAGE", component: "BiddingPage" },
@@ -87,7 +111,13 @@ export const pageClassifications: PageClassification[] = [
   { path: "/supply-mall", domain: "supply-mall", kind: "LIST_PAGE", component: "SupplyMallPage" },
   { path: "/supply-mall/:section", domain: "supply-mall", kind: "DETAIL_PAGE", component: "SupplyMallSectionPage" },
   { path: "/order-fulfillment", domain: "order-fulfillment", kind: "LIST_PAGE", component: "OrderFulfillmentPage" },
-  { path: "/settlement-materials", domain: "settlement", kind: "LIST_PAGE", component: "SettlementMaterialsPage" },
+  {
+    path: "/settlement-materials",
+    domain: "settlement",
+    kind: "LIST_PAGE",
+    component: "SettlementMaterialsPage",
+    exceptionReason: "Settlement processing uses a controlled finance ledger shell."
+  },
   { path: "/payment-status", domain: "payment", kind: "LIST_PAGE", component: "PaymentStatusPage" },
   { path: "/archive-audit", domain: "archive", kind: "LIST_PAGE", component: "ArchiveAuditPage" },
   { path: "/audit", domain: "audit", kind: "LIST_PAGE", component: "AuditPage" },

@@ -2,7 +2,7 @@
 import { RouterLink } from "vue-router";
 import AuditLogRef from "../../components/AuditLogRef.vue";
 import ErrorAlert from "../../components/ErrorAlert.vue";
-import { EnterpriseSurface, PageHeader, SummaryCards, type SummaryCardItem } from "../../components/base";
+import { EnterpriseSurface, PageHeader, type SummaryCardItem } from "../../components/base";
 
 defineProps<{
   pageTitle: string;
@@ -26,8 +26,14 @@ defineProps<{
 
     <ErrorAlert v-if="workflowTaskError" :message="workflowTaskError" />
 
-    <EnterpriseSurface title="需求流转口径" description="酒店提交需求，集团确认采购必要性，采购经办按制度判定采购方式并承接为项目。">
-      <SummaryCards :items="summaryItems" />
+    <EnterpriseSurface class="eds-template-b-command-surface" title="需求流转口径" description="酒店提交需求，集团确认采购必要性，采购经办按制度判定采购方式并承接为项目。">
+      <div class="eds-template-b-ledger">
+        <article v-for="item in summaryItems" :key="item.label" class="eds-template-b-ledger-item">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+          <small v-if="item.meta">{{ item.meta }}</small>
+        </article>
+      </div>
     </EnterpriseSurface>
 
     <slot />

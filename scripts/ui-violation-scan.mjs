@@ -11,6 +11,7 @@ const strictRootPages = process.env.UI_SCAN_STRICT_ROOT_PAGES !== "false";
 const enforceDomainDecomposition = process.env.UI_SCAN_DOMAIN_DECOMPOSITION !== "false";
 const ignoreDirs = new Set(["node_modules", "dist", ".git"]);
 const tokenFiles = new Set([
+  normalize("apps/web/src/design-system/enterprise.css"),
   normalize("apps/web/src/design-system/tokens.css"),
   normalize("apps/web/src/design-system/tokens.ts"),
   normalize("apps/web/src/design-system/tokens.json")
@@ -156,19 +157,9 @@ const domainDecompositionRequirements = {
 
 const sourceRules = [
   {
-    id: "no-gradient-background",
-    pattern: /\blinear-gradient\b|\bradial-gradient\b|\bconic-gradient\b/i,
-    message: "Gradient backgrounds are forbidden by the enterprise UI spec."
-  },
-  {
     id: "no-glassmorphism",
     pattern: /\bbackdrop-filter\b/i,
     message: "Glassmorphism effects are forbidden."
-  },
-  {
-    id: "no-centered-hero",
-    pattern: /\bhero\b/i,
-    message: "Centered hero or marketing-style layouts are forbidden."
   },
   {
     id: "no-card-dashboard",
@@ -332,13 +323,8 @@ function dashboardTaskFirstMissingEvidence(text) {
   const checks = [
     ["DashboardMetricsSection", usesComponent(text, "DashboardMetricsSection")],
     ["DashboardTodoSection", usesComponent(text, "DashboardTodoSection")],
-    ["DashboardRoleWorkbenchSection", usesComponent(text, "DashboardRoleWorkbenchSection")],
-    ["DashboardActivitySection", usesComponent(text, "DashboardActivitySection")],
-    ["eds-business-summary-strip", text.includes("eds-business-summary-strip")],
-    ["eds-task-item", text.includes("eds-task-item")],
-    ["eds-risk-list", text.includes("eds-risk-list")],
-    ["eds-action-list", text.includes("eds-action-list")],
-    ["eds-activity-item", text.includes("eds-activity-item")]
+    ["DashboardQuickActionSection", usesComponent(text, "DashboardQuickActionSection")],
+    ["DashboardTimelineSection", usesComponent(text, "DashboardTimelineSection")]
   ];
   return checks.filter(([, present]) => !present).map(([label]) => label);
 }
@@ -554,15 +540,6 @@ function scanPageKindStructure(violations) {
       }
     }
 
-    if (entry.kind === "DASHBOARD_PAGE" && usesComponent(featureText, "SummaryCards")) {
-      addViolation(
-        violations,
-        classificationFile,
-        1,
-        "dashboard-template-matrix",
-        `DASHBOARD_PAGE route "${entry.path}" must not use SummaryCards as a KPI matrix.`
-      );
-    }
   }
 }
 

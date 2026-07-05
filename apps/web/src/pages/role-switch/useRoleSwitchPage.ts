@@ -1,23 +1,9 @@
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { apiGet } from "../../api/http";
+import { roleHome } from "../../permissions/role-model";
 import { useSessionStore } from "../../stores/session";
 import type { SwitchableUser } from "./types";
-
-const roleDefaultRoutes: Record<string, string> = {
-  group_manager: "/",
-  buyer: "/",
-  hotel_buyer: "/",
-  supplier: "/",
-  platform_operator: "/",
-  supplier_admin: "/",
-  supplier_quotation: "/",
-  expert: "/",
-  hotel_finance: "/",
-  finance_reviewer: "/",
-  auditor: "/",
-  admin: "/permissions"
-};
 
 export function accountLabel(user: SwitchableUser) {
   if (user.supplierName) return `${user.roleLabel} / ${user.supplierName}`;
@@ -48,7 +34,7 @@ export function useRoleSwitchPage() {
     try {
       const data = await session.demoLogin(nextUserId.value);
       auditLogId.value = data.auditLogId ?? "";
-      await router.replace(roleDefaultRoutes[data.roleId] ?? "/");
+      await router.replace(roleHome(data.roleId));
     } catch (err) {
       error.value = err instanceof Error ? err.message : "角色切换失败";
       auditLogId.value = String((err as { auditLogId?: string }).auditLogId ?? "");

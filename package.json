@@ -32,6 +32,7 @@
     "ui:smoke": "node scripts/ui-page-kind-smoke.mjs",
     "ui:role-flow": "node scripts/ui-role-flow-regression.mjs",
     "role:menu-snapshot": "node scripts/sellable-readiness.mjs role-menu-snapshot",
+    "role:rbac-audit": "node scripts/sellable-readiness.mjs rbac-role-audit",
     "permission:align": "node scripts/sellable-readiness.mjs permission-align",
     "production:gate": "node scripts/sellable-readiness.mjs production-gate",
     "readiness:strict": "node scripts/sellable-readiness.mjs readiness-strict",
