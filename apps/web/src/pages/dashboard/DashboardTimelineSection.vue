@@ -46,8 +46,7 @@ function stageStateText(state: StageState) {
               v-for="(stage, index) in row.stages"
               :key="`${row.id}-${stage.label}`"
               class="eds-gantt-cell"
-              :class="[`is-${stage.state}`]"
-              :style="{ '--stage-index': index }"
+              :class="[`is-${stage.state}`, `eds-gantt-cell-${index + 1}`]"
             >
               <span class="eds-gantt-dot" aria-hidden="true"></span>
               <span>{{ stageStateText(stage.state) }}</span>

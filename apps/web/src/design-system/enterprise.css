@@ -6,18 +6,6 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-@keyframes eds-rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -67,7 +55,6 @@ body {
   gap: var(--ep-space-16);
   border-bottom: 1px solid rgba(23, 63, 61, 0.1);
   background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(18px);
   padding: 0 var(--ep-space-20) 0 var(--ep-space-16);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8), var(--ep-shadow-xs);
 }
@@ -373,10 +360,6 @@ body {
   width: 100%;
   min-width: 0;
   padding: var(--ep-space-28) var(--ep-space-32) var(--ep-space-32);
-}
-
-.enterprise-content > * {
-  animation: eds-rise-in 220ms ease both;
 }
 
 .enterprise-auth-shell {
@@ -1134,7 +1117,7 @@ body {
   border-bottom: 0;
 }
 
-.eds-permission-matrix-row.is-head {
+.eds-permission-matrix-row.eds-permission-matrix-head {
   min-height: 40px;
   background: var(--ep-color-panel);
   color: var(--ep-color-text-secondary);
@@ -2769,7 +2752,7 @@ body {
   }
 
   .eds-permission-matrix-row,
-  .eds-permission-matrix-row.is-head {
+  .eds-permission-matrix-row.eds-permission-matrix-head {
     grid-template-columns: 1fr;
     gap: var(--ep-space-4);
     align-items: start;

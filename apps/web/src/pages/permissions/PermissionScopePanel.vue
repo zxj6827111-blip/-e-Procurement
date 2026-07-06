@@ -39,7 +39,7 @@ const matrixRows = computed(() => {
     </div>
 
     <div class="eds-permission-matrix-table" role="table" aria-label="角色权限矩阵">
-      <div class="eds-permission-matrix-row is-head" role="row">
+      <div class="eds-permission-matrix-row eds-permission-matrix-head" role="row">
         <span role="columnheader">序号</span>
         <span role="columnheader">菜单授权</span>
         <span role="columnheader">状态</span>
