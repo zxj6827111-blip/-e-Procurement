@@ -25,7 +25,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <FormSection title="保存报价草稿" description="填写金额、税率、交付周期和响应文件，先保存草稿再提交。">
+  <FormSection class="g-hotel-form-card g-hotel-quote-form" title="我的报价单 (请认真核对后填写)" description="报价为含税金额；点击提交并锁定后将按截标规则冻结。">
     <label>
       项目
       <select v-model="selectedProjectId" @change="emit('projectChange')">
@@ -35,7 +35,7 @@ const emit = defineEmits<{
     </label>
     <label>
       报价金额
-      <input v-model.number="amount" type="number" />
+      <input v-model.number="amount" type="number" placeholder="0.00" />
     </label>
     <label>
       税率
@@ -43,7 +43,7 @@ const emit = defineEmits<{
     </label>
     <label>
       交付周期（天）
-      <input v-model.number="deliveryDays" type="number" min="1" />
+      <input v-model.number="deliveryDays" type="number" min="1" placeholder="30" />
     </label>
     <label>
       含税说明
@@ -70,8 +70,8 @@ const emit = defineEmits<{
     </label>
     <p class="eds-meta">{{ responseFileName || "未选择文件" }}</p>
     <p v-if="emptyProjectHint" class="eds-meta">{{ emptyProjectHint }}</p>
-    <SubmitPanel>
-      <EnterpriseButton type="primary" :disabled="!selectedProjectId" @click="emit('saveDraft')">保存草稿</EnterpriseButton>
+    <SubmitPanel class="g-hotel-sticky-actions">
+      <EnterpriseButton type="primary" :disabled="!selectedProjectId" @click="emit('saveDraft')">暂存草稿</EnterpriseButton>
     </SubmitPanel>
   </FormSection>
 </template>

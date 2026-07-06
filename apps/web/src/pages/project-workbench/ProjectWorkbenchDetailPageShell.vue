@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { RouterLink } from "vue-router";
 import AuditLogRef from "../../components/AuditLogRef.vue";
 import ErrorAlert from "../../components/ErrorAlert.vue";
 import {
@@ -61,17 +62,24 @@ const executionSummaryItems = computed<SummaryCardItem[]>(() => [
 </script>
 
 <template>
-  <section class="eds-section">
-    <header class="eds-page-header eds-business-context">
-      <div class="eds-business-context-main">
-        <p class="eds-business-eyebrow">采购项目 / 执行总览</p>
-        <h2>采购项目执行</h2>
-        <p>{{ currentProjectLabel }}</p>
+  <section class="eds-section g-hotel-project-detail">
+    <header class="g-hotel-project-command">
+      <div>
+        <div class="g-hotel-project-title-row">
+          <h2>{{ currentProjectLabel }}</h2>
+          <StatusTag v-if="isExternalTradeProject" tone="warning">外部交易备案</StatusTag>
+        </div>
+        <p>
+          <span>{{ selectedProjectOptionLabel }}</span>
+          <span>当前阶段: {{ projectStatusText }}</span>
+          <span>执行模式: {{ isExternalTradeProject ? "外部采购备案" : "内部招采履约" }}</span>
+        </p>
       </div>
-      <div class="eds-business-context-aside">
-        <span class="eds-meta">当前阶段</span>
-        <strong>{{ projectStatusText }}</strong>
-        <StatusTag>{{ projectStatusText }}</StatusTag>
+      <div class="g-hotel-project-actions">
+        <RouterLink class="eds-button" to="/project-workbench">返回列表</RouterLink>
+        <RouterLink v-if="workbench && !isExternalTradeProject" class="eds-button eds-button-primary" :to="`/project-workbench/${encodeURIComponent(workbench.project.id)}/sourcing`">
+          进入下一阶段处理
+        </RouterLink>
       </div>
     </header>
 
@@ -91,12 +99,27 @@ const executionSummaryItems = computed<SummaryCardItem[]>(() => [
     <FeedbackMessage v-else-if="!workbench" align="center">当前角色没有可访问的项目执行数据。</FeedbackMessage>
 
     <template v-else>
-      <div class="eds-process-hero">
-        <EnterpriseSurface title="项目执行总账" eyebrow="版式 D / 高信息密度工作流" description="把项目阶段、下一步动作与关键处理链路固定在同一张执行面板中。">
+      <div class="g-hotel-project-status-band">
+        <article>
+          <span>当前业务阶段</span>
+          <strong>{{ projectStatusText }}</strong>
+        </article>
+        <article>
+          <span>关键时间节点</span>
+          <strong>{{ nextAction?.title ?? "未设定" }}</strong>
+        </article>
+        <article>
+          <span>档案完整度</span>
+          <strong>{{ completedOperationCount }} / {{ totalOperationCount }}</strong>
+        </article>
+      </div>
+
+      <div class="eds-process-hero g-hotel-project-hero">
+        <EnterpriseSurface title="项目基本信息" description="项目阶段、下一步动作与关键处理链路固定在同一张执行面板中。">
           <SummaryCards :items="executionSummaryItems" />
         </EnterpriseSurface>
 
-        <RiskAlertPanel title="执行关注点" description="只保留当前项目最影响推进和审计追溯的判断点，减少无效装饰。">
+        <RiskAlertPanel title="审计跟踪与风险" description="保留当前项目最影响推进和审计追溯的判断点。">
           <div class="eds-process-reference">
             <article class="eds-process-reference-item">
               <span>当前阶段</span>
@@ -124,7 +147,7 @@ const executionSummaryItems = computed<SummaryCardItem[]>(() => [
         </RiskAlertPanel>
       </div>
 
-      <EnterpriseTabs :tabs="detailTabs" active-key="details" />
+      <EnterpriseTabs class="g-hotel-project-tabs" :tabs="detailTabs" active-key="details" />
 
       <div class="eds-process-shell">
         <section class="eds-panel-stack">

@@ -16,8 +16,8 @@ defineProps<{
 </script>
 
 <template>
-  <section class="eds-section">
-    <PageHeader :title="pageTitle" eyebrow="采购申请" :description="flowDescription">
+  <section class="eds-section g-hotel-page">
+    <PageHeader :title="pageTitle === '需求审批' ? '需求审批' : '采购申请单管理'" eyebrow="采购申请" :description="pageTitle === '需求审批' ? '采购需求审核与立项批复' : '集中管理所有部门提报的采购需求及审批状态'">
       <template #actions>
         <RouterLink v-if="canCreateRequest" class="eds-button eds-button-primary" to="/procurement-requests/new">新建申请</RouterLink>
         <RouterLink class="eds-button" to="/my-tasks">查看待办</RouterLink>
@@ -26,7 +26,7 @@ defineProps<{
 
     <ErrorAlert v-if="workflowTaskError" :message="workflowTaskError" />
 
-    <EnterpriseSurface class="eds-template-b-command-surface" title="需求流转口径" description="酒店提交需求，集团确认采购必要性，采购经办按制度判定采购方式并承接为项目。">
+    <EnterpriseSurface class="eds-template-b-command-surface g-hotel-ledger-card" title="采购申请单处理口径" :description="flowDescription">
       <div class="eds-template-b-ledger">
         <article v-for="item in summaryItems" :key="item.label" class="eds-template-b-ledger-item">
           <span>{{ item.label }}</span>

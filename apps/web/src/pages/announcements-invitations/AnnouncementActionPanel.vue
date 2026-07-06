@@ -33,7 +33,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="当前公告处理" :description="nextActionHint">
+  <EnterpriseSurface class="eds-drawer-panel" title="公告邀请处理" :description="nextActionHint">
     <div class="eds-form-section">
       <label>
         选择公告

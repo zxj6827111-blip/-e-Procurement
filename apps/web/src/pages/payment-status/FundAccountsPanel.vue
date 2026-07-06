@@ -17,7 +17,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="资金账户" :description="`共 ${accounts.length} 个账户。`">
+  <EnterpriseSurface class="g-hotel-table-card" title="资金账户台账" :description="`共 ${accounts.length} 个账户。`">
     <DataTable :columns="ACCOUNT_COLUMNS" :rows="accounts" row-key="id" empty-text="暂无资金账户。">
       <template #account="{ row }">{{ orgName(row.orgId) }}</template>
       <template #status="{ row }">

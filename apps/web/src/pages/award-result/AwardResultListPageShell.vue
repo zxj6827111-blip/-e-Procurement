@@ -7,7 +7,6 @@ import {
   EnterpriseSurface,
   FeedbackMessage,
   FilterBar,
-  PageHeader,
   PaginationBar,
   StatusTag,
   SummaryCards,
@@ -42,6 +41,7 @@ const projects = ref<AwardProject[]>([]);
 const keyword = ref("");
 const statusFilter = ref("全部");
 const error = ref("");
+const selectedProject = ref<AwardProject | null>(null);
 const supplierRoles = new Set(["supplier", "supplier_admin", "supplier_quotation"]);
 const isSupplierResultView = computed(() => supplierRoles.has(session.roleId));
 
@@ -55,11 +55,10 @@ const columns = computed<DataTableColumn[]>(() => {
     ];
   }
   return [
-    { key: "project", label: "项目" },
-    { key: "department", label: "需求部门" },
-    { key: "status", label: "定标阶段" },
-    { key: "budget", label: "预算" },
-    { key: "next", label: "下一步" },
+    { key: "project", label: "项目编号 / 名称" },
+    { key: "winner", label: "推荐中标人" },
+    { key: "scoreQuote", label: "综合得分 / 报价" },
+    { key: "status", label: "当前状态" },
     { key: "actions", label: "操作" }
   ];
 });
@@ -76,6 +75,7 @@ const filteredProjects = computed(() =>
     return keywordMatched && statusMatched;
   })
 );
+const activeAwardProject = computed(() => selectedProject.value ?? filteredProjects.value[0] ?? null);
 
 const summaryItems = computed<SummaryCardItem[]>(() => {
   if (isSupplierResultView.value) {
@@ -150,6 +150,10 @@ function currency(value: number | undefined) {
   }).format(value);
 }
 
+function selectAwardProject(project: AwardProject) {
+  selectedProject.value = project;
+}
+
 async function loadProjects() {
   error.value = "";
   try {
@@ -182,20 +186,22 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="eds-section">
-    <PageHeader
-      :title="isSupplierResultView ? '中标结果' : '定标结果'"
-      eyebrow="评审定标"
-      :description="isSupplierResultView ? '查看采购方发送给本供应商的结果通知、合同确认和价格报告。' : '先选择项目，再进入定标审批、结果通知、价格报告、合同和商品上架详情。'"
-    />
+  <section class="eds-section g-hotel-page g-hotel-award-page">
+    <header class="g-hotel-page-header">
+      <div>
+        <p>评审定标 / 定标审批</p>
+        <h2><span aria-hidden="true">标</span>{{ isSupplierResultView ? "中标结果" : "定标审批" }}</h2>
+        <small>{{ isSupplierResultView ? "查看采购方发送给本供应商的结果通知、合同确认和价格报告。" : "复核评审结果、推荐中标人、报价与合规检查，再进入定标审批详情。" }}</small>
+      </div>
+    </header>
 
     <FeedbackMessage v-if="error" tone="error">{{ error }}</FeedbackMessage>
 
-    <EnterpriseSurface title="定标阶段分布">
+    <EnterpriseSurface class="g-hotel-ledger-card" title="定标阶段分布">
       <SummaryCards :items="summaryItems" />
     </EnterpriseSurface>
 
-    <FilterBar>
+    <FilterBar class="g-hotel-filter-bar">
       <label>
         关键字
         <input v-model="keyword" placeholder="项目编号、项目名称、需求部门" />
@@ -208,24 +214,56 @@ onMounted(async () => {
       </label>
     </FilterBar>
 
-    <EnterpriseSurface title="定标项目台账">
-      <DataTable :columns="columns" :rows="filteredProjects" row-key="id" :empty-text="isSupplierResultView ? '当前账号暂无可见的中标结果。' : '当前筛选条件下暂无定标项目'">
-        <template #project="{ row }">
-          <strong>{{ projectName(row) }}</strong>
-          <p class="eds-meta">{{ row.code || row.id }} / {{ row.category || "-" }}</p>
+    <div class="g-hotel-award-review-grid">
+      <EnterpriseSurface class="g-hotel-table-card" title="定标项目台账">
+        <DataTable :columns="columns" :rows="filteredProjects" row-key="id" :empty-text="isSupplierResultView ? '当前账号暂无可见的中标结果。' : '当前筛选条件下暂无定标项目'">
+          <template #project="{ row }">
+            <button class="g-hotel-link-cell" type="button" @click="selectAwardProject(row)">
+              <strong>{{ row.code || row.id }}</strong>
+              <span>{{ projectName(row) }}</span>
+            </button>
+          </template>
+          <template #winner="{ row }">{{ row.requestDepartment || "待评审推荐" }}</template>
+          <template #scoreQuote="{ row }">
+            <strong>{{ rawStatus(row) === "award_approving" ? "待审批" : "已汇总" }}</strong>
+            <p class="eds-meta">{{ currency(row.budgetAmount) }}</p>
+          </template>
+          <template #status="{ row }">
+            <StatusTag :tone="statusTone(row)">{{ statusText(row) }}</StatusTag>
+          </template>
+          <template #next="{ row }">{{ nextStep(row) }}</template>
+          <template #actions="{ row }">
+            <RouterLink class="eds-button eds-button-text" :to="`/award-result/${encodeURIComponent(row.id)}`">{{ isSupplierResultView ? "查看结果" : "定标审查" }}</RouterLink>
+          </template>
+        </DataTable>
+        <PaginationBar :total="filteredProjects.length" />
+      </EnterpriseSurface>
+
+      <EnterpriseSurface class="g-hotel-compliance-card" title="定标合规审查">
+        <template v-if="activeAwardProject">
+          <p class="eds-meta">{{ activeAwardProject.code || activeAwardProject.id }} / {{ activeAwardProject.name }}</p>
+          <div class="g-hotel-compliance-list">
+            <article>
+              <span aria-hidden="true">✓</span>
+              <strong>专家评分偏离度正常</strong>
+              <small>复核综合评分、评审意见和异常低分说明。</small>
+            </article>
+            <article>
+              <span aria-hidden="true">✓</span>
+              <strong>中标价未突破预算</strong>
+              <small>预算金额 {{ currency(activeAwardProject.budgetAmount) }}，需结合详情页审批记录确认。</small>
+            </article>
+            <article>
+              <span aria-hidden="true">✓</span>
+              <strong>有效响应供应商满足要求</strong>
+              <small>确认供应商资格、报价锁定和评审记录完整。</small>
+            </article>
+          </div>
+          <RouterLink class="eds-button eds-button-primary" :to="`/award-result/${encodeURIComponent(activeAwardProject.id)}`">进入定标审查</RouterLink>
         </template>
-        <template #department="{ row }">{{ row.requestDepartment || "-" }}</template>
-        <template #status="{ row }">
-          <StatusTag :tone="statusTone(row)">{{ statusText(row) }}</StatusTag>
-        </template>
-        <template #budget="{ row }">{{ currency(row.budgetAmount) }}</template>
-        <template #next="{ row }">{{ nextStep(row) }}</template>
-        <template #actions="{ row }">
-          <RouterLink class="eds-button eds-button-text" :to="`/award-result/${encodeURIComponent(row.id)}`">{{ isSupplierResultView ? "查看结果" : "进入定标" }}</RouterLink>
-        </template>
-      </DataTable>
-      <PaginationBar :total="filteredProjects.length" />
-    </EnterpriseSurface>
+        <p v-else class="eds-meta">点击左侧列表查看合规审查详情。</p>
+      </EnterpriseSurface>
+    </div>
   </section>
 </template>
 

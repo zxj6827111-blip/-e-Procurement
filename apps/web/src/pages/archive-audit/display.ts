@@ -11,15 +11,15 @@ export const ARCHIVE_ITEM_COLUMNS: DataTableColumn[] = [
 
 export const SUPPLEMENT_COLUMNS: DataTableColumn[] = [
   { key: "request", label: "申请编号" },
-  { key: "archiveItem", label: "档案项" },
-  { key: "reason", label: "原因" },
+  { key: "archiveItem", label: "档案材料" },
+  { key: "reason", label: "补档原因" },
   { key: "approvalStatus", label: "审批状态" }
 ];
 
 export const AUDIT_COLUMNS: DataTableColumn[] = [
-  { key: "action", label: "动作" },
-  { key: "objectType", label: "对象" },
-  { key: "result", label: "结果" },
+  { key: "action", label: "审计动作" },
+  { key: "objectType", label: "业务对象" },
+  { key: "result", label: "处理结果" },
   { key: "createdAt", label: "时间" }
 ];
 

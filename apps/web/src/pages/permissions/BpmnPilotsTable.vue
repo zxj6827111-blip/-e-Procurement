@@ -10,7 +10,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="规则试点" description="按组织、环境和业务对象控制业务灰度范围。">
+  <EnterpriseSurface class="g-hotel-table-card" title="规则试点" description="按组织、环境和业务对象控制业务灰度范围。">
     <DataTable :columns="bpmnPilotColumns" :rows="rows" row-key="id" empty-text="暂无 规则试点">
       <template #businessType="{ row }">{{ businessTypeText(row.businessType) }}</template>
       <template #mode="{ row }"><StatusTag>{{ labelStatus(row.mode) }}</StatusTag></template>

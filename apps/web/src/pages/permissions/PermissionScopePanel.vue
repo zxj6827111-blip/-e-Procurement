@@ -19,7 +19,7 @@ const matrixRows = computed(() => {
 </script>
 
 <template>
-  <EnterpriseSurface title="角色权限矩阵" description="当前登录角色的菜单授权与动作授权由后端策略返回，前端只做可视化呈现。">
+  <EnterpriseSurface class="g-hotel-table-card" title="角色权限矩阵" description="当前登录角色的菜单授权与动作授权由后端策略返回，前端只做可视化呈现。">
     <div class="eds-permission-matrix-summary">
       <article>
         <span>菜单范围</span>

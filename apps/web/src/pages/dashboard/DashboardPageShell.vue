@@ -10,6 +10,7 @@ import type { DataTableColumn, SummaryCardItem } from "../../components/base";
 import DashboardActivitySection from "./DashboardActivitySection.vue";
 import DashboardMetricsSection from "./DashboardMetricsSection.vue";
 import DashboardQuickActionSection from "./DashboardQuickActionSection.vue";
+import DashboardSmartRiskPanel from "./DashboardSmartRiskPanel.vue";
 import DashboardTimelineSection from "./DashboardTimelineSection.vue";
 import DashboardTodoSection from "./DashboardTodoSection.vue";
 import {
@@ -36,6 +37,14 @@ import { loadWorkflowNotifications, loadWorkflowTasks, type R8WorkflowNotificati
 import { roleTemplate } from "../../permissions/role-model";
 
 type TimelineState = "done" | "current" | "pending";
+type DashboardRiskItem = {
+  id: string;
+  type: string;
+  description: string;
+  time: string;
+  tone: "high" | "medium";
+  to: string;
+};
 
 const session = useSessionStore();
 const health = ref("检查中");
@@ -85,7 +94,7 @@ function buildTimelineStages(status: string) {
 const roleTitle = computed(() => resolveRoleTitle(session.roleId));
 const landingTemplate = computed(() => roleTemplate(session.roleId));
 const roleWorkbench = computed(() => getRoleWorkbench(session.roleId));
-const quickActions = computed(() => roleWorkbench.value.primaryActions.slice(0, 4));
+const quickActions = computed(() => roleWorkbench.value.primaryActions.slice(0, 6));
 const focusItems = computed(() => roleWorkbench.value.todayFocus.slice(0, 5));
 
 const pendingProcurementRequestCount = computed(() => {
@@ -302,20 +311,113 @@ const summaryItems = computed<SummaryCardItem[]>(() =>
   }))
 );
 
+const gHotelDashboardKpis = computed<SummaryCardItem[]>(() => {
+  const quoteDeadlineCount = projects.value.filter((item) => ["document_published", "registration_open", "bidding_open"].includes(item.status)).length;
+  const reviewCount = projects.value.filter((item) => ["expert_reviewing", "review_report_frozen", "award_approving"].includes(item.status)).length;
+  const abnormalCount = orders.value.filter((item) => ["return_requested", "return_rejected", "partial"].includes(item.status)).length;
+  return [
+    { label: "我的待办事项", value: `${todoItems.value.length} 项`, tone: "green" },
+    { label: "今日截止报价项目", value: `${quoteDeadlineCount} 个`, meta: "需密切关注", tone: "amber" },
+    { label: "待评审/定标项目", value: `${reviewCount} 个`, tone: "blue" },
+    { label: "异常履约/违约告警", value: `${abnormalCount} 起`, meta: abnormalCount ? "立即处理" : "", tone: "red" }
+  ];
+});
+
+const gHotelTodoColumns: DataTableColumn[] = [
+  { key: "status", label: "状态" },
+  { key: "title", label: "任务名称" },
+  { key: "code", label: "关联项目编号" },
+  { key: "deadline", label: "截止时间" },
+  { key: "action", label: "操作" }
+];
+
+const gHotelTodoItems = computed<DashboardTodoItem[]>(() =>
+  todoItems.value.slice(0, 5).map((item, index) => ({
+    ...item,
+    code: item.code ?? item.meta ?? `TASK-${String(index + 1).padStart(2, "0")}`,
+    deadline: item.deadline ?? item.due ?? "按阶段推进"
+  }))
+);
+
+const dashboardUpdatedAt = computed(() => {
+  const candidates = [
+    ...projects.value.map((item) => item.updatedAt),
+    ...orders.value.map((item) => item.createdAt),
+    ...auditLogs.value.map((item) => item.createdAt),
+    ...workflowTasks.value.map((item) => item.updatedAt),
+    ...workflowMessages.value.map((item) => item.updatedAt)
+  ].filter(Boolean) as string[];
+  const latest = candidates.sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0];
+  return latest ? formatDateTime(latest) : "暂无业务更新";
+});
+
+const dashboardRiskItems = computed<DashboardRiskItem[]>(() => {
+  const risks: DashboardRiskItem[] = [];
+  const deniedLog = auditLogs.value.find((item) => item.result === "denied");
+  if (deniedLog) {
+    risks.push({
+      id: `audit-${deniedLog.id}`,
+      type: "敏感操作异常",
+      description: `${labelAuditAction(deniedLog.action)} / ${labelObjectType(deniedLog.objectType)} 被系统拒绝，请审计核查。`,
+      time: deniedLog.createdAt ? formatDateTime(deniedLog.createdAt) : "最近",
+      tone: "high",
+      to: "/audit"
+    });
+  }
+
+  const riskySupplier = suppliers.value.find((item) => ["pending", "restricted", "suspended"].includes(item.admissionStatus ?? item.status) || Boolean(item.risk));
+  if (riskySupplier) {
+    risks.push({
+      id: `supplier-${riskySupplier.id}`,
+      type: "供应商准入风险",
+      description: `${riskySupplier.name} 当前状态为 ${labelStatus(riskySupplier.admissionStatus ?? riskySupplier.status)}，${riskySupplier.risk || "需跟进准入或资质材料"}。`,
+      time: "按供应商台账",
+      tone: "high",
+      to: "/suppliers"
+    });
+  }
+
+  const abnormalOrder = orders.value.find((item) => ["return_requested", "return_rejected", "partial"].includes(item.status));
+  if (abnormalOrder) {
+    risks.push({
+      id: `order-${abnormalOrder.id}`,
+      type: "履约验收异常",
+      description: `${abnormalOrder.orderNo} 当前状态为 ${labelStatus(abnormalOrder.status)}，涉及金额 ${money(abnormalOrder.totalAmount)}。`,
+      time: abnormalOrder.createdAt ? formatDateTime(abnormalOrder.createdAt) : "最近",
+      tone: "medium",
+      to: "/order-fulfillment"
+    });
+  }
+
+  const deadlineProject = projects.value.find((item) => isFormalProject(item) && ["document_published", "registration_open", "bidding_open"].includes(item.status));
+  if (deadlineProject) {
+    risks.push({
+      id: `project-${deadlineProject.id}`,
+      type: "招采时效提醒",
+      description: `${deadlineProject.name ?? deadlineProject.title ?? deadlineProject.id} 处于 ${labelStatus(deadlineProject.status)} 阶段，请关注公告、报名和报价截止节点。`,
+      time: deadlineProject.updatedAt ? formatDateTime(deadlineProject.updatedAt) : "按项目阶段",
+      tone: "medium",
+      to: "/project-workbench"
+    });
+  }
+
+  return risks.slice(0, 3);
+});
+
 const todoColumns = computed<DataTableColumn[]>(() => {
   if (["buyer", "platform_operator"].includes(session.roleId)) {
     return [
-      { key: "title", label: "项目 / 事项" },
+      { key: "title", label: "任务名称" },
       { key: "status", label: "当前阶段" },
-      { key: "due", label: "时限" },
+      { key: "due", label: "截止时间" },
       { key: "risk", label: "关注点" },
       { key: "action", label: "操作" }
     ];
   }
   return [
     { key: "status", label: "状态" },
-    { key: "title", label: "事项" },
-    { key: "meta", label: "业务信息" },
+    { key: "title", label: "任务名称" },
+    { key: "meta", label: "关联业务" },
     { key: "action", label: "操作" }
   ];
 });
@@ -327,7 +429,7 @@ const activityColumns: DataTableColumn[] = [
   { key: "action", label: "操作" }
 ];
 
-const todoItems = computed(() => {
+const todoItems = computed<DashboardTodoItem[]>(() => {
   if (session.roleId === "expert") {
     return expertTodoItems.value;
   }
@@ -556,7 +658,7 @@ watch(
 
 <template>
   <section class="eds-section">
-    <PageHeader :title="roleTitle" eyebrow="工作台" :description="roleWorkbench.description">
+    <PageHeader v-if="landingTemplate !== 'A'" :title="roleTitle" eyebrow="工作台" :description="roleWorkbench.description">
       <template #actions>
         <StatusTag :tone="health === '正常' ? 'success' : 'warning'">服务{{ health }}</StatusTag>
       </template>
@@ -565,22 +667,36 @@ watch(
     <FeedbackMessage v-if="loadError" tone="error">{{ loadError }}</FeedbackMessage>
 
     <template v-if="landingTemplate === 'A'">
-      <DashboardMetricsSection :items="summaryItems" />
+      <div class="g-hotel-dashboard">
+        <header class="g-hotel-dashboard-head">
+          <h2>工作台概览</h2>
+          <span>更新时间: {{ dashboardUpdatedAt }}</span>
+        </header>
 
-      <div class="eds-template-a-main-grid">
-        <div class="eds-template-a-flow">
-          <DashboardTodoSection
-            :items="todoItems"
-            :columns="todoColumns"
-            :entry-link="todoEntryLink"
-            :show-entry="true"
-            :empty-text="roleWorkbench.emptyTodoText"
-          />
+        <DashboardMetricsSection :items="gHotelDashboardKpis" />
 
-          <DashboardTimelineSection class="eds-template-a-timeline" :rows="timelineRows" />
+        <div class="g-hotel-dashboard-grid eds-template-a-main-grid">
+          <div class="g-hotel-dashboard-main eds-template-a-flow">
+            <DashboardTodoSection
+              :items="gHotelTodoItems"
+              :columns="gHotelTodoColumns"
+              :entry-link="{ label: '查看全部', to: todoEntryLink.to }"
+              :show-entry="true"
+              :empty-text="roleWorkbench.emptyTodoText"
+            />
+
+            <DashboardTimelineSection class="eds-template-a-timeline" :rows="timelineRows" />
+          </div>
+
+          <div class="g-hotel-dashboard-side">
+            <DashboardQuickActionSection
+              :actions="quickActions"
+              :risk-signals="[]"
+              :storage-key="`dashboard-quick-actions-${session.user?.id || session.roleId}`"
+            />
+            <DashboardSmartRiskPanel :risks="dashboardRiskItems" />
+          </div>
         </div>
-
-        <DashboardQuickActionSection :actions="quickActions" :risk-signals="roleWorkbench.riskSignals" />
       </div>
     </template>
 
@@ -618,7 +734,11 @@ watch(
 
     <div v-else-if="landingTemplate === 'C'" class="eds-template-c-shell">
       <div class="eds-template-c-hero">
-        <DashboardQuickActionSection :actions="quickActions" :risk-signals="roleWorkbench.riskSignals" />
+        <DashboardQuickActionSection
+          :actions="quickActions"
+          :risk-signals="roleWorkbench.riskSignals"
+          :storage-key="`dashboard-quick-actions-${session.user?.id || session.roleId}`"
+        />
 
         <EnterpriseSurface title="提交规则与时效" description="外部门户保持任务导向，只展示会影响提交、锁定与履约的关键上下文。">
           <div class="eds-ledger-strip">

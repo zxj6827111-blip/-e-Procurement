@@ -270,6 +270,7 @@ export function roleTemplate(roleId: string) {
 export function routeAllowed(path: string, roleId: string, mockAuthEnabled = false) {
   if (!hasRoleProfile(roleId)) return false;
   if (path === roleHome(roleId)) return true;
+  if (path === "/" && businessRoles.includes(roleId as RoleId)) return true;
   const rule = routeAccessRules.find((item) => item.test(path));
   if (rule) return (!rule.mockOnly || mockAuthEnabled) && rule.roles.includes(roleId);
   return visibleNavItems(roleId).some((item) => item.to === path);

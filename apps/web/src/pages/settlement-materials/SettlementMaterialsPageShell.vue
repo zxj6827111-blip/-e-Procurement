@@ -135,6 +135,7 @@ onMounted(load);
 </script>
 
 <template>
+  <section class="eds-section g-hotel-page g-hotel-settlement-page">
   <SettlementPageShell
     :loading="loading"
     :message="message"
@@ -179,5 +180,6 @@ onMounted(load);
 
     <SettlementReconciliationTable :rows="overview.reconciliationLines" :supplier-name="supplierName" :money="money" />
   </SettlementPageShell>
+  </section>
 </template>
 

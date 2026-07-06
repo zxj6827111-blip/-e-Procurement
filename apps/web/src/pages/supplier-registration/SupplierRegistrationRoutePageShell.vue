@@ -38,7 +38,7 @@ const {
 </script>
 
 <template>
-  <section class="eds-section">
+  <section class="eds-section g-hotel-page g-hotel-supplier-page">
     <SupplierRegistrationPageShell
       :can-review-registration="canReviewRegistration"
       :is-supplier-view="isSupplierView"

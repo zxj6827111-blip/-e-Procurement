@@ -60,11 +60,11 @@ const summaryItems = computed<SummaryCardItem[]>(() => [
 ]);
 
 const columns: DataTableColumn[] = [
-  { key: "project", label: "项目" },
-  { key: "department", label: "需求部门" },
-  { key: "type", label: "类型" },
-  { key: "status", label: "阶段" },
-  { key: "budget", label: "预算" },
+  { key: "project", label: "项目编号 / 名称" },
+  { key: "department", label: "组织与经办" },
+  { key: "type", label: "采购方式" },
+  { key: "status", label: "当前阶段" },
+  { key: "budget", label: "风险与预算" },
   { key: "actions", label: "操作" }
 ];
 
@@ -122,21 +122,25 @@ onMounted(loadProjects);
 <template>
   <section class="eds-section">
     <PageHeader
-      title="采购项目执行"
+      title="采购项目台账"
       eyebrow="项目工作台"
-      description="按项目进入执行详情，避免在同一页面混合项目列表、招采评审、履约结算和归档动作。"
-    />
+      description="查看和管理授权范围内的采购项目"
+    >
+      <template #actions>
+        <RouterLink class="eds-button eds-button-primary" to="/procurement-requests">新建项目</RouterLink>
+      </template>
+    </PageHeader>
 
     <FeedbackMessage v-if="error" tone="error">{{ error }}</FeedbackMessage>
 
-    <EnterpriseSurface title="项目阶段分布">
+    <EnterpriseSurface class="g-hotel-ledger-card" title="项目阶段分布">
       <SummaryCards :items="summaryItems" />
     </EnterpriseSurface>
 
-    <FilterBar>
+    <FilterBar class="g-hotel-filter-bar">
       <label>
         关键字
-        <input v-model="keyword" placeholder="项目编号、项目名称、需求部门" />
+        <input v-model="keyword" placeholder="搜索项目编号、名称或经办人" />
       </label>
       <label>
         阶段
@@ -152,18 +156,24 @@ onMounted(loadProjects);
       </label>
     </FilterBar>
 
-    <EnterpriseSurface title="项目执行台账">
+    <EnterpriseSurface class="g-hotel-table-card" title="采购项目台账">
       <DataTable :columns="columns" :rows="filteredProjects" row-key="id" empty-text="当前筛选条件下暂无项目">
         <template #project="{ row }">
           <strong>{{ projectName(row) }}</strong>
           <p class="eds-meta">{{ row.code || row.id }} / {{ row.category || "-" }}</p>
         </template>
-        <template #department="{ row }">{{ row.requestDepartment || "-" }}</template>
+        <template #department="{ row }">
+          <strong>{{ row.requestDepartment || "-" }}</strong>
+          <p class="eds-meta">{{ row.category || "采购经办范围" }}</p>
+        </template>
         <template #type="{ row }">{{ projectTypeText(row) }}</template>
         <template #status="{ row }">
           <StatusTag :tone="statusTone(row)">{{ statusText(row) }}</StatusTag>
         </template>
-        <template #budget="{ row }">{{ currency(row.budgetAmount) }}</template>
+        <template #budget="{ row }">
+          <strong>{{ currency(row.budgetAmount) }}</strong>
+          <p class="eds-meta">{{ row.externalTradeFlag ? "外部交易备案" : "内部采购流程" }}</p>
+        </template>
         <template #actions="{ row }">
           <RouterLink class="eds-button eds-button-text" :to="`/project-workbench/${encodeURIComponent(row.id)}`">进入详情</RouterLink>
         </template>

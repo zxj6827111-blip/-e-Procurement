@@ -2,18 +2,18 @@ import { formatDateTime } from "../../utils/status-labels";
 import type { IntegrationLog } from "./types";
 
 export const adapterColumns = [
-  { key: "key", label: "Key" },
-  { key: "name", label: "名称" },
-  { key: "mode", label: "模式" },
+  { key: "key", label: "适配器编号" },
+  { key: "name", label: "适配器名称" },
+  { key: "mode", label: "运行模式" },
   { key: "logs", label: "日志数" }
 ];
 
 export const jobColumns = [
-  { key: "job", label: "任务" },
-  { key: "key", label: "Adapter" },
+  { key: "job", label: "任务编号" },
+  { key: "key", label: "适配器" },
   { key: "operation", label: "操作" },
-  { key: "business", label: "业务" },
-  { key: "status", label: "状态" },
+  { key: "business", label: "业务对象" },
+  { key: "status", label: "任务状态" },
   { key: "request", label: "请求" },
   { key: "response", label: "响应 / 错误" },
   { key: "updatedAt", label: "更新时间" },

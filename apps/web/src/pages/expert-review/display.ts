@@ -20,7 +20,8 @@ export const assignmentColumns: DataTableColumn[] = [
   { key: "status", label: "状态" },
   { key: "avoidance", label: "回避确认" },
   { key: "discipline", label: "纪律确认" },
-  { key: "confidentiality", label: "保密承诺" }
+  { key: "confidentiality", label: "保密承诺" },
+  { key: "actions", label: "操作" }
 ];
 
 export const supplierScoreColumns: DataTableColumn[] = [

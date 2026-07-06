@@ -19,7 +19,7 @@ const emit = defineEmits<{
 
 <template>
   <div class="eds-stack">
-    <FormSection title="基础资料" description="供应商可维护自身基础信息；准入结论由集团采购侧评审后生成。">
+    <FormSection title="企业基础资料" description="供应商可维护自身基础信息；准入结论由集团采购侧评审后生成。">
       <label>供应商名称<input :value="profileForm.name" @input="profileForm.name = ($event.target as HTMLInputElement).value" /></label>
       <label>联系人<input :value="profileForm.contactName" @input="profileForm.contactName = ($event.target as HTMLInputElement).value" /></label>
       <label>联系电话<input :value="profileForm.contactPhone" @input="profileForm.contactPhone = ($event.target as HTMLInputElement).value" /></label>
@@ -50,7 +50,7 @@ const emit = defineEmits<{
       <EnterpriseButton type="primary" :disabled="profileSaving" @click="emit('saveProfile')">保存档案资料</EnterpriseButton>
     </SubmitPanel>
 
-    <EnterpriseSurface title="服务范围">
+    <EnterpriseSurface title="服务范围台账">
       <DataTable :columns="serviceColumns" :rows="serviceRows" row-key="id" empty-text="暂无服务范围">
         <template #status="{ row }">{{ labelStatus(row.status) }}</template>
       </DataTable>

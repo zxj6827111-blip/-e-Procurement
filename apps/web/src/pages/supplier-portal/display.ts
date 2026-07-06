@@ -2,7 +2,7 @@ import { formatDateTime, labelStatus } from "../../utils/status-labels";
 import type { Attachment, SealSample, Supplier, SupplierPortalProfileForm, SupplierPortalTab } from "./types";
 
 export const supplierPortalTabs: Array<{ key: SupplierPortalTab; label: string }> = [
-  { key: "profile", label: "档案资料" },
+  { key: "profile", label: "企业档案" },
   { key: "qualifications", label: "资质证照" },
   { key: "samples", label: "封样样品" },
   { key: "reviews", label: "准入记录" }

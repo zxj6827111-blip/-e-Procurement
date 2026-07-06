@@ -23,22 +23,20 @@ defineProps<{
 </script>
 
 <template>
-  <header class="eds-page-header eds-business-context">
-    <div class="eds-business-context-main">
-      <p class="eds-business-eyebrow">结算材料 / 批量审核</p>
-      <h2>结算与发票审核</h2>
-      <p>集中处理结算单、送货验收材料、发票核验和金额核对记录，强调批量审核与列表处理。</p>
+  <header class="g-hotel-page-header">
+    <div>
+      <p>结算材料 / 批量审核</p>
+      <h2><span aria-hidden="true">结</span>结算材料</h2>
+      <small>集中处理结算单、送货验收材料、发票核验和金额核对记录。</small>
     </div>
-    <div class="eds-business-context-aside">
-      <span class="eds-meta">当前视图</span>
-      <strong>{{ loading ? "正在同步结算数据" : "批量审核与核对" }}</strong>
+    <div class="g-hotel-page-actions">
       <StatusTag v-if="loading" tone="warning">加载中</StatusTag>
       <StatusTag v-else tone="success">数据已同步</StatusTag>
     </div>
   </header>
 
   <div class="eds-process-hero">
-    <EnterpriseSurface title="审核快照" eyebrow="结算概览" description="不展示空洞大数字，只保留审核和流转判断所需信息。">
+    <EnterpriseSurface class="g-hotel-ledger-card" title="审核快照" eyebrow="结算概览" description="不展示空洞大数字，只保留审核和流转判断所需信息。">
       <SummaryCards :items="summaryItems" />
     </EnterpriseSurface>
 
@@ -72,8 +70,8 @@ defineProps<{
 
   <div class="eds-review-shell">
     <section class="eds-review-main">
-      <EnterpriseSurface title="审核范围" description="只展示当前角色权限范围内的结算材料与审核操作。">
-        <FilterBar>
+      <EnterpriseSurface class="g-hotel-ledger-card" title="审核范围" description="只展示当前角色权限范围内的结算材料与审核操作。">
+        <FilterBar class="g-hotel-filter-bar">
           <label>
             结算范围
             <select value="visible" disabled>

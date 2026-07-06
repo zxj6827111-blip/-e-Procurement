@@ -43,8 +43,24 @@ defineEmits<{
     <DataTable :columns="requestColumns" :rows="requests" empty-text="暂无采购申请">
       <template #request="{ row }">
         <div class="eds-table-primary-cell">
+          <strong>{{ row.code || row.id }}</strong>
+          <span>{{ row.title }}</span>
+          <RouterLink v-if="row.projectId" class="eds-action-link" :to="projectExecutionLink(row.projectId)">
+            {{ projectName(row.projectId) }}
+          </RouterLink>
+        </div>
+      </template>
+
+      <template #code="{ row }">
+        <div class="eds-table-primary-cell">
+          <strong>{{ row.code || row.id }}</strong>
+          <span>{{ row.id }}</span>
+        </div>
+      </template>
+
+      <template #title="{ row }">
+        <div class="eds-table-primary-cell">
           <strong>{{ row.title }}</strong>
-          <span>{{ row.code || row.id }}</span>
           <RouterLink v-if="row.projectId" class="eds-action-link" :to="projectExecutionLink(row.projectId)">
             {{ projectName(row.projectId) }}
           </RouterLink>
@@ -53,8 +69,15 @@ defineEmits<{
 
       <template #owner="{ row }">
         <div class="eds-stack-tight">
-          <span>{{ row.requestDepartment || "-" }} / {{ row.requesterName || "-" }}</span>
-          <span class="eds-table-muted">{{ labelStatus(row.methodSuggestion) }}</span>
+          <strong>{{ row.requestDepartment || "-" }}</strong>
+          <span class="eds-table-muted">{{ row.requesterName || "-" }} / {{ labelStatus(row.methodSuggestion) }}</span>
+        </div>
+      </template>
+
+      <template #department="{ row }">
+        <div class="eds-stack-tight">
+          <strong>{{ row.requestDepartment || "-" }}</strong>
+          <span class="eds-table-muted">{{ row.requesterName || "-" }}</span>
         </div>
       </template>
 
@@ -71,6 +94,13 @@ defineEmits<{
         <div class="eds-stack-tight">
           <strong>{{ money(row.budgetAmount) }}</strong>
           <span class="eds-table-muted">附件 {{ row.attachments?.length ?? 0 }} 份</span>
+        </div>
+      </template>
+
+      <template #date="{ row }">
+        <div class="eds-stack-tight">
+          <strong>{{ row.createdAt ? row.createdAt.slice(0, 10) : "-" }}</strong>
+          <span class="eds-table-muted">{{ row.updatedAt ? `更新 ${row.updatedAt.slice(0, 10)}` : labelStatus(row.methodSuggestion) }}</span>
         </div>
       </template>
 

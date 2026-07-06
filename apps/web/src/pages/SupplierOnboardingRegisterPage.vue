@@ -1,7 +1,7 @@
-﻿<script setup lang="ts">
-import SupplierOnboardingRegisterPageContainer from "./supplier-onboarding-register/SupplierOnboardingRegisterPageContainer.vue";
+<script setup lang="ts">
+import GeminiStandaloneViewBridge from "../gemini-react/GeminiStandaloneViewBridge.vue";
 </script>
 
 <template>
-  <SupplierOnboardingRegisterPageContainer />
+  <GeminiStandaloneViewBridge view="SUPPLIER_ONBOARDING" />
 </template>

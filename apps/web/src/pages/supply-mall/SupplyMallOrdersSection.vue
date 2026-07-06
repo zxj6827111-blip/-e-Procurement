@@ -71,7 +71,7 @@ const emit = defineEmits<{
     </label>
   </FormSection>
 
-  <EnterpriseSurface title="最近订单">
+  <EnterpriseSurface title="订单与复购台账">
     <DataTable :columns="orderColumns" :rows="recentOrders" empty-text="暂无订单。">
       <template #supplier="{ row }">{{ orderSupplierName(row) }}</template>
       <template #status="{ row }"><StatusTag>{{ labelStatus(row.status) }}</StatusTag></template>

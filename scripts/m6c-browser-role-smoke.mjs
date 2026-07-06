@@ -145,6 +145,10 @@ async function withTimeout(label, promise, timeoutMs = 30000) {
   }
 }
 
+function isIgnorableExternalAsset(url) {
+  return url.startsWith("https://fonts.googleapis.com/") || url.startsWith("https://fonts.gstatic.com/");
+}
+
 async function captureRole(browser, role) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
   const page = await context.newPage();
@@ -156,6 +160,7 @@ async function captureRole(browser, role) {
     }
   });
   page.on("requestfailed", (request) => {
+    if (isIgnorableExternalAsset(request.url())) return;
     failedRequests.push({ url: request.url(), failure: request.failure()?.errorText ?? "request failed" });
   });
 

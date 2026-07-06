@@ -22,7 +22,7 @@ const {
 </script>
 
 <template>
-  <section class="eds-section">
+  <section class="eds-section g-hotel-page g-hotel-message-page">
     <MessageCenterPageShell :loading="loading" :summary-items="summaryItems" />
 
     <div class="eds-process-shell">
@@ -42,7 +42,7 @@ const {
       </section>
 
       <aside class="eds-panel-stack">
-        <EnterpriseSurface title="当前处理边界" description="本页只做消息分流和已读管理，不在这里替代真实业务流。">
+        <EnterpriseSurface class="g-hotel-compliance-card" title="当前处理边界" description="本页只做消息分流和已读管理，不在这里替代真实业务流。">
           <p class="eds-meta">当前可见消息：{{ filteredMessages.length }}</p>
           <p class="eds-meta">如果仍有未读消息，建议先按业务类型收窄范围，再做批量已读。</p>
         </EnterpriseSurface>

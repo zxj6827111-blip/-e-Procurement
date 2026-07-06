@@ -155,9 +155,9 @@ addCheck(
 addCheck(
   checks,
   "login:compact-role-selector",
-  textIncludes("apps/web/src/pages/login/DemoAccountTable.vue", ["eds-role-select-panel", "<select"]) &&
-    !readText("apps/web/src/pages/login/DemoAccountTable.vue").includes("<DataTable"),
-  "Mock role switching uses a compact selector instead of a tall test table."
+  textIncludes("apps/web/src/pages/login/LoginPageShell.vue", ["g-hotel-role-accounts", "data-user-id"]) &&
+    !readText("apps/web/src/pages/login/LoginPageShell.vue").includes("<DataTable"),
+  "Local role quick entry uses compact account chips instead of a tall test table."
 );
 
 for (const component of [
@@ -195,17 +195,21 @@ addCheck(
 
 addCheck(
   checks,
-  "dashboard:template-routing",
+  "dashboard:gemini-workbench-routing",
   textIncludes("apps/web/src/pages/dashboard/DashboardPageShell.vue", [
     "landingTemplate",
+    "g-hotel-dashboard",
+    "gHotelDashboardKpis",
+    "gHotelTodoColumns",
     "eds-template-a-main-grid",
     "eds-template-a-flow",
     "eds-template-b-shell",
     "eds-template-c-shell",
     "eds-template-d-shell",
-    "DashboardTimelineSection"
+    "DashboardTimelineSection",
+    "DashboardSmartRiskPanel"
   ]) && !readText("apps/web/src/pages/dashboard/DashboardPageShell.vue").includes("DashboardRoleWorkbenchSection"),
-  "Dashboard routes through A/B/C/D templates instead of one shared workbench layout."
+  "Dashboard preserves role templates while rendering the Gemini G-Hotel workbench structure for template A."
 );
 
 addCheck(
@@ -241,15 +245,18 @@ addCheck(
 addCheck(
   checks,
   "bidding:portal-shell",
-  textIncludes("apps/web/src/pages/bidding/BiddingPageShell.vue", ["eds-business-context", "SummaryCards", "BIDDING_ENTRY_HINT"]),
+  textIncludes("apps/web/src/pages/bidding/BiddingPageShell.vue", ["g-hotel-page-header", "项目报价响应", "SummaryCards"]) &&
+    textIncludes("apps/web/src/pages/bidding/BiddingRoutePageShell.vue", ["g-hotel-bidding-page", "g-hotel-quote-response"]) &&
+    textIncludes("apps/web/src/pages/bidding/BiddingActionPanel.vue", ["提交并锁定报价"]),
   "Supplier bidding exposes a portal-style context shell instead of a generic dashboard card."
 );
 
 addCheck(
   checks,
   "expert:avoidance-gate",
-  textIncludes("apps/web/src/pages/expert-scoring/ExpertScoringRoutePageShell.vue", ["EnterpriseDialog", "showAvoidanceDialog", "confirmAll"]) &&
-    textIncludes("apps/web/src/pages/expert-scoring/ExpertScoringPageShell.vue", ["eds-business-context", "TaskInboxSummary", "SummaryCards"]),
+  textIncludes("apps/web/src/pages/expert-scoring/ExpertScoringRoutePageShell.vue", ["@view-materials=\"viewMaterials\"", "confirmAll"]) &&
+    textIncludes("apps/web/src/pages/expert-scoring/ExpertScoringPageShell.vue", ["g-hotel-scoring-header", "viewMaterials", "printSheet"]) &&
+    textIncludes("apps/web/src/pages/expert-scoring/ExpertConfirmationPanel.vue", ["g-hotel-recusal-card", "confirmAll"]),
   "Expert scoring forces avoidance confirmation before entering the scoring flow."
 );
 

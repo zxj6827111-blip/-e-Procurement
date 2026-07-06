@@ -9,24 +9,20 @@ defineProps<{
 </script>
 
 <template>
-  <header class="eds-page-header eds-business-context">
-    <div class="eds-business-context-main">
-      <p class="eds-business-eyebrow">业务通知 / 消息分发</p>
-      <h2>消息中心</h2>
-      <p>查看审批、任务和业务活动提醒，并按业务对象直接进入对应处理页，减少通知与动作脱节。</p>
+  <header class="g-hotel-page-header">
+    <div>
+      <p>业务通知 / 消息分发</p>
+      <h2><span aria-hidden="true">信</span>消息中心</h2>
+      <small>查看系统通知、业务提醒与待办消息。</small>
     </div>
-    <div class="eds-business-context-aside">
-      <span class="eds-meta">当前模式</span>
-      <strong>消息分流</strong>
-      <div class="eds-actions">
-        <StatusTag v-if="loading" tone="warning">加载中</StatusTag>
-        <RouterLink class="eds-action-link" to="/my-tasks">待办中心 <span>→</span></RouterLink>
-      </div>
+    <div class="g-hotel-page-actions">
+      <StatusTag v-if="loading" tone="warning">加载中</StatusTag>
+      <RouterLink class="eds-action-link" to="/my-tasks">待办中心 <span>→</span></RouterLink>
     </div>
   </header>
 
   <div class="eds-process-hero">
-    <EnterpriseSurface title="通知到达概览" eyebrow="版式 B / 列表与分发" description="按当前角色权限汇总未读、已读和业务类型消息，帮助用户先分流再处理。">
+    <EnterpriseSurface class="g-hotel-ledger-card" title="通知分发概览" eyebrow="列表与分发" description="按当前角色权限汇总未读、已读和业务类型消息，帮助用户先分流再处理。">
       <SummaryCards :items="summaryItems" />
     </EnterpriseSurface>
 

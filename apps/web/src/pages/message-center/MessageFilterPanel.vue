@@ -19,7 +19,7 @@ defineEmits<{
 </script>
 
 <template>
-  <FilterBar>
+  <FilterBar class="g-hotel-filter-bar">
     <label>
       已读状态
       <select v-model="readFilter">
@@ -33,6 +33,6 @@ defineEmits<{
         <option v-for="item in businessTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
       </select>
     </label>
-    <EnterpriseButton :disabled="!hasUnreadVisible || Boolean(busyMessageId)" @click="$emit('markAllVisibleRead')">当前列表全部已读</EnterpriseButton>
+    <EnterpriseButton :disabled="!hasUnreadVisible || Boolean(busyMessageId)" @click="$emit('markAllVisibleRead')">全部标记已读</EnterpriseButton>
   </FilterBar>
 </template>

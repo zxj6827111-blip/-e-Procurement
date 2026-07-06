@@ -17,30 +17,28 @@ export const LISTING_OPERATOR_ROLES = ["group_manager", "buyer", "platform_opera
 export const PRODUCT_LISTING_STEPS = ["供应商维护商品", "平台关联来源", "生成/选择定价报告", "平台上架", "酒店采购下单"];
 
 export const PRODUCT_COLUMNS: DataTableColumn[] = [
-  { key: "name", label: "商品" },
-  { key: "supplier", label: "供应商" },
-  { key: "price", label: "价格" },
-  { key: "source", label: "来源/定价" },
-  { key: "delivery", label: "交期" },
-  { key: "status", label: "状态" },
-  { key: "quantity", label: "数量" },
+  { key: "name", label: "商品编号 / 商品名称" },
+  { key: "category", label: "分类" },
+  { key: "unit", label: "单位" },
+  { key: "price", label: "参考价" },
+  { key: "status", label: "上架状态" },
   { key: "actions", label: "操作" }
 ];
 
 export const ORDER_COLUMNS: DataTableColumn[] = [
-  { key: "orderNo", label: "订单号" },
-  { key: "supplier", label: "供应商" },
-  { key: "status", label: "状态" },
-  { key: "amount", label: "金额" },
+  { key: "orderNo", label: "订单编号" },
+  { key: "supplier", label: "供应商名称" },
+  { key: "status", label: "订单状态" },
+  { key: "amount", label: "订单金额" },
   { key: "address", label: "收货地址" },
-  { key: "actions", label: "操作" }
+  { key: "actions", label: "处理" }
 ];
 
 export const TEMPLATE_COLUMNS: DataTableColumn[] = [
-  { key: "name", label: "采购包" },
-  { key: "type", label: "类型" },
-  { key: "summary", label: "配置" },
-  { key: "actions", label: "操作" }
+  { key: "name", label: "采购包名称" },
+  { key: "type", label: "适用类型" },
+  { key: "summary", label: "配置摘要" },
+  { key: "actions", label: "处理" }
 ];
 
 export function createProductForm(): ProductForm {

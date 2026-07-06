@@ -9,24 +9,20 @@ defineProps<{
 </script>
 
 <template>
-  <header class="eds-page-header eds-business-context">
-    <div class="eds-business-context-main">
-      <p class="eds-business-eyebrow">业务待办 / 批量处理</p>
-      <h2>待办中心</h2>
-      <p>集中处理当前岗位可办理的采购申请、供应商、评审、履约和结算事项，避免在多个业务页来回切换。</p>
+  <header class="g-hotel-page-header">
+    <div>
+      <p>业务待办 / 批量处理</p>
+      <h2><span aria-hidden="true">办</span>我的待办任务</h2>
+      <small>集中处理需要您确认、审批或执行的业务。</small>
     </div>
-    <div class="eds-business-context-aside">
-      <span class="eds-meta">当前模式</span>
-      <strong>列表处理</strong>
-      <div class="eds-actions">
-        <StatusTag v-if="loading" tone="warning">加载中</StatusTag>
-        <RouterLink class="eds-action-link" to="/messages">消息中心 <span>→</span></RouterLink>
-      </div>
+    <div class="g-hotel-page-actions">
+      <StatusTag v-if="loading" tone="warning">加载中</StatusTag>
+      <RouterLink class="eds-action-link" to="/messages">消息中心 <span>→</span></RouterLink>
     </div>
   </header>
 
   <div class="eds-process-hero">
-    <EnterpriseSurface title="待办处理概览" eyebrow="版式 B / 列表与处理" description="把可处理任务数量、状态分布和处理入口收成一层，不做空洞仪表盘。">
+    <EnterpriseSurface class="g-hotel-ledger-card" title="待办处理概览" eyebrow="列表与处理" description="把可处理任务数量、状态分布和处理入口收成一层，不做空洞仪表盘。">
       <SummaryCards :items="summaryItems" />
     </EnterpriseSurface>
 

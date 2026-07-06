@@ -49,11 +49,11 @@ const {
 </script>
 
 <template>
-  <section class="eds-section">
+  <section class="eds-section g-hotel-page g-hotel-bidding-page">
     <BiddingPageShell :selected-project="selectedProject" :selected-project-id="selectedProjectId" :summary-items="summaryItems" />
 
-    <div class="eds-template-c-quotation-shell">
-      <section class="eds-quotation-requirement-band">
+    <div class="eds-template-c-quotation-shell g-hotel-quote-response">
+      <section class="eds-quotation-requirement-band g-hotel-quote-requirement">
         <BiddingListPanel
           :bids="bids"
           :project-label="projectLabel"
@@ -69,7 +69,7 @@ const {
         />
       </section>
 
-      <section class="eds-quotation-submit-band">
+      <section class="eds-quotation-submit-band g-hotel-quote-submit">
         <BiddingDraftPanel
           v-model:selected-project-id="selectedProjectId"
           v-model:amount="amount"

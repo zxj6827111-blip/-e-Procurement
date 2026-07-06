@@ -10,7 +10,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface v-if="canMaintainFunds" title="资金操作参数" description="用于登记充值、确认付款和释放占用时写入资金流水备注。">
+  <EnterpriseSurface v-if="canMaintainFunds" class="eds-drawer-panel" title="付款操作区" description="用于登记充值、确认付款和释放占用时写入资金流水备注。">
     <div class="eds-form-section">
       <label>
         充值金额

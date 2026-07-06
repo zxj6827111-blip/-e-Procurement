@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRouter } from "vue-router";
-import { EnterpriseSurface, EnterpriseTabs, FeedbackMessage, PageHeader, StatusTag, SummaryCards, type SummaryCardItem } from "../../components/base";
+import { EnterpriseSurface, EnterpriseTabs, FeedbackMessage, StatusTag, SummaryCards, type SummaryCardItem } from "../../components/base";
 import type { MallNavigationItem, MallSection } from "./types";
 
 const props = defineProps<{
@@ -35,20 +35,25 @@ function changeSection(key: string) {
 </script>
 
 <template>
-  <PageHeader title="酒店物资采购目录" eyebrow="商品目录" description="按供应商、来源、价格和上架状态查看可采购商品，并处理下单、复购、商品维护和定价上架。">
-    <template #actions>
+  <header class="g-hotel-page-header">
+    <div>
+      <p>商品目录 / 集采目录与下单</p>
+      <h2><span aria-hidden="true">商</span>商品采购目录</h2>
+      <small>按供应商、来源、价格和上架状态查看可采购商品，并处理下单、复购、商品维护和定价上架。</small>
+    </div>
+    <div class="g-hotel-page-actions">
       <StatusTag v-if="canMaintainProductCatalog && !currentSupplierId" tone="error">缺少供应商归属</StatusTag>
       <StatusTag v-else-if="canMaintainProductCatalog" tone="primary">供应商维护</StatusTag>
       <StatusTag v-else-if="listingOperatorVisible" tone="warning">平台定价上架</StatusTag>
       <StatusTag v-else>采购目录</StatusTag>
-    </template>
-  </PageHeader>
+    </div>
+  </header>
 
-  <EnterpriseSurface>
+  <EnterpriseSurface class="g-hotel-ledger-card">
     <SummaryCards :items="summaryItems" />
   </EnterpriseSurface>
 
-  <EnterpriseSurface v-if="mallRoleHint || (canMaintainProductCatalog && !listingOperatorVisible)">
+  <EnterpriseSurface v-if="mallRoleHint || (canMaintainProductCatalog && !listingOperatorVisible)" class="g-hotel-ledger-card">
     <FeedbackMessage v-if="mallRoleHint">{{ mallRoleHint }}</FeedbackMessage>
     <div v-if="canMaintainProductCatalog && !listingOperatorVisible" class="eds-stack-tight">
       <strong>商品上架规则</strong>
@@ -61,11 +66,11 @@ function changeSection(key: string) {
     </div>
   </EnterpriseSurface>
 
-  <EnterpriseSurface title="目录操作分区" description="商品目录、订单、采购包、供应商维护和平台定价按角色分开处理。">
-    <EnterpriseTabs :tabs="navigationTabs" :active-key="routeSection" @change="changeSection" />
+  <EnterpriseSurface class="g-hotel-table-card" title="目录业务分区" description="商品目录、订单复购、采购包、供应商维护和平台定价按角色分开处理。">
+    <EnterpriseTabs class="g-hotel-project-tabs" :tabs="navigationTabs" :active-key="routeSection" @change="changeSection" />
   </EnterpriseSurface>
 
-  <EnterpriseSurface v-if="!sectionVisible" title="当前角色不可办理该业务" description="请从本角色可办理的商品目录、订单、采购包、商品维护或定价上架入口进入。">
+  <EnterpriseSurface v-if="!sectionVisible" title="当前角色不可办理该业务" description="请从本角色可办理的商品目录、订单复购、采购包、商品维护或定价上架入口进入。">
     <p class="eds-meta">当前账号不承担该业务区职责，系统不会展示跨角色操作表单。</p>
   </EnterpriseSurface>
 

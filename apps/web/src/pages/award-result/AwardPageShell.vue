@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { EnterpriseSurface, EnterpriseTabs, PageHeader, StatusTag, SummaryCards, type SummaryCardItem } from "../../components/base";
+import { EnterpriseSurface, EnterpriseTabs, StatusTag, SummaryCards, type SummaryCardItem } from "../../components/base";
 import type { AwardProjectOption } from "./types";
 
 const props = defineProps<{
@@ -28,19 +28,20 @@ const detailTabs = [
 </script>
 
 <template>
-  <PageHeader
-    :title="isSupplierResultView ? '中标结果与后续工作' : '定标审批与结果通知'"
-    eyebrow="评审定标"
-    :description="isSupplierResultView ? '查看采购方发送给本供应商的结果通知、合同确认和价格报告。' : '基于评标记录完成定标审批、结果通知、价格报告、合同和商品上架。'"
-  >
-    <template #actions>
+  <header class="g-hotel-page-header">
+    <div>
+      <p>评审定标 / 结果通知</p>
+      <h2><span aria-hidden="true">结</span>{{ isSupplierResultView ? "中标结果与后续工作" : "定标审批与结果通知" }}</h2>
+      <small>{{ isSupplierResultView ? "查看采购方发送给本供应商的结果通知、合同确认和价格报告。" : "基于评标记录完成定标审批、结果通知、价格报告、合同和商品上架。" }}</small>
+    </div>
+    <div class="g-hotel-page-actions">
       <StatusTag v-if="projectHasApprovedAward" tone="success">定标已通过</StatusTag>
       <StatusTag v-else-if="canApproveAward" tone="warning">集团审批视角</StatusTag>
       <StatusTag v-else tone="warning">待定标</StatusTag>
-    </template>
-  </PageHeader>
+    </div>
+  </header>
 
-  <EnterpriseSurface title="项目选择" description="定标和结果通知均以项目为边界。">
+  <EnterpriseSurface class="g-hotel-ledger-card" title="项目选择" description="定标和结果通知均以项目为边界。">
     <div class="eds-form-section">
       <label>
         项目
@@ -54,9 +55,9 @@ const detailTabs = [
     </div>
   </EnterpriseSurface>
 
-  <EnterpriseTabs :tabs="detailTabs" active-key="details" />
+  <EnterpriseTabs class="g-hotel-project-tabs" :tabs="detailTabs" active-key="details" />
 
-  <EnterpriseSurface :title="isSupplierResultView ? '我的结果概览' : '定标执行概览'" description="汇总当前项目的审批、通知、报告、合同和商品状态。">
+  <EnterpriseSurface class="g-hotel-ledger-card" :title="isSupplierResultView ? '我的结果概览' : '定标执行概览'" description="汇总当前项目的审批、通知、报告、合同和商品状态。">
     <SummaryCards :items="summaryItems" />
   </EnterpriseSurface>
 </template>

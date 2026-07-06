@@ -24,7 +24,7 @@ const {
 </script>
 
 <template>
-  <section class="eds-section">
+  <section class="eds-section g-hotel-page g-hotel-tasks-page">
     <MyTasksPageShell :loading="loading" :summary-items="summaryItems" />
 
     <div class="eds-process-shell">
@@ -43,7 +43,7 @@ const {
       </section>
 
       <aside class="eds-panel-stack">
-        <EnterpriseSurface title="当前处理边界" description="本页强调按筛选条件批量处理，不在这里重复业务详情录入。">
+        <EnterpriseSurface class="g-hotel-compliance-card" title="当前处理边界" description="本页强调按筛选条件批量处理，不在这里重复业务详情录入。">
           <p class="eds-meta">当前可见任务：{{ filteredTasks.length }}</p>
           <p class="eds-meta">填写处理意见后再执行审批类动作，方便后续审计追踪。</p>
         </EnterpriseSurface>

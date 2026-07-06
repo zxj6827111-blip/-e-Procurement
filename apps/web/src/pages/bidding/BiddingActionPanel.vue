@@ -20,7 +20,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="报价单操作" description="选择已有报价单后，可更新草稿、提交、撤回或重新提交。">
+  <EnterpriseSurface class="g-hotel-table-card" title="报价单操作" description="选择已有报价单后，可更新草稿、提交、撤回或重新提交。">
     <div class="eds-form-section">
       <label>
         报价单
@@ -35,8 +35,8 @@ const emit = defineEmits<{
       </label>
     </div>
     <SubmitPanel>
-      <EnterpriseButton :disabled="!selectedBidId" @click="emit('updateDraft')">更新草稿</EnterpriseButton>
-      <EnterpriseButton type="primary" :disabled="!selectedBidId" @click="emit('submitBid')">提交报价</EnterpriseButton>
+      <EnterpriseButton :disabled="!selectedBidId" @click="emit('updateDraft')">暂存草稿</EnterpriseButton>
+      <EnterpriseButton type="primary" :disabled="!selectedBidId" @click="emit('submitBid')">提交并锁定报价</EnterpriseButton>
       <EnterpriseButton :disabled="!selectedBidId" @click="emit('withdrawBid')">撤回</EnterpriseButton>
       <EnterpriseButton :disabled="!selectedBidId" @click="emit('resubmitBid')">重新提交</EnterpriseButton>
     </SubmitPanel>

@@ -30,6 +30,12 @@ const supplierQuotationUsers = new Map([
   ["sup-3", "u17"]
 ]);
 
+const supplierAdminUsers = new Map([
+  ["sup-1", "u11"],
+  ["sup-2", "u14"],
+  ["sup-3", "u16"]
+]);
+
 const roleIdByUserId = {
   u1: "group_manager",
   u2: "buyer",
@@ -102,6 +108,13 @@ function sameItems(left, right) {
   return left.length === right.length && left.every((item, index) => item === right[index]);
 }
 
+const geminiExpectedNavByRole = {
+  buyer: ["工作台", "我的待办", "消息中心", "采购申请", "采购项目", "采购文件", "公告与邀请", "商品目录", "评审定标", "定标审批", "订单履约", "档案审计"],
+  platform_operator: ["工作台", "我的待办", "消息中心", "采购申请", "采购项目", "商品目录", "评审定标", "评分模板", "定标审批", "订单履约", "档案审计"],
+  group_manager: ["工作台", "我的待办", "消息中心", "审批规则", "需求审批", "采购项目", "采购文件", "公告与邀请", "报价进度", "评审定标", "评分模板", "定标审批", "供应商管理", "商品目录", "档案审计"],
+  auditor: ["工作台", "我的待办", "消息中心", "审批规则", "档案审计", "采购监督", "定标监督", "供应商监督", "操作日志", "集成配置"]
+};
+
 function jsonHeaders(userId) {
   return {
     "content-type": "application/json",
@@ -143,8 +156,13 @@ function activeCategoryAuthorization(supplier) {
 async function selectSupplierQuotationActor() {
   const { suppliers } = await getAs(actors.groupManager, "/api/suppliers");
   const candidates = suppliers
-    .map((supplier) => ({ supplier, authorization: activeCategoryAuthorization(supplier), userId: supplierQuotationUsers.get(supplier.id) }))
-    .filter(({ supplier, authorization, userId }) => {
+    .map((supplier) => ({
+      supplier,
+      authorization: activeCategoryAuthorization(supplier),
+      userId: supplierQuotationUsers.get(supplier.id),
+      adminUserId: supplierAdminUsers.get(supplier.id)
+    }))
+    .filter(({ supplier, authorization, userId, adminUserId }) => {
       const admissionStatus = supplier.admissionStatus ?? (supplier.status === "限制名单" ? "restricted" : "admitted");
       const riskText = String(supplier.risk ?? "");
       return (
@@ -154,18 +172,20 @@ async function selectSupplierQuotationActor() {
         !riskText.includes("限制") &&
         !riskText.includes("黑名单") &&
         authorization &&
-        userId
+        userId &&
+        adminUserId
       );
     });
   if (candidates.length === 0) {
     throw new Error("未找到具备有效品类授权和报价账号的供应商，无法执行端到端报价流。");
   }
-  const { supplier, authorization, userId } = candidates[0];
+  const { supplier, authorization, userId, adminUserId } = candidates[0];
   return {
     supplierId: supplier.id,
     supplierName: supplier.name,
     category: authorization.category,
-    actor: { label: `供应商报价(${supplier.id})`, userId }
+    actor: { label: `供应商报价(${supplier.id})`, userId },
+    adminActor: { label: `供应商管理员(${supplier.id})`, userId: adminUserId }
   };
 }
 
@@ -327,8 +347,129 @@ async function runApiFlow() {
   });
   trace.push("集团审批:定标审批通过");
 
+  const signing = await postAs(actors.buyer, `/api/projects/${projectId}/contracts/signing`, undefined, 201);
+  const contractId = signing.contract.id;
+  trace.push("buyer:start contract signing");
+
+  const generatedOrder = await postAs(
+    actors.buyer,
+    `/api/project-workbench/projects/${projectId}/purchase-orders/generate`,
+    {
+      contractId,
+      orderNo: `PO-FLOW-${suffix}`,
+      expectedDeliveryAt: "2026-07-22",
+      receivingLocation: "Shanghai hotel warehouse"
+    },
+    201
+  );
+  const orderId = generatedOrder.purchaseOrder.id;
+  trace.push("buyer:generate purchase order");
+
   await postAs(actors.buyer, `/api/projects/${projectId}/result-notifications`, { scope: "supplier_self", visibilityConfig: "supplier_self_only" }, 201);
-  trace.push("采购经办:发送中标结果");
+  trace.push("buyer:send award result notification");
+
+  await postAs(selectedSupplier.adminActor, `/api/contracts/${contractId}/confirm`, {
+    attachmentMetadata: [{ fileName: `contract-confirm-${suffix}.pdf`, fileType: "application/pdf" }]
+  });
+  trace.push("supplier:confirm contract");
+
+  const performanceNode = await postAs(
+    actors.buyer,
+    `/api/contracts/${contractId}/performance-nodes`,
+    { nodeName: "delivery acceptance", planDate: "2026-07-22" },
+    201
+  );
+  await postAs(actors.buyer, `/api/performance-nodes/${performanceNode.performanceNode.id}/status`, {
+    status: "completed",
+    acceptanceRecord: "accepted",
+    paymentRecord: "pending settlement"
+  });
+  await postAs(
+    actors.buyer,
+    `/api/contracts/${contractId}/acceptance-payments`,
+    {
+      recordType: "acceptance",
+      amount: 118000,
+      summary: "contract acceptance record"
+    },
+    201
+  );
+  trace.push("buyer:record contract performance");
+
+  await postAs(actors.buyer, `/api/projects/${projectId}/award-products/auto-list`, undefined, 201);
+  trace.push("buyer:auto-list awarded products");
+
+  await postAs(selectedSupplier.adminActor, `/api/project-workbench/purchase-orders/${orderId}/confirm`);
+  trace.push("supplier:confirm purchase order");
+
+  const orderLineItems = Array.isArray(generatedOrder.purchaseOrder.lineItems) ? generatedOrder.purchaseOrder.lineItems : [];
+  await postAs(
+    actors.buyer,
+    `/api/project-workbench/purchase-orders/${orderId}/receipts`,
+    {
+      receiptType: "full",
+      summary: "full receipt accepted",
+      receivedItems: orderLineItems.map((item) => ({
+        itemName: item.itemName,
+        receivedQuantity: item.quantity,
+        unit: item.unit,
+        accepted: true
+      }))
+    },
+    201
+  );
+  trace.push("buyer:record full receipt");
+
+  const uploadedSettlementFile = await postAs(
+    selectedSupplier.adminActor,
+    "/api/files/upload",
+    {
+      originalName: `settlement-${suffix}.txt`,
+      contentType: "text/plain",
+      contentBase64: Buffer.from(`settlement-${projectId}`, "utf8").toString("base64"),
+      attachmentKind: "settlement_material",
+      objectType: "settlement_material",
+      objectId: `${orderId}-settlement`,
+      projectId,
+      supplierId: selectedSupplier.supplierId
+    },
+    201
+  );
+  const settlement = await postAs(
+    selectedSupplier.adminActor,
+    `/api/project-workbench/purchase-orders/${orderId}/settlement-materials`,
+    { materialType: "invoice", storedFileId: uploadedSettlementFile.file.id },
+    201
+  );
+  const settlementMaterialId = settlement.settlementMaterial.id;
+  trace.push("supplier:submit settlement material");
+
+  await postAs(actors.buyer, `/api/project-workbench/settlement-materials/${settlementMaterialId}/verify`, {
+    approved: true,
+    verificationOpinion: "settlement material verified"
+  });
+  trace.push("buyer:verify settlement material");
+
+  await postAs(
+    actors.buyer,
+    `/api/project-workbench/purchase-orders/${orderId}/evaluations`,
+    {
+      dimensions: {
+        quality: 94,
+        delivery: 93,
+        service: 92,
+        cooperation: 95,
+        priceReasonableness: 91
+      },
+      description: "supplier performance meets expectations"
+    },
+    201
+  );
+  trace.push("buyer:submit fulfillment evaluation");
+
+  await postAs(actors.buyer, `/api/projects/${projectId}/archive-check`);
+  await postAs(actors.buyer, `/api/projects/${projectId}/archive-seal`);
+  trace.push("buyer:archive check and seal");
 
   return {
     requestId,
@@ -336,9 +477,13 @@ async function runApiFlow() {
     projectId,
     projectName,
     awardId,
+    contractId,
+    orderId,
+    settlementMaterialId,
     supplierId: selectedSupplier.supplierId,
     supplierName: selectedSupplier.supplierName,
     supplierQuotationUserId: selectedSupplier.actor.userId,
+    supplierAdminUserId: selectedSupplier.adminActor.userId,
     category: selectedSupplier.category,
     trace
   };
@@ -404,14 +549,17 @@ async function checkRoleMenu(browser, roleModel) {
     const page = await context.newPage();
     await applyUser(page, role.userId);
     await page.goto(`${webBaseUrl}${role.path}`, { waitUntil: "commit", timeout: 15000 });
-    await page.waitForSelector(".enterprise-shell", { timeout: 10000 });
+    await page.waitForSelector('[data-ui-check~="shell"], .enterprise-shell', { timeout: 10000 });
     await openAccountMenu(page);
-    const navLabels = await page.locator(".enterprise-nav-label").allInnerTexts();
-    const expectedNav = roleModel.visibleNavItems(role.roleId).map((item) => item.label);
-    const bellVisible = (await page.locator('.enterprise-bell-button[aria-label="消息中心"]').count()) > 0;
+    const geminiShellVisible = (await page.locator('[data-ui-check~="shell"]').count()) > 0;
+    const navLabels = (await page.locator('[data-ui-check~="nav-item"], .enterprise-nav-label').allInnerTexts())
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const expectedNav = geminiExpectedNavByRole[role.roleId] ?? roleModel.visibleNavItems(role.roleId).map((item) => item.label);
+    const bellVisible = (await page.locator('[data-ui-check~="bell-button"], .enterprise-bell-button[aria-label="消息中心"]').count()) > 0;
     const expectedBell = roleModel.roleHasMessageBell(role.roleId);
     const accountSecurityVisible = (await page.locator('.enterprise-account-popover a[href="/account-security"]').count()) > 0;
-    const expectedAccountSecurity = roleModel.visibleUtilityItems(role.roleId).some((item) => item.to === "/account-security");
+    const expectedAccountSecurity = geminiShellVisible ? false : roleModel.visibleUtilityItems(role.roleId).some((item) => item.to === "/account-security");
     const direct = role.directForbiddenPath ? await checkForbiddenRoute(page, role.directForbiddenPath) : null;
     const result = {
       label: role.label,
@@ -459,13 +607,18 @@ async function checkFlowPages(browser, flow) {
     { userId: "u1", label: "集团需求审批详情", path: `/procurement-requests/${encodeURIComponent(flow.requestId)}`, requiredText: "需求" },
     { userId: "u2", label: "采购项目执行详情", path: `/project-workbench/${encodeURIComponent(flow.projectId)}`, requiredText: flow.projectName },
     { userId: "u2", label: "招采执行详情", path: `/project-workbench/${encodeURIComponent(flow.projectId)}/sourcing`, requiredText: "招采" },
+    { userId: "u2", label: "采购项目履约详情", path: `/project-workbench/${encodeURIComponent(flow.projectId)}/fulfillment`, requiredText: "履约" },
     { userId: "u2", label: "消息中心", path: "/messages", requiredText: "消息中心" },
     { userId: "u2", label: "账号安全", path: "/account-security", requiredText: "账号安全" },
     { userId: flow.supplierQuotationUserId, label: "供应商报名页", path: "/supplier-registration", requiredText: "报名" },
     { userId: flow.supplierQuotationUserId, label: "供应商报价页", path: "/bidding", requiredText: "报价" },
+    { userId: flow.supplierAdminUserId, label: "供应商订单履约", path: "/order-fulfillment", requiredText: "履约" },
+    { userId: flow.supplierAdminUserId, label: "供应商结算材料", path: "/settlement-materials", requiredText: "结算" },
+    { userId: "u13", label: "财务结算审核", path: "/settlement-materials", requiredText: "结算" },
     { userId: "u7", label: "专家评分页", path: "/expert-scoring", requiredText: "评分" },
     { userId: "u2", label: "采购经办定标详情", path: `/award-result/${encodeURIComponent(flow.projectId)}`, requiredText: "定标" },
-    { userId: flow.supplierQuotationUserId, label: "供应商中标结果", path: `/award-result/${encodeURIComponent(flow.projectId)}`, requiredText: "结果" }
+    { userId: flow.supplierQuotationUserId, label: "供应商中标结果", path: `/award-result/${encodeURIComponent(flow.projectId)}`, requiredText: "结果" },
+    { userId: "u2", label: "采购经办档案审计", path: "/archive-audit", requiredText: "档案" }
   ];
   const checks = [];
   for (const item of pages) {
@@ -481,15 +634,22 @@ async function checkFlowPages(browser, flow) {
     });
     await applyUser(page, item.userId);
     await page.goto(`${webBaseUrl}${item.path}`, { waitUntil: "commit", timeout: 15000 });
+    await page.waitForSelector('[data-ui-check~="shell"], .enterprise-shell, .eds-state-error, body', { timeout: 10000 }).catch(() => undefined);
+    await page
+      .waitForFunction((requiredText) => document.body?.innerText?.includes(String(requiredText)), item.requiredText, { timeout: 10000 })
+      .catch(() => undefined);
     const text = await bodyText(page);
     const finalPath = new URL(page.url()).pathname;
+    const geminiShellVisible = (await page.locator('[data-ui-check~="shell"]').count()) > 0;
+    const legacyShellVisible = (await page.locator(".enterprise-shell").count()) > 0;
+    const renderMode = geminiShellVisible ? "gemini" : legacyShellVisible ? "legacy-vue" : "unknown";
     const blocked = text.includes("请先登录") || text.includes("无权") || text.includes("加载失败");
     const pathLoaded = finalPath === item.path;
     const contentLoaded = text.includes(item.requiredText);
     const passed = pathLoaded && contentLoaded && !blocked && consoleErrors.length === 0 && httpErrors.length === 0;
     await page.screenshot({ path: join(outDir, `flow-${item.userId}-${item.label.replace(/[^\u4e00-\u9fa5A-Za-z0-9]+/g, "-")}.png`), fullPage: true });
     await context.close();
-    checks.push({ ...item, finalPath, passed, pathLoaded, contentLoaded, blocked, consoleErrors, httpErrors });
+    checks.push({ ...item, finalPath, renderMode, passed, pathLoaded, contentLoaded, blocked, consoleErrors, httpErrors });
   }
   return checks;
 }

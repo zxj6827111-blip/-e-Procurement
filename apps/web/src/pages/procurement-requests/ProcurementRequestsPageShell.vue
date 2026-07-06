@@ -171,22 +171,22 @@ onMounted(async () => {
       </section>
 
       <aside class="eds-template-b-rail">
-        <EnterpriseSurface title="列表处理规则" description="按状态、审批节点和承接条件批量处理，不从仪表盘跳转。">
+        <EnterpriseSurface title="审批操作区" description="点击左侧台账中的可处理动作，按当前节点完成审批、方式判定或项目承接。">
           <div class="eds-workflow-rule-list">
             <article>
               <span>01</span>
-              <strong>先处理待审批</strong>
-              <p>集团角色先确认需求必要性，避免后续项目承接无依据。</p>
+              <strong>先核验附件与预算</strong>
+              <p>确认需求申请表、预算凭证和采购必要性，再给出审批意见。</p>
             </article>
             <article>
               <span>02</span>
-              <strong>再判定采购方式</strong>
-              <p>采购经办只在审批通过后选择规则，保持流程可追溯。</p>
+              <strong>再处理当前节点</strong>
+              <p>集团审批、采购方式判定和项目承接均只展示给有权限的角色。</p>
             </article>
             <article>
               <span>03</span>
-              <strong>最后承接项目</strong>
-              <p>只有方式已判定且未生成项目时，才允许创建采购项目。</p>
+              <strong>最后留痕归档</strong>
+              <p>所有通过、驳回、方式判定和项目创建动作都会进入审计流水。</p>
             </article>
           </div>
         </EnterpriseSurface>

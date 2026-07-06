@@ -70,6 +70,8 @@ export interface DashboardTodoItem {
   meta: string;
   status: string;
   to: string;
+  code?: string;
+  deadline?: string;
   due?: string;
   risk?: string;
 }

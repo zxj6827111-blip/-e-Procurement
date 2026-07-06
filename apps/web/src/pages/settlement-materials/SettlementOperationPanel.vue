@@ -31,7 +31,7 @@ function materialTypeLabel(value: SettlementOperationForm["materialType"]) {
 </script>
 
 <template>
-  <EnterpriseSurface title="结算操作参数" eyebrow="审核参数" description="设置审核意见和补充材料类型，下方各表格中的处理动作会复用这些参数。">
+  <EnterpriseSurface class="eds-drawer-panel g-hotel-compliance-card" title="结算审核操作区" eyebrow="审核参数" description="设置审核意见和补充材料类型，下方各表格中的处理动作会复用这些参数。">
     <div class="eds-process-reference">
       <article class="eds-process-reference-item">
         <span>补充材料类型</span>

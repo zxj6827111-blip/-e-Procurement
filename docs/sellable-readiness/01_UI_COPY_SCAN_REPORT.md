@@ -1,11 +1,11 @@
 # Sprint 1 UI Copy Scan
 
-- Generated at: 2026-07-06T00:05:45.705Z
+- Generated at: 2026-07-06T12:59:58.365Z
 - Scope: apps/web/src visible Vue copy and apps/api/src user-facing string literals.
 - Result: PASS
 - Blockers: 0
-- Warnings: 7
-- Informational findings: 41
+- Warnings: 8
+- Informational findings: 44
 
 | Severity | Term | Location | Text |
 | --- | --- | --- | --- |
@@ -45,7 +45,11 @@
 | INFO | 本地模拟 | apps/api/src/seed/data.ts:3391 | 本地模拟资金账户台账：完成余额、充值、授信、支付占用、退款/冲正留痕；未连接真实支付、银行、授信或财务系统。 |
 | INFO | R8/Process/BPMN display | apps/api/src/services/bpmn-pilot-service.ts:261 | BPMN_PILOT_VALIDATION_FAILED |
 | INFO | R8/Process/BPMN display | apps/api/src/services/bpmn-pilot-service.ts:297 | BPMN_PILOT_SIMULATION_FAILED |
-| WARN | 治理 | apps/web/src/pages/approval-rules/ApprovalRulesPageShell.vue:18 | 系统治理 |
+| INFO | AI/智能 | apps/web/src/gemini-react/prototype/views/ExpertRatingView.tsx:30 | 杭州绿谷智能系统 |
+| INFO | 演示 | apps/web/src/gemini-react/prototype/views/LoginView.tsx:54 | 账号不存在，请使用演示账号 |
+| INFO | 演示 | apps/web/src/gemini-react/prototype/views/LoginView.tsx:59 | 密码错误，演示密码统一为 123456 |
+| WARN | 治理 | apps/web/src/pages/approval-rules/ApprovalRulesPageShell.vue:20 | 系统治理 / 审批规则 |
+| WARN | AI/智能 | apps/web/src/pages/dashboard/DashboardSmartRiskPanel.vue:23 | AI 智能风控预警 |
 | WARN | 治理 | apps/web/src/pages/file-center/FileCenterPageShell.vue:12 | 附件治理 |
 | WARN | 治理 | apps/web/src/pages/permissions/BpmnDefinitionsTable.vue:13 | 规则版本以版本号、校验状态和签名摘要作为治理字段。 |
 | WARN | 治理 | apps/web/src/pages/permissions/BpmnPilotGovernanceLogsTable.vue:13 | 展示最近的规则变更、执行角色和治理说明。 |
@@ -53,7 +57,7 @@
 | INFO | 治理 | apps/web/src/pages/permissions/display.ts:16 | 规则版本治理 |
 | INFO | 治理 | apps/web/src/pages/permissions/display.ts:93 | 版本治理 |
 | WARN | 治理 | apps/web/src/pages/procurement-documents/ProcurementDocumentsPageShell.vue:24 | 采购准备 / 文件治理 |
-| WARN | 治理 | apps/web/src/pages/supplier-management/SupplierActionPanel.vue:66 | 这里保存的基础信息、资质附件会同步到集团供应商治理页，用于资质初审和准入评审。 |
+| WARN | 治理 | apps/web/src/pages/supplier-management/SupplierActionPanel.vue:74 | 这里保存的基础信息、资质附件会同步到集团供应商治理页，用于资质初审和准入评审。 |
 | INFO | Mock customer message | apps/web/src/router/page-classification.ts:30 | Mock role switch is a controlled system form. |
 | INFO | R8/Process/BPMN display | apps/web/src/utils/status-labels.ts:72 | 影子试点 |
 | INFO | 本地模拟 | apps/web/src/utils/status-labels.ts:73 | 模拟异常 |

@@ -41,7 +41,7 @@ const {
 </script>
 
 <template>
-  <section class="eds-section">
+  <section class="eds-section g-hotel-page g-hotel-archive-page">
     <ArchiveAuditPageShell :can-maintain-archive="canMaintainArchive" :loading="loading" :summary-items="summaryItems" />
 
     <TaskInboxSummary title="档案补档审批与消息" :business-types="['archive_supplement']" compact />

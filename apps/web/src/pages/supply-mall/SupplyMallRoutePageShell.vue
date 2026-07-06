@@ -76,6 +76,7 @@ const {
 } = useSupplyMallPage();
 </script>
 <template>
+  <section class="eds-section g-hotel-page g-hotel-mall-page">
   <SupplyMallPageShell
     :summary-items="summaryItems"
     :sections="mallSections"
@@ -167,6 +168,7 @@ const {
     @apply-selected-pricing-report="applySelectedPricingReport"
     @submit-price-and-list="submitPriceAndList"
   />
+  </section>
 </template>
 
 

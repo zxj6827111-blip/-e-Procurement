@@ -19,7 +19,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <FormSection title="供应商商品维护" description="维护商品基础资料。缺少供应商归属的账号不能创建或更新商品。">
+  <FormSection class="g-hotel-form-card" title="商品信息" description="维护商品基础资料。缺少供应商归属的账号不能创建或更新商品。">
     <label>
       商品名称
       <input v-model="productForm.name" />
@@ -98,7 +98,7 @@ const emit = defineEmits<{
     </label>
   </FormSection>
 
-  <SubmitPanel>
+  <SubmitPanel class="g-hotel-sticky-actions">
     <StatusTag v-if="productImageName">{{ productImageName }}</StatusTag>
     <StatusTag v-else>未选择商品图片</StatusTag>
     <EnterpriseButton v-if="!editingProductId" type="primary" :disabled="!currentSupplierId" @click="emit('createProduct')">新建商品</EnterpriseButton>

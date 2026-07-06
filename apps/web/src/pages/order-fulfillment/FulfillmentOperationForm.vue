@@ -8,7 +8,7 @@ const mallShipmentForm = defineModel<MallShipmentForm>("mallShipmentForm", { req
 </script>
 
 <template>
-  <FormSection title="履约操作参数" description="选择本次操作需要使用的收货、异常和发货参数，再到下方订单表执行动作。">
+  <FormSection title="履约操作参数" description="先设置本次收货、异常或发货参数，再到下方订单表格执行对应动作。">
     <label>
       招采收货类型
       <select v-model="procurementReceiptForm.receiptType">
@@ -37,7 +37,7 @@ const mallShipmentForm = defineModel<MallShipmentForm>("mallShipmentForm", { req
     </label>
     <label>
       招采收货明细
-      <textarea v-model="procurementReceiptForm.receivedItems" rows="3" placeholder="物资名|数量|单位|是"></textarea>
+      <textarea v-model="procurementReceiptForm.receivedItems" rows="3" placeholder="物资名称|数量|单位|是"></textarea>
     </label>
     <label>
       商城收货类型
@@ -63,7 +63,7 @@ const mallShipmentForm = defineModel<MallShipmentForm>("mallShipmentForm", { req
     </label>
     <label>
       商城收货明细
-      <textarea v-model="mallReceiptForm.receivedItems" rows="3" placeholder="商品名|数量|单位|是"></textarea>
+      <textarea v-model="mallReceiptForm.receivedItems" rows="3" placeholder="商品名称|数量|单位|是"></textarea>
     </label>
     <label>
       承运商

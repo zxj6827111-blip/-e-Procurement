@@ -35,7 +35,7 @@ const {
 </script>
 
 <template>
-  <section class="eds-section">
+  <section class="eds-section g-hotel-page g-hotel-template-page">
     <ScoringTemplatesPageShell :can-maintain="canMaintain" :summary-items="summaryItems" @reset-form="resetForm" />
 
     <ScoringTemplateListPanel

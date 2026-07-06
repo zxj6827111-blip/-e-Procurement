@@ -1,13 +1,13 @@
 import type { DataTableColumn } from "../../components/base";
 
 export const ANNOUNCEMENT_COLUMNS: DataTableColumn[] = [
+  { key: "type", label: "编号 / 类型" },
   { key: "title", label: "公告标题" },
-  { key: "document", label: "采购文件" },
-  { key: "methodScope", label: "方式 / 范围" },
+  { key: "project", label: "关联项目" },
+  { key: "date", label: "日期" },
+  { key: "methodScope", label: "类型 / 范围" },
   { key: "status", label: "状态" },
-  { key: "registrationDeadline", label: "报名截止" },
-  { key: "quoteDeadline", label: "报价截止" },
-  { key: "published", label: "发布状态" }
+  { key: "actions", label: "操作" }
 ];
 
 export const INVITATION_COLUMNS: DataTableColumn[] = [

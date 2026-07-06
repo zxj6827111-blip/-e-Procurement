@@ -20,8 +20,12 @@ defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="结算单台账" description="先判断结算单状态，再决定是补资料、提交审核还是直接进入财务复核。">
+  <EnterpriseSurface class="g-hotel-table-card" title="结算单处理台账" description="先判断结算单状态，再决定是补资料、提交审核还是进入财务复核。">
     <DataTable :columns="billColumns" :rows="bills" empty-mode="compact" empty-text="当前角色暂无可见结算单。">
+      <template #billNo="{ row }">
+        <strong>{{ row.billNo }}</strong>
+        <small class="eds-meta">{{ row.period || "-" }}</small>
+      </template>
       <template #supplier="{ row }">{{ supplierName(row.supplierId) }}</template>
       <template #orderAmount="{ row }">{{ money(row.orderAmount) }}</template>
       <template #deductions="{ row }">{{ money(row.returnAmount + row.serviceFee) }}</template>

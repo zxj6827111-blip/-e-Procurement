@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
 import path, { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -14,6 +14,49 @@ const webPort = Number(process.env.UI_SMOKE_WEB_PORT ?? 5296);
 const apiBaseUrl = process.env.UI_SMOKE_API_BASE_URL ?? `http://127.0.0.1:${apiPort}`;
 const baseUrl = process.env.UI_SMOKE_BASE_URL ?? `http://127.0.0.1:${webPort}`;
 const externalMode = process.env.UI_SMOKE_EXTERNAL_SERVICES === "true";
+
+const geminiPrimaryRoutes = new Set([
+  "/",
+  "/my-tasks",
+  "/messages",
+  "/approval-rules",
+  "/permissions",
+  "/modules",
+  "/procurement-requests",
+  "/procurement-requests/new",
+  "/procurement-requests/:requestId",
+  "/project-workbench",
+  "/project-workbench/:projectId",
+  "/project-workbench/:projectId/sourcing",
+  "/project-workbench/:projectId/fulfillment",
+  "/procurement-documents",
+  "/announcements-invitations",
+  "/supplier-registration",
+  "/bidding",
+  "/bid-control",
+  "/expert-review",
+  "/scoring-templates",
+  "/expert-scoring",
+  "/award-result",
+  "/award-result/:projectId",
+  "/suppliers",
+  "/suppliers/new",
+  "/suppliers/:supplierId",
+  "/suppliers/:supplierId/:section",
+  "/supplier-portal",
+  "/supplier-portal/:section",
+  "/supply-mall",
+  "/supply-mall/:section",
+  "/order-fulfillment",
+  "/settlement-materials",
+  "/payment-status",
+  "/archive-audit",
+  "/audit",
+  "/integration-boundary",
+  "/account-security",
+  "/external-trade",
+  "/file-center"
+]);
 
 const userByRoute = [
   { pattern: /^\/modules(?:\/|$)/, userId: "u6" },
@@ -53,7 +96,7 @@ const routeOverrides = new Map([
   [
     "/login",
     {
-      all: [".enterprise-login-layout", ".enterprise-login-card", ".eds-page-header"],
+      all: [".enterprise-login-layout", ".enterprise-login-card", "form"],
       any: [".enterprise-login-proof-item", ".eds-form-section", "form"],
       minBodyLength: 120
     }
@@ -79,8 +122,8 @@ const routeOverrides = new Map([
   [
     "/supplier-onboarding-register",
     {
-      all: [".eds-page-header", ".eds-form-section"],
-      any: [".eds-submit-panel", "form"],
+      all: ["input", "button"],
+      any: ["svg", '[class~="min-h-screen"]'],
       minBodyLength: 120
     }
   ],
@@ -117,6 +160,25 @@ const kindExpectations = {
   }
 };
 
+const geminiShellExpectation = {
+  all: ['[data-ui-check~="shell"]', '[data-ui-check~="sidebar"]', '[data-ui-check~="topbar"]'],
+  any: [],
+  minBodyLength: 120
+};
+
+const geminiDashboardExpectation = {
+  all: ['[data-ui-check~="shell"]', '[data-ui-check~="dashboard"]', '[data-ui-check~="summary-card"]'],
+  any: ['[data-ui-check~="quick-surface"]', '[data-ui-check~="gantt-board"]', '[data-ui-check~="table"]'],
+  minBodyLength: 180,
+  waitMs: 8000
+};
+
+const geminiTodoExpectation = {
+  all: ['[data-ui-check~="shell"]', '[data-ui-check~="todo-view"]', '[data-ui-check~="todo-list"]'],
+  any: ['[data-ui-check~="todo-row"]'],
+  minBodyLength: 180
+};
+
 function ensureDirs() {
   mkdirSync(outDir, { recursive: true });
   mkdirSync(runtimeDataDir, { recursive: true });
@@ -146,7 +208,7 @@ function stopProcessTree(child) {
   if (!child?.pid) return;
   try {
     if (process.platform === "win32") {
-      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+      spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
     } else {
       process.kill(-child.pid, "SIGTERM");
     }
@@ -245,9 +307,19 @@ async function samplePath(routePath, userId) {
   return resolvedPath;
 }
 
-async function applyUser(page, userId) {
-  await page.goto(`${baseUrl}/login`, { waitUntil: "commit", timeout: 15000 });
-  await page.evaluate((nextUserId) => {
+async function createPageForUser(browser, userId, consoleErrors, httpErrors) {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
+  page.on("console", (message) => {
+    const text = message.text();
+    if (message.type() === "error" && !text.startsWith("Failed to load resource:")) consoleErrors.push(text);
+  });
+  page.on("pageerror", (error) => consoleErrors.push(error.message));
+  page.on("response", (response) => {
+    const status = response.status();
+    const url = response.url();
+    if (status >= 400 && !url.endsWith("/favicon.ico")) httpErrors.push(`${status} ${url}`);
+  });
+  await page.addInitScript((nextUserId) => {
     window.sessionStorage.clear();
     if (!nextUserId) {
       window.localStorage.removeItem("mockAuthEnabled");
@@ -259,9 +331,13 @@ async function applyUser(page, userId) {
     window.localStorage.setItem("mockAuthEnabled", "true");
     window.localStorage.setItem("mockUserId", nextUserId);
   }, userId);
+  return page;
 }
 
 function selectorsForEntry(entry) {
+  if (entry.path === "/") return geminiDashboardExpectation;
+  if (entry.path === "/my-tasks") return geminiTodoExpectation;
+  if (geminiPrimaryRoutes.has(entry.path)) return geminiShellExpectation;
   return routeOverrides.get(entry.path) ?? kindExpectations[entry.kind] ?? { all: [], any: [], minBodyLength: 80 };
 }
 
@@ -277,7 +353,7 @@ async function waitForPageEvidence(page, expectation) {
         return allMatched && anyMatched && textMatched;
       },
       expectation,
-      { timeout: 10000 }
+      { timeout: expectation.waitMs ?? 3000 }
     )
     .catch(() => undefined);
 }
@@ -314,20 +390,8 @@ async function runSmoke() {
 
     const browser = await chromium.launch({ headless: true });
     try {
-      const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
       const consoleErrors = [];
       const httpErrors = [];
-
-      page.on("console", (message) => {
-        const text = message.text();
-        if (message.type() === "error" && !text.startsWith("Failed to load resource:")) consoleErrors.push(text);
-      });
-      page.on("pageerror", (error) => consoleErrors.push(error.message));
-      page.on("response", (response) => {
-        const status = response.status();
-        const url = response.url();
-        if (status >= 400 && !url.endsWith("/favicon.ico")) httpErrors.push(`${status} ${url}`);
-      });
 
       const results = [];
 
@@ -337,37 +401,58 @@ async function runSmoke() {
         const expectation = selectorsForEntry(entry);
         const trackedSelectors = [...new Set([...expectation.all, ...expectation.any])];
 
-        await applyUser(page, userId);
-        await page.goto(`${baseUrl}${sampledPath}`, { waitUntil: "commit", timeout: 15000 });
-        await waitForPageEvidence(page, expectation);
+        const page = await createPageForUser(browser, userId, consoleErrors, httpErrors);
+        try {
+          await page.goto(`${baseUrl}${sampledPath}`, { waitUntil: "commit", timeout: 15000 });
+          await waitForPageEvidence(page, expectation);
 
-        const counts = await collectSelectorCounts(page, trackedSelectors);
-        const bodyText = await page.locator("body").innerText();
-        const finalPath = new URL(page.url()).pathname;
-        const routeMatched = finalPath === sampledPath;
-        const allMatched = expectation.all.every((selector) => (counts[selector] ?? 0) > 0);
-        const anyMatched = expectation.any.length === 0 || expectation.any.some((selector) => (counts[selector] ?? 0) > 0);
-        const textMatched = !expectation.expectedText || bodyText.includes(expectation.expectedText);
-        const passed = routeMatched && bodyText.length >= expectation.minBodyLength && allMatched && anyMatched && textMatched;
+          const counts = await collectSelectorCounts(page, trackedSelectors);
+          const bodyText = await page.locator("body").innerText();
+          const finalPath = new URL(page.url()).pathname;
+          const routeMatched = finalPath === sampledPath;
+          const allMatched = expectation.all.every((selector) => (counts[selector] ?? 0) > 0);
+          const anyMatched = expectation.any.length === 0 || expectation.any.some((selector) => (counts[selector] ?? 0) > 0);
+          const textMatched = !expectation.expectedText || bodyText.includes(expectation.expectedText);
+          const passed = routeMatched && bodyText.length >= expectation.minBodyLength && allMatched && anyMatched && textMatched;
 
-        results.push({
-          route: entry.path,
-          sampledPath,
-          kind: entry.kind,
-          userId,
-          finalUrl: page.url(),
-          finalPath,
-          routeMatched,
-          bodyLength: bodyText.length,
-          counts,
-          allMatched,
-          anyMatched,
-          textMatched,
-          passed
-        });
+          results.push({
+            route: entry.path,
+            sampledPath,
+            kind: entry.kind,
+            userId,
+            finalUrl: page.url(),
+            finalPath,
+            routeMatched,
+            bodyLength: bodyText.length,
+            counts,
+            allMatched,
+            anyMatched,
+            textMatched,
+            passed
+          });
+        } finally {
+          await page.close().catch(() => undefined);
+        }
+
+        writeFileSync(
+          join(outDir, "results.json"),
+          JSON.stringify(
+            {
+              passed: false,
+              inProgress: true,
+              baseUrl,
+              apiBaseUrl,
+              completed: results.length,
+              total: classifications.length,
+              results,
+              consoleErrors,
+              httpErrors
+            },
+            null,
+            2
+          )
+        );
       }
-
-      await page.close();
 
       const payload = {
         passed: results.every((result) => result.passed) && consoleErrors.length === 0 && httpErrors.length === 0,

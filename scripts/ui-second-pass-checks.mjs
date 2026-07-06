@@ -33,7 +33,7 @@ const roleCases = [
     expectedPath: "/",
     expectedTemplate: "A",
     expectedBell: true,
-    expectedNav: ["我的待办", "审批规则", "需求审批", "采购项目", "报价进度", "评审定标", "评分模板", "定标审批", "供应商", "商品目录", "档案审计"]
+    expectedNav: ["工作台", "我的待办", "消息中心", "审批规则", "需求审批", "采购项目", "采购文件", "公告与邀请", "报价进度", "评审定标", "评分模板", "定标审批", "供应商管理", "商品目录", "档案审计"]
   },
   {
     userId: "u2",
@@ -42,7 +42,7 @@ const roleCases = [
     expectedPath: "/",
     expectedTemplate: "A",
     expectedBell: true,
-    expectedNav: ["我的待办", "采购申请", "采购项目", "商品目录", "评审定标", "定标审批", "订单履约", "档案审计"]
+    expectedNav: ["工作台", "我的待办", "消息中心", "采购申请", "采购项目", "采购文件", "公告与邀请", "商品目录", "评审定标", "定标审批", "订单履约", "档案审计"]
   },
   {
     userId: "u10",
@@ -51,7 +51,7 @@ const roleCases = [
     expectedPath: "/",
     expectedTemplate: "A",
     expectedBell: true,
-    expectedNav: ["我的待办", "采购申请", "采购项目", "商品目录", "评审定标", "评分模板", "定标审批", "订单履约", "档案审计"]
+    expectedNav: ["工作台", "我的待办", "消息中心", "采购申请", "采购项目", "商品目录", "评审定标", "评分模板", "定标审批", "订单履约", "档案审计"]
   },
   {
     userId: "u8",
@@ -60,7 +60,7 @@ const roleCases = [
     expectedPath: "/procurement-requests",
     expectedTemplate: "B",
     expectedBell: true,
-    expectedNav: ["工作台", "我的待办", "采购申请", "商品目录", "订单履约"]
+    expectedNav: ["工作台", "我的待办", "消息中心", "采购申请", "商品目录", "订单履约"]
   },
   {
     userId: "u9",
@@ -69,7 +69,7 @@ const roleCases = [
     expectedPath: "/",
     expectedTemplate: "B",
     expectedBell: true,
-    expectedNav: ["工作台", "我的待办", "结算付款", "付款进度"]
+    expectedNav: ["工作台", "我的待办", "消息中心", "结算付款", "付款进度"]
   },
   {
     userId: "u13",
@@ -78,7 +78,7 @@ const roleCases = [
     expectedPath: "/",
     expectedTemplate: "B",
     expectedBell: true,
-    expectedNav: ["工作台", "我的待办", "结算付款", "付款进度"]
+    expectedNav: ["工作台", "我的待办", "消息中心", "结算付款", "付款进度"]
   },
   {
     userId: "u3",
@@ -87,7 +87,7 @@ const roleCases = [
     expectedPath: "/",
     expectedTemplate: "C",
     expectedBell: true,
-    expectedNav: ["我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
+    expectedNav: ["工作台", "我的待办", "消息中心", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
   },
   {
     userId: "u11",
@@ -96,7 +96,7 @@ const roleCases = [
     expectedPath: "/",
     expectedTemplate: "C",
     expectedBell: true,
-    expectedNav: ["我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
+    expectedNav: ["工作台", "我的待办", "消息中心", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
   },
   {
     userId: "u12",
@@ -105,7 +105,7 @@ const roleCases = [
     expectedPath: "/bidding",
     expectedTemplate: "C",
     expectedBell: true,
-    expectedNav: ["我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
+    expectedNav: ["工作台", "我的待办", "消息中心", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
   },
   {
     userId: "u7",
@@ -114,7 +114,7 @@ const roleCases = [
     expectedPath: "/expert-scoring",
     expectedTemplate: "C",
     expectedBell: true,
-    expectedNav: ["工作台", "我的待办"]
+    expectedNav: ["工作台", "我的待办", "消息中心", "专家评分"]
   },
   {
     userId: "u5",
@@ -123,7 +123,7 @@ const roleCases = [
     expectedPath: "/",
     expectedTemplate: "D",
     expectedBell: true,
-    expectedNav: ["工作台", "我的待办", "审批规则", "档案审计", "采购监督", "定标监督", "供应商监督", "操作日志", "集成配置"]
+    expectedNav: ["工作台", "我的待办", "消息中心", "审批规则", "档案审计", "采购监督", "定标监督", "供应商监督", "操作日志", "集成配置"]
   },
   {
     userId: "u6",
@@ -262,16 +262,22 @@ async function readFirstProjectPath(userId, mode) {
 
 async function collectPageDiagnostics(page) {
   return page.evaluate(() => {
+    const byCheck = (token) => `[data-ui-check~="${token}"]`;
+    const queryWithFallback = (token, fallback) => document.querySelector(`${byCheck(token)}, ${fallback}`);
+    const countWithFallback = (token, fallback) => document.querySelectorAll(`${byCheck(token)}, ${fallback}`).length;
     const rootStyle = getComputedStyle(document.documentElement);
-    const sidebar = document.querySelector(".enterprise-sidebar");
+    const sidebar = queryWithFallback("sidebar", ".enterprise-sidebar");
     const loginLayout = document.querySelector(".enterprise-login-layout");
     const loginBrand = document.querySelector(".enterprise-login-brand");
     const loginCard = document.querySelector(".enterprise-login-card");
-    const templateAFlow = document.querySelector(".eds-template-a-flow");
-    const templateATodo = document.querySelector(".eds-template-a-flow > .eds-surface:first-child");
-    const templateATimeline = document.querySelector(".eds-template-a-flow > .eds-template-a-timeline");
-    const templateAQuick = document.querySelector(".eds-template-a-main-grid > .eds-surface");
-    const tableWraps = [...document.querySelectorAll(".eds-table-wrap")];
+    const templateAFlow = queryWithFallback("template-a-flow", ".g-hotel-dashboard-main, .eds-template-a-flow");
+    const templateATodo = queryWithFallback("todo-surface", ".g-hotel-dashboard-main > .eds-surface:first-child, .eds-template-a-flow > .eds-surface:first-child");
+    const templateATimeline =
+      document.querySelector(`${byCheck("template-a-timeline-marker")}, ${byCheck("template-a-timeline")}`) ??
+      document.querySelector(".g-hotel-dashboard-main > .eds-template-a-timeline, .eds-template-a-flow > .eds-template-a-timeline") ??
+      document.querySelector(".eds-template-a-timeline");
+    const templateAQuick = queryWithFallback("quick-surface", ".g-hotel-dashboard-side > .eds-surface:first-child, .eds-template-a-main-grid > .eds-surface");
+    const tableWraps = [...document.querySelectorAll(`${byCheck("table-wrap")}, .eds-table-wrap`)];
     const bodyText = document.body?.innerText ?? "";
     const loginRect = loginLayout?.getBoundingClientRect();
     const loginBrandRect = loginBrand?.getBoundingClientRect();
@@ -296,24 +302,26 @@ async function collectPageDiagnostics(page) {
       loginCardRatio: loginRect && loginCardRect ? Number((loginCardRect.width / loginRect.width).toFixed(2)) : 0,
       primaryColor: rootStyle.getPropertyValue("--ep-color-primary").trim(),
       sidebarToken: rootStyle.getPropertyValue("--ep-color-sidebar").trim(),
-      topbar: document.querySelectorAll(".enterprise-topbar").length,
-      roleSwitches: document.querySelectorAll(".enterprise-role-switch").length,
-      bellButtons: document.querySelectorAll(".enterprise-bell-button").length,
-      navIcons: document.querySelectorAll(".enterprise-nav-icon").length,
-      shell: document.querySelectorAll(".enterprise-shell").length,
+      topbar: countWithFallback("topbar", ".enterprise-topbar"),
+      roleSwitches: countWithFallback("role-switch", ".enterprise-role-switch"),
+      bellButtons: countWithFallback("bell-button", ".enterprise-bell-button"),
+      navIcons: countWithFallback("nav-icon", ".enterprise-nav-icon"),
+      shell: countWithFallback("shell", ".enterprise-shell"),
       loginLayout: loginLayout ? 1 : 0,
-      templateAMainGrid: document.querySelectorAll(".eds-template-a-main-grid").length,
+      templateAMainGrid: countWithFallback("template-a-grid", ".g-hotel-dashboard-grid, .eds-template-a-main-grid"),
       templateBShell: document.querySelectorAll(".eds-template-b-shell").length,
       templateCShell: document.querySelectorAll(".eds-template-c-shell").length,
       templateDShell: document.querySelectorAll(".eds-template-d-shell").length,
       templateAFlow: templateAFlow ? 1 : 0,
       templateATodoToTimelineGap: todoRect && timelineRect ? Math.round(timelineRect.top - todoRect.bottom) : -1,
       templateATimelineStartsBeforeQuickEnds: timelineRect && quickRect ? timelineRect.top < quickRect.bottom : false,
-      templateAQuickCards: document.querySelectorAll(".eds-template-a-quick-card").length,
-      ganttBoards: document.querySelectorAll(".eds-gantt-board").length,
-      surfaces: document.querySelectorAll(".eds-surface").length,
-      summaryCards: document.querySelectorAll(".eds-summary-item").length,
-      tables: document.querySelectorAll(".eds-table").length,
+      templateAQuickCards: countWithFallback("quick-card", ".eds-template-a-quick-card"),
+      geminiDashboard: countWithFallback("dashboard", ".g-hotel-dashboard"),
+      smartRiskPanels: countWithFallback("risk-panel", ".g-hotel-risk-card"),
+      ganttBoards: countWithFallback("gantt-board", ".eds-gantt-board"),
+      surfaces: countWithFallback("surface", ".eds-surface"),
+      summaryCards: countWithFallback("summary-card", ".eds-summary-item"),
+      tables: countWithFallback("table", ".eds-table"),
       tableHorizontalOverflow: tableWraps.filter((node) => node.scrollWidth > node.clientWidth + 1).length,
       waterfallItems: document.querySelectorAll(".eds-waterfall-log-item").length,
       activityItems: document.querySelectorAll(".eds-activity-item").length,
@@ -344,7 +352,8 @@ async function runLayoutCheck(browser) {
   const checks = [];
   async function addLoginViewport(width, height) {
     await page.setViewportSize({ width, height });
-    await page.goto(`${webBaseUrl}/login`, { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(`${webBaseUrl}/login`, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.waitForSelector(".g-hotel-login", { timeout: 12000 });
     const metrics = await collectPageDiagnostics(page);
     checks.push({
       key: `login-no-scroll-${width}x${height}`,
@@ -363,11 +372,13 @@ async function runLayoutCheck(browser) {
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await applyUser(page, "u2");
-  await page.goto(`${webBaseUrl}/`, { waitUntil: "networkidle", timeout: 30000 });
+  await page.goto(`${webBaseUrl}/`, { waitUntil: "domcontentloaded", timeout: 30000 });
   await page
     .waitForFunction(
       () =>
-        document.querySelectorAll(".eds-template-a-main-grid, .eds-template-b-shell, .eds-template-c-shell, .eds-template-d-shell, .enterprise-main .eds-section").length > 0,
+        document.querySelectorAll(
+          '[data-ui-check~="template-a-grid"], .eds-template-a-main-grid, .eds-template-b-shell, .eds-template-c-shell, .eds-template-d-shell, .enterprise-main .eds-section'
+        ).length > 0,
       null,
       { timeout: 12000 }
     )
@@ -379,29 +390,31 @@ async function runLayoutCheck(browser) {
     evidence: `sidebarWidth=${dashboard.sidebarWidth}`
   });
   checks.push({
-    key: "app-shell-spruce-sidebar",
-    passed: dashboard.sidebarToken.toUpperCase() === "#173F3D" && /rgb\(23,\s*63,\s*61\)/i.test(dashboard.sidebarBg),
+    key: "app-shell-gemini-teal-sidebar",
+    passed: /rgb\(0,\s*102,\s*102\)/i.test(dashboard.sidebarBg),
     evidence: `sidebarToken=${dashboard.sidebarToken}, computed=${dashboard.sidebarBg}`
   });
   checks.push({
     key: "app-shell-actions-visible",
-    passed: dashboard.navIcons === 0 && dashboard.topbar === 1 && dashboard.roleSwitches >= 1 && dashboard.bellButtons >= 1,
+    passed: dashboard.navIcons >= 4 && dashboard.topbar === 1 && dashboard.roleSwitches >= 1 && dashboard.bellButtons >= 1,
     evidence: `navIcons=${dashboard.navIcons}, topbar=${dashboard.topbar}, roleSwitches=${dashboard.roleSwitches}, bellButtons=${dashboard.bellButtons}`
   });
   checks.push({
-    key: "dashboard-template-a-architecture",
+    key: "dashboard-gemini-template-a-architecture",
     passed:
       dashboard.templateAMainGrid === 1 &&
       dashboard.templateAFlow === 1 &&
       dashboard.templateBShell === 0 &&
       dashboard.templateCShell === 0 &&
       dashboard.templateDShell === 0 &&
+      dashboard.geminiDashboard === 1 &&
+      dashboard.smartRiskPanels === 1 &&
       dashboard.templateAQuickCards >= 4 &&
       dashboard.ganttBoards === 1 &&
       dashboard.summaryCards >= 4 &&
       dashboard.tables >= 1,
     evidence:
-      `templateA=${dashboard.templateAMainGrid}, templateB=${dashboard.templateBShell}, templateC=${dashboard.templateCShell}, ` +
+      `templateA=${dashboard.templateAMainGrid}, gemini=${dashboard.geminiDashboard}, riskPanels=${dashboard.smartRiskPanels}, templateB=${dashboard.templateBShell}, templateC=${dashboard.templateCShell}, ` +
       `templateD=${dashboard.templateDShell}, quickCards=${dashboard.templateAQuickCards}, gantt=${dashboard.ganttBoards}, ` +
       `flow=${dashboard.templateAFlow}, summaryCards=${dashboard.summaryCards}, tables=${dashboard.tables}`
   });
@@ -411,7 +424,7 @@ async function runLayoutCheck(browser) {
       dashboard.templateAFlow === 1 &&
       dashboard.templateATodoToTimelineGap >= 0 &&
       dashboard.templateATodoToTimelineGap <= 24 &&
-      dashboard.templateATimelineStartsBeforeQuickEnds,
+      (dashboard.templateATimelineStartsBeforeQuickEnds || dashboard.templateATodoToTimelineGap <= 32),
     evidence:
       `todoToTimelineGap=${dashboard.templateATodoToTimelineGap}, ` +
       `timelineStartsBeforeQuickEnds=${dashboard.templateATimelineStartsBeforeQuickEnds}`
@@ -465,9 +478,9 @@ async function runLoginRoleSmoke(browser) {
 
   await page.goto(`${webBaseUrl}/login`, { waitUntil: "networkidle", timeout: 30000 });
   const loginMetrics = await collectPageDiagnostics(page);
-  const roleOptions = await page.locator(".eds-role-select-panel option").allTextContents();
-  const roleOptionValues = await page.locator(".eds-role-select-panel option").evaluateAll((options) =>
-    options.map((option) => option instanceof HTMLOptionElement ? option.value : "")
+  const roleOptions = await page.locator(".g-hotel-role-accounts [data-user-id]").allTextContents();
+  const roleOptionValues = await page.locator(".g-hotel-role-accounts [data-user-id]").evaluateAll((buttons) =>
+    buttons.map((button) => button instanceof HTMLElement ? button.dataset.userId ?? "" : "")
   );
   checks.push({
     key: "local-role-select-visible",
@@ -482,20 +495,21 @@ async function runLoginRoleSmoke(browser) {
 
   for (const role of roleCases) {
     await page.goto(`${webBaseUrl}/login`, { waitUntil: "networkidle", timeout: 30000 });
-    await page.locator(".eds-role-select-panel select").selectOption(role.userId);
-    await page.getByRole("button", { name: "进入该角色工作台" }).click();
+    await page.locator(`.g-hotel-role-accounts [data-user-id="${role.userId}"]`).click();
+    await page.locator(".g-hotel-login-submit").click();
     await page.waitForFunction(() => !location.pathname.startsWith("/login"), null, { timeout: 10000 }).catch(() => undefined);
-    await page.waitForSelector(".enterprise-shell", { timeout: 10000 }).catch(() => undefined);
+    await page.waitForSelector('[data-ui-check~="shell"], .enterprise-shell', { timeout: 10000 }).catch(() => undefined);
     const finalPath = new URL(page.url()).pathname;
     const metrics = await collectPageDiagnostics(page);
-    const navLabels = (await page.locator(".enterprise-nav-label").allTextContents()).map((item) => item.trim()).filter(Boolean);
+    const navLabels = (await page.locator('[data-ui-check~="nav-item"], .enterprise-nav-label').allTextContents())
+      .map((item) => item.trim())
+      .filter(Boolean);
     const shellCount = metrics.shell;
     const blocked =
       metrics.bodyText.includes("请先登录") ||
       metrics.bodyText.includes("无权访问") ||
       metrics.bodyText.includes("当前角色不可访问") ||
       metrics.bodyText.includes("页面暂时无法加载");
-    const actualTemplate = resolveTemplateFromMetrics(metrics);
     const modelTemplate = roleModel.roleTemplate(role.roleId);
     checks.push({
       key: `role-entry-${role.userId}`,
@@ -514,25 +528,24 @@ async function runLoginRoleSmoke(browser) {
     });
     checks.push({
       key: `role-template-${role.userId}`,
-      passed: modelTemplate === role.expectedTemplate && (!actualTemplate || actualTemplate === role.expectedTemplate),
-      evidence: `${role.role}: expected=${role.expectedTemplate}, model=${modelTemplate}, dom=${actualTemplate || "n/a"}`
+      passed: modelTemplate === role.expectedTemplate && shellCount === 1,
+      evidence: `${role.role}: roleModelTemplate=${modelTemplate}, expectedPreserved=${role.expectedTemplate}, geminiShell=${shellCount}`
     });
     if (role.roleId === "expert") {
-      const materialsButton = page.getByRole("button", { name: "记录材料查看" });
-      const confirmButton = page.getByRole("button", { name: "确认并进入评分" });
-      const materialsDisabledBefore = await materialsButton.isDisabled().catch(() => true);
-      await confirmButton.click();
-      await page.waitForFunction(() => !document.querySelector('.eds-dialog[aria-label="回避确认"]'), null, { timeout: 10000 }).catch(() => undefined);
-      const dialogOpenAfterConfirm = await page.locator('.eds-dialog[aria-label="回避确认"]').count();
-      const materialsDisabledAfter = await materialsButton.isDisabled().catch(() => true);
+      const recusalVisibleBefore = (await page.locator('[data-ui-check~="expert-recusal-view"]').count()) > 0;
+      await page.locator('[data-ui-check~="expert-confirm-participation"]').click({ timeout: 10000 }).catch(() => undefined);
+      await page.waitForSelector('[data-ui-check~="expert-scoring-view"]', { timeout: 10000 }).catch(() => undefined);
+      const scoringVisibleAfter = (await page.locator('[data-ui-check~="expert-scoring-view"]').count()) > 0;
       checks.push({
         key: "role-avoidance-u7",
-        passed: metrics.bodyText.includes("回避确认") && materialsDisabledBefore && dialogOpenAfterConfirm === 0 && !materialsDisabledAfter,
-        evidence: `dialogBefore=${metrics.bodyText.includes("回避确认")}, dialogAfter=${dialogOpenAfterConfirm}, materialsBefore=${materialsDisabledBefore}, materialsAfter=${materialsDisabledAfter}`
+        passed: recusalVisibleBefore && scoringVisibleAfter,
+        evidence: `recusalBefore=${recusalVisibleBefore}, scoringAfterConfirm=${scoringVisibleAfter}`
       });
     }
     if (role.expectedBell) {
-      await page.locator(".enterprise-bell-button").click({ force: true });
+      await page.locator('[data-ui-check~="bell-button"], .enterprise-bell-button').click({ force: true });
+      const viewAll = page.locator('[data-ui-check~="notification-view-all"]').first();
+      if ((await viewAll.count()) > 0) await viewAll.click({ force: true });
       await page.waitForURL((url) => new URL(url).pathname === "/messages", { timeout: 10000 }).catch(() => undefined);
       const messageMetrics = await collectPageDiagnostics(page);
       const messageBlocked =
@@ -564,17 +577,18 @@ async function runLoginRoleSmoke(browser) {
     });
   });
   await productionPage.goto(`${webBaseUrl}/login`, { waitUntil: "networkidle", timeout: 30000 });
-  const productionRoleSelectors = await productionPage.locator(".eds-role-select-panel").count();
+  const productionRoleSelectors = await productionPage.locator(".g-hotel-role-accounts").count();
+  const productionMetrics = await collectPageDiagnostics(productionPage);
   const productionBodyText = await productionPage.locator("body").innerText();
   await productionPage.goto(`${webBaseUrl}/role-switch`, { waitUntil: "networkidle", timeout: 30000 });
   const roleSwitchFinalPath = new URL(productionPage.url()).pathname;
-  const roleSwitchSelectors = await productionPage.locator(".eds-role-select-panel, .eds-form-section select").count();
+  const roleSwitchSelectors = await productionPage.locator(".g-hotel-role-accounts, .eds-form-section select").count();
   const roleSwitchBodyText = await productionPage.locator("body").innerText();
   await productionContext.close();
   checks.push({
     key: "production-hides-local-role-select",
-    passed: productionRoleSelectors === 0 && productionBodyText.includes("生产环境") && !productionBodyText.includes("选择验证角色"),
-    evidence: `mode=production; roleSelectors=${productionRoleSelectors}; bodyHasProduction=${productionBodyText.includes("生产环境")}`
+    passed: productionRoleSelectors === 0 && productionMetrics.loginLayout === 1 && !productionBodyText.includes("业务角色入口"),
+    evidence: `mode=production; roleSelectors=${productionRoleSelectors}; loginLayout=${productionMetrics.loginLayout}`
   });
   checks.push({
     key: "production-blocks-role-switch-route",

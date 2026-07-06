@@ -24,7 +24,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <FormSection v-if="selectedSheetDetail" title="逐项评分" description="按评分模板逐项录入分值和专家意见。">
+  <FormSection v-if="selectedSheetDetail" class="g-hotel-score-sheet" title="逐项评分" description="按评分模板逐项录入分值和专家意见。">
     <label>
       项目
       <input :value="`${selectedSheetDetail.projectCode || selectedSheetDetail.projectId} / ${selectedSheetDetail.projectName || ''}`" disabled />
@@ -61,11 +61,15 @@ const emit = defineEmits<{
       </div>
     </div>
 
-    <div class="eds-score-table eds-form-full-row">
+    <div class="eds-score-table eds-form-full-row g-hotel-score-table">
       <DataTable :columns="SCORE_ITEM_COLUMNS" :rows="scoringItems" row-key="id" empty-text="当前评分单暂无评分项。">
         <template #item="{ row }">
           <strong>{{ row.categoryLabel }}</strong>
           <p class="eds-meta">{{ row.label }}</p>
+        </template>
+        <template #reference="{ row }">
+          <strong>{{ row.reference }}</strong>
+          <p class="eds-meta">{{ row.evidence }}</p>
         </template>
         <template #score="{ row }">
           <input
@@ -93,12 +97,12 @@ const emit = defineEmits<{
       <textarea v-model="opinion" rows="4" :disabled="!canEditSheet(selectedSheetDetail)" />
     </label>
 
-    <SubmitPanel>
+    <SubmitPanel class="g-hotel-sticky-actions">
       <EnterpriseButton :disabled="!selectedSheetId || !confirmationCompleted || !canEditSheet(selectedSheetDetail)" @click="emit('saveScore')">
-        暂存评分
+        保存评分进度
       </EnterpriseButton>
       <EnterpriseButton type="primary" :disabled="!selectedSheetId || !confirmationCompleted || !canEditSheet(selectedSheetDetail)" @click="emit('submitScore')">
-        提交并锁定
+        确认无误，提交签名
       </EnterpriseButton>
       <EnterpriseButton @click="emit('printSheet')">打印评分表</EnterpriseButton>
     </SubmitPanel>

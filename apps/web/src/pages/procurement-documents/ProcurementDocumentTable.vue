@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { RouterLink } from "vue-router";
 import AttachmentList from "../../components/AttachmentList.vue";
 import { DataTable, EnterpriseButton, EnterpriseSurface, PaginationBar, StatusTag } from "../../components/base";
@@ -23,11 +24,19 @@ const emit = defineEmits<{
   reviseDocument: [document: ProcurementDocument];
   voidDocument: [document: ProcurementDocument];
 }>();
+
+const selectedDocument = ref<ProcurementDocument | null>(null);
 </script>
 
 <template>
-  <EnterpriseSurface title="采购文件列表" description="锁定后的版本才能进入公告与邀请，列表保留全部版本和停用留痕。">
+  <EnterpriseSurface class="g-hotel-table-card" title="采购文件台账" description="管理招标文件、采购清单及合同范本草案。">
     <DataTable :columns="DOCUMENT_COLUMNS" :rows="documents" row-key="id" empty-text="暂无采购文件" empty-mode="compact">
+      <template #title="{ row }">
+        <div class="eds-table-primary-cell">
+          <strong>{{ row.title }}</strong>
+          <span>{{ row.id }} / v{{ row.versionNo }}</span>
+        </div>
+      </template>
       <template #project="{ row }">{{ projectLabel(row.projectId) }}</template>
       <template #version="{ row }">v{{ row.versionNo }}</template>
       <template #status="{ row }">
@@ -46,6 +55,7 @@ const emit = defineEmits<{
       <template #lockedAt="{ row }">{{ formatDateTime(row.lockedAt) }}</template>
       <template #actions="{ row }">
         <div class="eds-actions-table">
+          <EnterpriseButton size="sm" @click="selectedDocument = row">查看详情</EnterpriseButton>
           <EnterpriseButton v-if="canPublishDocument(row)" type="primary" size="sm" @click="emit('publishDocument', row)">发布并锁定</EnterpriseButton>
           <RouterLink
             v-if="row.status === 'locked'"
@@ -62,4 +72,43 @@ const emit = defineEmits<{
     </DataTable>
     <PaginationBar :total="documents.length" />
   </EnterpriseSurface>
+
+  <div v-if="selectedDocument" class="g-hotel-drawer" role="dialog" aria-modal="true" aria-label="文件版本详情">
+    <button class="g-hotel-drawer-mask" type="button" aria-label="关闭详情" @click="selectedDocument = null"></button>
+    <aside class="g-hotel-drawer-panel">
+      <header>
+        <h3>文件版本详情</h3>
+        <button type="button" @click="selectedDocument = null">×</button>
+      </header>
+      <section>
+        <h4>文件信息</h4>
+        <div class="g-hotel-detail-list">
+          <p><span>名称：</span>{{ selectedDocument.title }}</p>
+          <p><span>编号：</span>{{ selectedDocument.id }}</p>
+          <p><span>项目：</span>{{ projectLabel(selectedDocument.projectId) }}</p>
+          <p><span>状态：</span>{{ labelStatus(selectedDocument.status) }} / {{ labelStatus(selectedDocument.reviewStatus) }}</p>
+        </div>
+      </section>
+      <section>
+        <h4>版本历史</h4>
+        <div class="g-hotel-timeline">
+          <article>
+            <span></span>
+            <div>
+              <small>{{ formatDateTime(selectedDocument.lockedAt) }}</small>
+              <strong>V{{ selectedDocument.versionNo }} {{ labelStatus(selectedDocument.status) }}</strong>
+              <p>{{ selectedDocument.contentSummary || "采购文件版本已记录并进入留痕。" }}</p>
+            </div>
+          </article>
+        </div>
+      </section>
+      <section>
+        <h4>附件</h4>
+        <AttachmentList :attachments="selectedDocument.attachmentMetadata" compact />
+      </section>
+      <footer>
+        <EnterpriseButton @click="selectedDocument = null">关闭</EnterpriseButton>
+      </footer>
+    </aside>
+  </div>
 </template>

@@ -24,7 +24,7 @@ defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="补档处理" description="封存后发现缺失材料时，必须走补档申请、审批和材料提交链路。">
+  <EnterpriseSurface class="g-hotel-compliance-card eds-drawer-panel" title="补档处理抽屉" description="封存后发现缺失材料时，必须走补档申请、审批和材料提交链路。">
     <p v-if="!canMaintainArchive" class="eds-meta">当前角色仅可查看补档申请状态。</p>
     <div class="eds-form-section">
       <label>
@@ -47,7 +47,7 @@ defineEmits<{
       </label>
       <p v-if="canMaintainArchive" class="eds-meta">{{ supplementFileName || "未选择文件" }}</p>
     </div>
-    <SubmitPanel v-if="canMaintainArchive">
+    <SubmitPanel v-if="canMaintainArchive" class="g-hotel-sticky-actions">
       <EnterpriseButton :disabled="!selectedArchiveItemId" @click="$emit('createSupplementRequest')">发起补档</EnterpriseButton>
       <EnterpriseButton :disabled="!selectedSupplementRequestId" @click="$emit('approveSupplementRequest')">批准补档</EnterpriseButton>
       <EnterpriseButton type="primary" :disabled="!selectedSupplementRequestId || !supplementFile" @click="$emit('applySupplement')">提交补档材料</EnterpriseButton>

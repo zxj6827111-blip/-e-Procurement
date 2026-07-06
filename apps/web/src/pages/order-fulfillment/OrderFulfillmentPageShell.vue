@@ -218,6 +218,7 @@ onMounted(load);
 </script>
 
 <template>
+  <section class="eds-section g-hotel-page g-hotel-fulfillment-page">
   <OrderFulfillmentShell
     :loading="loading"
     :message="message"
@@ -259,5 +260,6 @@ onMounted(load);
   />
 
   <ReceiptSummaryPanel :workbenches="visibleWorkbenches" :label-status="labelStatus" :format-date-time="formatDateTime" />
+  </section>
 </template>
 

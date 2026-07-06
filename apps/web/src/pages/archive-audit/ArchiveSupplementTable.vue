@@ -12,7 +12,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="补档申请" :description="`共 ${supplementRequests.length} 条补档申请。`">
+  <EnterpriseSurface class="g-hotel-table-card" title="补档申请" :description="`共 ${supplementRequests.length} 条补档申请。`">
     <DataTable :columns="SUPPLEMENT_COLUMNS" :rows="supplementRequests" row-key="id" empty-text="暂无补档申请。">
       <template #request="{ row }">{{ supplementRequestLabel(row.id) }}</template>
       <template #archiveItem="{ row }">{{ archiveItemLabel(row.archiveItemId) }}</template>

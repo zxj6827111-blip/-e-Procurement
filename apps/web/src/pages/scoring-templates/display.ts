@@ -2,11 +2,12 @@ import type { DataTableColumn } from "../../components/base";
 import type { ScoringCategory, StatusTone, TemplateStatus } from "./types";
 
 export const TEMPLATE_COLUMNS: DataTableColumn[] = [
-  { key: "status", label: "状态" },
-  { key: "template", label: "模板" },
-  { key: "version", label: "版本" },
+  { key: "template", label: "模板名称" },
+  { key: "category", label: "适用采购分类" },
   { key: "totalScore", label: "总分" },
-  { key: "usage", label: "使用情况" },
+  { key: "itemCount", label: "评分项数量" },
+  { key: "ratio", label: "技术/商务比重" },
+  { key: "status", label: "启用状态" },
   { key: "actions", label: "操作" }
 ];
 

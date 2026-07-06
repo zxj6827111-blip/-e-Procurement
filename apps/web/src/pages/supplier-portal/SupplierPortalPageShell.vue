@@ -75,9 +75,9 @@ const statusTone = computed(() => resolveStatusTone(supplier.value?.admissionSta
 
 const serviceRows = computed(() => supplier.value?.serviceRegions ?? []);
 const serviceColumns: DataTableColumn[] = [
-  { key: "region", label: "区域" },
+  { key: "region", label: "服务区域" },
   { key: "storeName", label: "门店 / 服务点" },
-  { key: "category", label: "品类" },
+  { key: "category", label: "授权品类" },
   { key: "status", label: "状态" }
 ];
 
@@ -232,16 +232,14 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="eds-section">
-    <header class="eds-page-header eds-business-context">
-      <div class="eds-business-context-main">
-        <p class="eds-business-eyebrow">供应商门户 / 企业档案</p>
-        <h2>{{ supplier?.name || "我的供应商档案" }}</h2>
-        <p>维护本企业基础资料、资质证照和封样样品；准入评审、账号管理和停用启用由集团采购侧处理。</p>
+  <section class="eds-section g-hotel-page g-hotel-supplier-page">
+    <header class="g-hotel-page-header">
+      <div>
+        <p>供应商工作台 / 企业档案</p>
+        <h2><span aria-hidden="true">档</span>{{ supplier?.name || "供应商档案" }}</h2>
+        <small>维护本企业基础资料、资质证照和封样样品；准入评审、账号管理和停用启用由集团采购侧处理。</small>
       </div>
-      <div class="eds-business-context-aside">
-        <span class="eds-meta">准入状态</span>
-        <strong>{{ supplierStatus }}</strong>
+      <div class="g-hotel-page-actions">
         <StatusTag :tone="statusTone">{{ supplierStatus }}</StatusTag>
         <EnterpriseButton type="text" @click="load">刷新资料</EnterpriseButton>
       </div>
@@ -249,7 +247,7 @@ onMounted(load);
 
     <FeedbackMessage v-if="message" tone="success">{{ message }}</FeedbackMessage>
 
-    <EnterpriseSurface v-if="supplier" title="档案完整度" class="eds-business-panel">
+    <EnterpriseSurface v-if="supplier" title="企业档案完整度" class="eds-business-panel g-hotel-ledger-card">
       <div class="eds-ledger-strip">
         <div v-for="item in summaryItems" :key="item.label">
           <span>{{ item.label }}</span>
@@ -258,7 +256,7 @@ onMounted(load);
       </div>
     </EnterpriseSurface>
 
-    <EnterpriseSurface v-if="supplier" title="供应商资料台账">
+    <EnterpriseSurface v-if="supplier" class="g-hotel-table-card" title="供应商资料处理区">
       <EnterpriseTabs :tabs="supplierPortalTabs" :active-key="activeTab" @change="switchTab" />
 
       <SupplierPortalProfilePanel

@@ -21,7 +21,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <FormSection title="商品定价上架" description="按来源、定价报告和有效期提交商品上架。">
+  <FormSection title="商品定价上架抽屉" description="按来源、定价报告和有效期提交商品上架。">
     <label>
       商品
       <select v-model="priceForm.productId" @change="emit('prepareSelectedPriceProduct')">

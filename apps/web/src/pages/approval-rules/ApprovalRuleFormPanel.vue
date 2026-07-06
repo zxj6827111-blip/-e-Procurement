@@ -19,7 +19,7 @@ defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="规则配置表单" :description="editingRuleId ? '编辑当前审批规则。' : '创建新的审批规则。'">
+  <EnterpriseSurface class="eds-drawer-panel g-hotel-compliance-card" title="审批规则配置抽屉" :description="editingRuleId ? '编辑当前审批规则。' : '创建新的审批规则。'">
     <div class="eds-form-section">
       <label>
         规则编码
@@ -82,7 +82,7 @@ defineEmits<{
         </select>
       </label>
     </div>
-    <SubmitPanel>
+    <SubmitPanel class="g-hotel-sticky-actions">
       <EnterpriseButton :disabled="!canMaintainRules" @click="$emit('resetRuleForm')">新建规则</EnterpriseButton>
       <EnterpriseButton type="primary" :disabled="!canMaintainRules || busyRuleId !== ''" @click="$emit('saveRule')">
         {{ editingRuleId ? "保存规则" : "创建规则" }}

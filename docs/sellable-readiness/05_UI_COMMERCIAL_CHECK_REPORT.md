@@ -1,6 +1,6 @@
 # UI Commercial Check Report
 
-- Generated at: 2026-07-06T00:05:47.560Z
+- Generated at: 2026-07-06T13:32:02.484Z
 - Result: PASS
 - Pass: 51
 - Failures: 0
@@ -27,7 +27,7 @@
 | role-model:exact-template-matrix | PASS | role-model.ts preserves the role-to-template mapping, per-role bell visibility and supervision-only menus. |
 | login:commercial-layout | PASS | Login page keeps the branded split portal layout. |
 | login:production-hides-local-access | PASS | Local role quick entry stays hidden in production mode. |
-| login:compact-role-selector | PASS | Mock role switching uses a compact selector instead of a tall test table. |
+| login:compact-role-selector | PASS | Local role quick entry uses compact account chips instead of a tall test table. |
 | component:EmptyState | PASS | apps/web/src/components/base/EmptyState.vue exported from base index. |
 | component:ErrorState | PASS | apps/web/src/components/base/ErrorState.vue exported from base index. |
 | component:PermissionState | PASS | apps/web/src/components/base/PermissionState.vue exported from base index. |
@@ -42,7 +42,7 @@
 | component:RoleBadge | PASS | apps/web/src/components/base/RoleBadge.vue exported from base index. |
 | component:EnterpriseDialog | PASS | apps/web/src/components/base/EnterpriseDialog.vue exported from base index. |
 | state-pages:routed | PASS | Permission denied and not-found state pages stay inside the AppShell flow. |
-| dashboard:template-routing | PASS | Dashboard routes through A/B/C/D templates instead of one shared workbench layout. |
+| dashboard:gemini-workbench-routing | PASS | Dashboard preserves role templates while rendering the Gemini G-Hotel workbench structure for template A. |
 | dashboard:quick-action-center | PASS | Dashboard quick-action center combines primary actions with restrained risk reminders. |
 | dashboard:gantt-and-shell-styles | PASS | enterprise.css contains the new A/B/C/D template scaffolding, gantt and waterfall patterns. |
 | procurement:business-shell | PASS | Procurement requests use a B-template list workspace with compact ledger context and processing rail. |

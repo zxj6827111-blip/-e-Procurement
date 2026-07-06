@@ -79,7 +79,7 @@ const {
 </script>
 
 <template>
-  <section class="eds-section">
+  <section class="eds-section g-hotel-page g-hotel-award-page">
     <AwardPageShell
       v-model:selected-project-id="selectedProjectId"
       :is-supplier-result-view="isSupplierResultView"

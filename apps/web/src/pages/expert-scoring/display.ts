@@ -10,10 +10,9 @@ export const ASSIGNMENT_COLUMNS: DataTableColumn[] = [
 ];
 
 export const SCORE_ITEM_COLUMNS: DataTableColumn[] = [
-  { key: "item", label: "评分项" },
-  { key: "reference", label: "参考标准" },
-  { key: "evidence", label: "需查看材料" },
-  { key: "maxScore", label: "分值" },
+  { key: "item", label: "评分维度" },
+  { key: "reference", label: "打分项及标准" },
+  { key: "maxScore", label: "满分" },
   { key: "score", label: "评分" },
   { key: "comment", label: "专家意见" }
 ];

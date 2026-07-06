@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { apiGet } from "../../api/http";
-import { DataTable, EnterpriseSurface, FilterBar, PageHeader, PaginationBar, StatusTag } from "../../components/base";
+import { DataTable, EnterpriseSurface, FilterBar, PaginationBar, StatusTag } from "../../components/base";
 import { formatDateTime, labelAuditAction, labelAuditReason, labelObjectType, labelStatus } from "../../utils/status-labels";
 
 interface AuditLog {
@@ -18,11 +18,11 @@ const keyword = ref("");
 const resultFilter = ref("all");
 
 const columns = [
-  { key: "id", label: "日志号" },
-  { key: "action", label: "动作" },
-  { key: "objectType", label: "对象" },
-  { key: "result", label: "结果" },
-  { key: "reason", label: "原因" }
+  { key: "id", label: "日志编号" },
+  { key: "action", label: "审计动作" },
+  { key: "objectType", label: "业务对象" },
+  { key: "result", label: "处理结果" },
+  { key: "reason", label: "原因说明" }
 ];
 
 const orderedLogs = computed(() =>
@@ -48,7 +48,7 @@ const filteredLogs = computed(() => {
 
 const summaryItems = computed(() => [
   { label: "近期流水", value: orderedLogs.value.length, meta: "当前角色可见" },
-  { label: "拒绝记录", value: orderedLogs.value.filter((item) => item.result === "denied").length, meta: "越权或拦截" },
+  { label: "拒绝记录", value: orderedLogs.value.filter((item) => item.result === "denied").length, meta: "越权或拒绝" },
   { label: "审计对象", value: new Set(orderedLogs.value.map((item) => item.objectType)).size, meta: "对象类型数" },
   { label: "当前筛选", value: filteredLogs.value.length, meta: "命中记录" }
 ]);
@@ -59,10 +59,19 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="eds-section">
-    <PageHeader title="操作日志" eyebrow="纪检审计" description="按流水和表格双视图审查敏感操作、越权尝试与归档行为。" />
+  <section class="eds-section g-hotel-page g-hotel-audit-page">
+    <header class="g-hotel-page-header">
+      <div>
+        <p>纪检审计 / 操作留痕</p>
+        <h2><span aria-hidden="true">审</span>审计操作日志</h2>
+        <small>按时间流水和明细表格追踪敏感操作、越权尝试与归档行为。</small>
+      </div>
+      <div class="g-hotel-page-actions">
+        <StatusTag :tone="filteredLogs.length ? 'success' : 'default'">命中 {{ filteredLogs.length }} 条</StatusTag>
+      </div>
+    </header>
 
-    <FilterBar>
+    <FilterBar class="g-hotel-filter-bar">
       <label>
         关键词
         <input v-model="keyword" placeholder="搜索动作、对象、结果或原因" />
@@ -78,8 +87,8 @@ onMounted(async () => {
       </label>
     </FilterBar>
 
-    <div class="eds-audit-matrix">
-      <EnterpriseSurface class="eds-audit-waterfall-surface" title="日志流水瀑布" description="按时间序列查看异常密度，快速定位敏感动作和归档痕迹。">
+    <div class="eds-audit-matrix g-hotel-governance-grid">
+      <EnterpriseSurface class="g-hotel-table-card eds-audit-waterfall-surface" title="操作流水时间线" description="按时间序列查看异常密度，快速定位敏感动作和归档痕迹。">
         <div v-if="filteredLogs.length" class="eds-waterfall-log">
           <article v-for="row in filteredLogs.slice(0, 14)" :key="row.id" class="eds-waterfall-log-item">
             <span class="eds-waterfall-log-time">{{ row.createdAt ? formatDateTime(row.createdAt).slice(5, 16) : "最近" }}</span>
@@ -98,7 +107,7 @@ onMounted(async () => {
       </EnterpriseSurface>
 
       <div class="eds-audit-right">
-        <EnterpriseSurface title="监督概览" description="汇总近期流水、拒绝记录、审计对象和当前筛选命中数。">
+        <EnterpriseSurface class="g-hotel-ledger-card" title="审计监督概览" description="汇总近期流水、拒绝记录、审计对象和当前筛选命中数。">
           <div class="eds-ledger-strip">
             <div v-for="item in summaryItems" :key="item.label">
               <span>{{ item.label }}</span>
@@ -108,7 +117,7 @@ onMounted(async () => {
           </div>
         </EnterpriseSurface>
 
-        <EnterpriseSurface class="eds-audit-table-surface" title="日志明细表" :description="`当前筛选命中 ${filteredLogs.length} 条记录。`">
+        <EnterpriseSurface class="g-hotel-table-card eds-audit-table-surface" title="日志明细表" :description="`当前筛选命中 ${filteredLogs.length} 条记录。`">
           <DataTable :columns="columns" :rows="filteredLogs" row-key="id" empty-text="暂无匹配的审计日志。">
             <template #action="{ row }">{{ labelAuditAction(row.action) }}</template>
             <template #objectType="{ row }">{{ labelObjectType(row.objectType) }}</template>

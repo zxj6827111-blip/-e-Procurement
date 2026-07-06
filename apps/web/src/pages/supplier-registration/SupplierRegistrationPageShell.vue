@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import TaskInboxSummary from "../../components/TaskInboxSummary.vue";
-import { EnterpriseSurface, PageHeader, StatusTag, SummaryCards, type SummaryCardItem } from "../../components/base";
+import { EnterpriseSurface, StatusTag, SummaryCards, type SummaryCardItem } from "../../components/base";
 
 defineProps<{
   canReviewRegistration: boolean;
@@ -12,12 +12,17 @@ defineProps<{
 </script>
 
 <template>
-  <PageHeader :title="pageTitle" eyebrow="供应商准入" :description="pageHint">
-    <template #actions>
+  <header class="g-hotel-page-header">
+    <div>
+      <p>供应商准入 / 报名资料</p>
+      <h2><span aria-hidden="true">报</span>{{ pageTitle }}</h2>
+      <small>{{ pageHint }}</small>
+    </div>
+    <div class="g-hotel-page-actions">
       <StatusTag v-if="canReviewRegistration" tone="warning">资格审核</StatusTag>
       <StatusTag v-else-if="isSupplierView" tone="primary">供应商视角</StatusTag>
-    </template>
-  </PageHeader>
+    </div>
+  </header>
 
   <TaskInboxSummary
     v-if="isSupplierView"
@@ -26,7 +31,7 @@ defineProps<{
     compact
   />
 
-  <EnterpriseSurface title="报名概览" description="报名资格通过后，供应商才能进入报价响应。">
+  <EnterpriseSurface class="g-hotel-ledger-card" title="报名概览" description="报名资格通过后，供应商才能进入报价响应。">
     <SummaryCards :items="summaryItems" />
   </EnterpriseSurface>
 </template>

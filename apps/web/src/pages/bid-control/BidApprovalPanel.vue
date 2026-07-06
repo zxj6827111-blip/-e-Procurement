@@ -27,7 +27,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface v-if="canMaintainBidControl" title="创建保密查看审批" description="指定供应商和可查看内容，下载权限需单独授权。">
+  <EnterpriseSurface v-if="canMaintainBidControl" class="eds-drawer-panel" title="创建保密查看审批" description="指定供应商和可查看内容，下载权限需单独授权。">
     <div class="eds-form-section">
       <label>
         目标供应商
@@ -56,7 +56,7 @@ const emit = defineEmits<{
     </SubmitPanel>
   </EnterpriseSurface>
 
-  <EnterpriseSurface v-if="canMaintainBidControl" title="审批处理" description="查看报价金额或响应文件下载前，必须有有效审批记录。">
+  <EnterpriseSurface v-if="canMaintainBidControl" class="eds-drawer-panel" title="报价查看审批处理" description="查看报价金额或响应文件下载前，必须有有效审批记录。">
     <div class="eds-form-section">
       <label>
         查看审批
@@ -75,7 +75,7 @@ const emit = defineEmits<{
     </SubmitPanel>
   </EnterpriseSurface>
 
-  <EnterpriseSurface title="有效查看审批" description="当前仍在有效期内的报价查看授权。">
+  <EnterpriseSurface title="保密查看审批台账" description="当前仍在有效期内的报价查看授权。">
     <DataTable :columns="APPROVAL_COLUMNS" :rows="approvals" row-key="id" empty-text="暂无有效查看审批">
       <template #approval="{ row }">{{ row.id }}</template>
       <template #supplier="{ row }">{{ supplierName(row.targetSupplierId) }}</template>

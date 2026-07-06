@@ -30,7 +30,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <FormSection title="采购包配置" description="用于门店开业、样板间和批量采购场景的商品包配置。">
+  <FormSection title="采购包配置抽屉" description="用于门店开业、样板间和批量采购场景的商品包配置。">
     <label v-if="operatorVisible">
       采购包类型
       <select v-model="scenarioForm.templateType">
@@ -109,7 +109,7 @@ const emit = defineEmits<{
     <EnterpriseButton type="primary" @click="emit('createScenario')">新建采购包</EnterpriseButton>
   </SubmitPanel>
 
-  <EnterpriseSurface title="采购包列表">
+  <EnterpriseSurface title="采购包台账">
     <DataTable :columns="templateColumns" :rows="visibleTemplates" empty-text="暂无采购包配置。">
       <template #type="{ row }">{{ labelStatus(row.templateType) }}</template>
       <template #summary="{ row }">{{ packageSummary(row) }}</template>

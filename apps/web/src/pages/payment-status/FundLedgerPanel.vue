@@ -16,7 +16,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="资金流水" :description="`共 ${allLedgerEntries.length} 条。`">
+  <EnterpriseSurface class="g-hotel-table-card" title="资金流水明细" :description="`共 ${allLedgerEntries.length} 条。`">
     <DataTable :columns="LEDGER_COLUMNS" :rows="allLedgerEntries" row-key="id" empty-text="暂无资金流水。">
       <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       <template #account="{ row }">{{ orgName(row.orgId) }}</template>

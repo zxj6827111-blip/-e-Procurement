@@ -1,19 +1,19 @@
 import type { DataTableColumn } from "../../components/base";
 
 export const PROGRESS_COLUMNS: DataTableColumn[] = [
-  { key: "supplier", label: "供应商" },
-  { key: "status", label: "报价状态" },
-  { key: "submittedAt", label: "提交时间" },
-  { key: "lockedAt", label: "锁定时间" },
-  { key: "version", label: "版本" }
+  { key: "project", label: "项目编号" },
+  { key: "supplier", label: "供应商 / 项目名称" },
+  { key: "progress", label: "已报价/邀请数" },
+  { key: "status", label: "状态" },
+  { key: "actions", label: "操作" }
 ];
 
 export const APPROVAL_COLUMNS: DataTableColumn[] = [
-  { key: "approval", label: "审批" },
+  { key: "approval", label: "审批编号" },
   { key: "supplier", label: "供应商" },
   { key: "viewContent", label: "查看内容" },
-  { key: "download", label: "下载" },
-  { key: "status", label: "状态" }
+  { key: "download", label: "下载权限" },
+  { key: "status", label: "审批状态" }
 ];
 
 export const LOG_COLUMNS: DataTableColumn[] = [

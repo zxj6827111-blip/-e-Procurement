@@ -28,7 +28,7 @@ const {
 </script>
 
 <template>
-  <section class="eds-section">
+  <section class="eds-section g-hotel-page g-hotel-approval-rules-page">
     <ApprovalRulesPageShell
       v-model:business-type-filter="businessTypeFilter"
       :business-type-options="businessTypeOptions"

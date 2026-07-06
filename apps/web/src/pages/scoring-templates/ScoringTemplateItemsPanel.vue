@@ -20,7 +20,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="评分项" description="评分项用于生成专家逐项评分表，启用前总分必须等于 100 分。">
+  <EnterpriseSurface class="g-hotel-table-card" title="评分项" description="评分项用于生成专家逐项评分表，启用前总分必须等于 100 分。">
     <SummaryCards
       :items="[
         { label: '技术分', value: categoryTotals.technical, meta: '技术响应' },

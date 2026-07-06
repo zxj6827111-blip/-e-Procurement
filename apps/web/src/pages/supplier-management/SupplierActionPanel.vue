@@ -52,10 +52,18 @@ const title = computed(() => {
   if (props.actionMode === "deactivate") return "作废停用供应商";
   return "重新启用供应商";
 });
+
+const description = computed(() => {
+  if (props.actionMode === "profile") return "补齐企业基础信息、资质附件和服务范围，保存后同步到供应商治理台账。";
+  if (props.actionMode === "review") return "按资质初审、准入评审、转正或周期考核记录评审结论。";
+  if (props.actionMode === "sample") return "上传封样图片和规格说明，用于后续履约验收对照。";
+  if (props.actionMode === "deactivate") return "停用只影响后续可用状态，历史档案与审计留痕继续保留。";
+  return "恢复供应商为可用状态，历史停用记录和审计留痕继续保留。";
+});
 </script>
 
 <template>
-  <EnterpriseSurface :title="title">
+  <EnterpriseSurface class="eds-drawer-panel" :title="title" :description="description">
     <template #actions>
       <EnterpriseButton type="text" @click="emit('close')">收起</EnterpriseButton>
     </template>

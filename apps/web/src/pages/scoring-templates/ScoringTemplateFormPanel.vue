@@ -19,7 +19,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <FormSection title="模板基础信息" :description="selectedTemplate?.inUse ? '当前模板已被评分单使用，只允许维护基础信息。' : '维护模板编码、名称和状态。'">
+  <FormSection class="g-hotel-form-card" title="模板基础信息" :description="selectedTemplate?.inUse ? '当前模板已被评分单使用，只允许维护基础信息。' : '维护模板编码、名称和状态。'">
     <label>
       模板编码
       <input v-model="form.templateCode" :disabled="Boolean(selectedTemplate) || !canMaintain" placeholder="例如 hotel-linen-v2" />

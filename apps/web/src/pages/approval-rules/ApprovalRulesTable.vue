@@ -18,7 +18,7 @@ defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="审批规则列表" :description="loading ? '正在加载审批规则。' : `当前筛选 ${rules.length} 条规则。`">
+  <EnterpriseSurface class="g-hotel-table-card" title="审批规则列表" :description="loading ? '正在加载审批规则。' : `当前筛选 ${rules.length} 条规则。`">
     <FeedbackMessage v-if="loading" align="center">正在加载审批规则...</FeedbackMessage>
     <DataTable v-else :columns="RULE_COLUMNS" :rows="rules" row-key="id" empty-text="当前筛选条件下没有可查看规则。">
       <template #rule="{ row }">

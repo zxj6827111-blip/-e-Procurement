@@ -1,3 +1,12 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+@layer utilities {
+  .shadow-soft {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -12,7 +21,7 @@ body {
   margin: 0;
   background: var(--ep-color-bg);
   color: var(--ep-color-text);
-  font-family: var(--ep-font-family);
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
   font-size: var(--ep-font-body);
 }
 

@@ -18,7 +18,7 @@ defineProps<{
       :project-id="projectId"
       compact
     />
-    <EnterpriseSurface v-if="nextAction" title="下一步" :description="nextAction.title">
+    <EnterpriseSurface v-if="nextAction" class="eds-drawer-panel" title="审计跟踪与风险" :description="nextAction.title">
       <p>{{ nextAction.detail }}</p>
       <RouterLink v-if="nextAction.to" class="eds-button eds-button-text" :to="nextAction.to">去处理</RouterLink>
       <a v-else-if="nextAction.anchor" class="eds-button eds-button-text" :href="`#${nextAction.anchor}`">查看详情</a>

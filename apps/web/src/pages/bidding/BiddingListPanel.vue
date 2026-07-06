@@ -14,7 +14,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="报价单列表" description="只保留供应商处理报价所需字段；金额和响应文件仍按采购侧保密规则处理。">
+  <EnterpriseSurface class="g-hotel-table-card" title="采购方需求与报价单列表" description="上半区查看当前项目、提交状态、金额和响应文件处理记录。">
     <DataTable :columns="BID_COLUMNS" :rows="bids" row-key="id" empty-text="当前项目暂无报价单">
       <template #project="{ row }">{{ projectLabel(row.projectId) }}</template>
       <template #amount="{ row }">{{ row.amount ?? "-" }}</template>

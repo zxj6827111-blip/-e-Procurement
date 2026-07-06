@@ -21,7 +21,8 @@ const emit = defineEmits<{
 <template>
   <EnterpriseSurface
     v-if="canMaintainDocuments"
-    title="创建采购文件"
+    class="eds-drawer-panel"
+    title="起草文件"
     description="先选择内部采购项目，再补齐文件标题、摘要与附件，形成可发布的文件版本。"
   >
     <FormSection title="文件基础信息" description="版本创建后仍可在锁定前补充，但公告只能引用锁定版本。">

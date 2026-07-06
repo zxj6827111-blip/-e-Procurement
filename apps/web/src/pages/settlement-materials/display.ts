@@ -5,42 +5,39 @@ import type { Invoice, Overview, SettlementBill, SettlementOperationForm } from 
 
 export const billColumns: DataTableColumn[] = [
   { key: "billNo", label: "结算单号" },
-  { key: "supplier", label: "供应商" },
+  { key: "supplier", label: "供应商名称" },
   { key: "period", label: "账期" },
   { key: "orderAmount", label: "订单金额" },
   { key: "deductions", label: "扣减/服务费" },
   { key: "settlementAmount", label: "应结金额" },
-  { key: "status", label: "状态" },
-  { key: "actions", label: "操作" }
+  { key: "status", label: "审核状态" },
+  { key: "actions", label: "处理" }
 ];
 
 export const materialColumns: DataTableColumn[] = [
-  { key: "materialType", label: "资料类型" },
-  { key: "fileName", label: "文件" },
-  { key: "supplier", label: "供应商" },
-  { key: "order", label: "订单" },
+  { key: "id", label: "结算编号" },
+  { key: "order", label: "关联订单" },
+  { key: "supplier", label: "供应商名称" },
   { key: "status", label: "状态" },
-  { key: "uploadedAt", label: "上传时间" },
-  { key: "opinion", label: "核验意见" },
   { key: "actions", label: "操作" }
 ];
 
 export const invoiceColumns: DataTableColumn[] = [
   { key: "invoice", label: "发票号/文件" },
   { key: "bill", label: "关联结算" },
-  { key: "supplier", label: "供应商" },
-  { key: "amount", label: "金额" },
+  { key: "supplier", label: "供应商名称" },
+  { key: "amount", label: "发票金额" },
   { key: "taxAmount", label: "税额" },
-  { key: "status", label: "状态" },
+  { key: "status", label: "核验状态" },
   { key: "uploadedAt", label: "上传时间" },
-  { key: "actions", label: "操作" }
+  { key: "actions", label: "处理" }
 ];
 
 export const reconciliationColumns: DataTableColumn[] = [
-  { key: "supplier", label: "供应商" },
+  { key: "supplier", label: "供应商名称" },
   { key: "expectedAmount", label: "应核金额" },
   { key: "actualAmount", label: "实核金额" },
-  { key: "status", label: "状态" },
+  { key: "status", label: "核对状态" },
   { key: "reason", label: "原因/更新时间" }
 ];
 

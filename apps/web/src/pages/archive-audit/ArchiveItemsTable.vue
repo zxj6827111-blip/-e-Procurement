@@ -10,7 +10,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="档案项" :description="`共 ${archiveItems.length} 项归档材料。`">
+  <EnterpriseSurface class="g-hotel-table-card" title="档案材料清单" :description="`共 ${archiveItems.length} 项归档材料。`">
     <DataTable :columns="ARCHIVE_ITEM_COLUMNS" :rows="archiveItems" row-key="id" empty-text="当前项目暂无档案项。">
       <template #required="{ row }">{{ yesNo(row.requiredFlag) }}</template>
       <template #collected="{ row }">{{ yesNo(row.collectedFlag) }}</template>

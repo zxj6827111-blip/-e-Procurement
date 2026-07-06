@@ -15,7 +15,7 @@ defineProps<{
 </script>
 
 <template>
-  <FilterBar>
+  <FilterBar class="g-hotel-filter-bar">
     <label>
       状态
       <select v-model="statusFilter">
@@ -37,7 +37,7 @@ defineProps<{
     </label>
     <label>
       处理意见
-      <input v-model="opinion" />
+      <input v-model="opinion" placeholder="请输入同意或驳回的详细意见..." />
     </label>
   </FilterBar>
 </template>

@@ -2,6 +2,10 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
 import { apiGet } from "./api/http";
+import { loadWorkflowNotifications, type R8WorkflowNotificationView } from "./api/workflow";
+import GeminiShellBridge from "./gemini-react/GeminiShellBridge.vue";
+import { geminiViewForPath, routeForGeminiView, toGeminiUser } from "./gemini-react/route-mapping";
+import type { ViewState } from "./gemini-react/prototype/types";
 import AppShell from "./layouts/AppShell.vue";
 import AuthShell from "./layouts/AuthShell.vue";
 import {
@@ -24,12 +28,22 @@ interface SwitchableUser {
   supplierName?: string;
 }
 
+interface ShellNotificationItem {
+  id: string;
+  title: string;
+  summary: string;
+  to: string;
+  unread: boolean;
+}
+
 const session = useSessionStore();
 const route = useRoute();
 const router = useRouter();
 const bootstrapped = ref(false);
 const roleSwitchOptions = ref<Array<{ id: string; label: string }>>([]);
 const selectedRoleSwitchId = ref("");
+const notificationItems = ref<ShellNotificationItem[]>([]);
+const pendingGeminiProjectId = ref<string | null>(null);
 
 const hasCurrentRoleProfile = computed(() => hasRoleProfile(session.roleId));
 const currentRoleLabel = computed(() => {
@@ -66,9 +80,40 @@ const renderStateInAuthShell = computed(() => isPermissionDeniedRoute.value && !
 const supplierPasswordChangeRequired = computed(
   () => session.passwordChangeRequired && ["supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId)
 );
+const geminiView = computed(() => geminiViewForPath(route.path, session.roleId));
+const geminiRenderableView = computed(() => geminiView.value);
+const geminiCurrentUser = computed(() => {
+  if (!session.user) return null;
+  return toGeminiUser({
+    id: session.user.id,
+    name: session.user.name,
+    roleId: session.roleId,
+    orgId: session.user.orgId
+  });
+});
+const routeProjectId = computed(() => {
+  const routeParam = route.params.projectId;
+  if (typeof routeParam === "string") return routeParam;
+  const queryParam = route.query.projectId;
+  if (typeof queryParam === "string") return queryParam;
+  return null;
+});
+const geminiProjectId = computed(() => routeProjectId.value ?? pendingGeminiProjectId.value);
 
 function routeAllowed(path: string) {
   return isRouteAllowed(path, session.roleId, session.mockAuthEnabled);
+}
+
+function navigateGeminiView(view: ViewState) {
+  const target = routeForGeminiView(view, session.roleId, geminiProjectId.value);
+  if (!target || target === route.fullPath) return;
+  void router.push(target);
+}
+
+function navigateGeminiProject(projectId: string | null) {
+  pendingGeminiProjectId.value = projectId;
+  if (!projectId) return;
+  void router.push(`/project-workbench/${encodeURIComponent(projectId)}`);
 }
 
 async function loadSwitchableUsers() {
@@ -87,6 +132,28 @@ async function loadSwitchableUsers() {
   } catch {
     roleSwitchOptions.value = [];
     selectedRoleSwitchId.value = session.user.id;
+  }
+}
+
+function toShellNotification(message: R8WorkflowNotificationView): ShellNotificationItem {
+  return {
+    id: message.id,
+    title: message.title || message.businessTypeLabel,
+    summary: message.contentSummary || `${message.businessTypeLabel} / ${message.readLabel}`,
+    to: message.targetPath || "/messages",
+    unread: !message.read
+  };
+}
+
+async function loadShellNotifications() {
+  if (!showMessageBell.value || !session.user) {
+    notificationItems.value = [];
+    return;
+  }
+  try {
+    notificationItems.value = (await loadWorkflowNotifications()).map(toShellNotification).slice(0, 6);
+  } catch {
+    notificationItems.value = [];
   }
 }
 
@@ -153,6 +220,7 @@ onMounted(async () => {
   } finally {
     bootstrapped.value = true;
     await loadSwitchableUsers();
+    await loadShellNotifications();
     enforceCurrentRoute();
   }
 });
@@ -161,6 +229,7 @@ watch(
   () => [session.user?.id, session.mockAuthEnabled, session.mode],
   () => {
     void loadSwitchableUsers();
+    void loadShellNotifications();
   }
 );
 
@@ -174,18 +243,38 @@ watch(
   },
   { immediate: true }
 );
+
+watch(
+  () => routeProjectId.value,
+  (projectId) => {
+    if (projectId) pendingGeminiProjectId.value = projectId;
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
-  <AuthShell v-if="isLoginRoute || isHiddenUtilityRoute || isPublicSupplierRegisterRoute || renderStateInAuthShell" :commercial="isLoginRoute">
+  <RouterView v-if="isPublicSupplierRegisterRoute" />
+
+  <AuthShell v-else-if="isLoginRoute || isHiddenUtilityRoute || renderStateInAuthShell" :commercial="isLoginRoute">
     <RouterView />
   </AuthShell>
 
+  <GeminiShellBridge
+    v-else-if="shellVisible && geminiRenderableView && geminiCurrentUser"
+    :current-user="geminiCurrentUser"
+    :current-view="geminiRenderableView"
+    :current-project-id="geminiProjectId"
+    :on-view-change="navigateGeminiView"
+    :on-project-id-change="navigateGeminiProject"
+    :on-logout="logout"
+  />
+
   <AppShell
     v-else-if="shellVisible"
-    brand-mark="H"
-    brand-title="酒店供应链采购平台"
-    brand-subtitle="RBAC 中台 · 招采 · 履约 · 审计"
+    brand-mark="采"
+    brand-title="集团内部采购规范化平台"
+    brand-subtitle="招采流程 · 供应协同 · 履约审计"
     :home-to="roleHome(session.roleId)"
     :context-label="currentRoleLabel"
     :page-title="shellPageTitle"
@@ -198,7 +287,9 @@ watch(
     :role-switch-options="roleSwitchOptions"
     :selected-role-switch-id="selectedRoleSwitchId"
     :show-message-bell="showMessageBell"
+    :notification-items="notificationItems"
     message-route="/messages"
+    global-title="G-Hotel Enterprise Procurement Platform"
     @logout="logout"
     @update:selected-role-switch-id="selectedRoleSwitchId = $event"
     @switch-role="switchRole"

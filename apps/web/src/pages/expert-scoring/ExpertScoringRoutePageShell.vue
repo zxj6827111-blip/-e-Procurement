@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
 import AuditLogRef from "../../components/AuditLogRef.vue";
 import ErrorAlert from "../../components/ErrorAlert.vue";
-import { EnterpriseButton, EnterpriseDialog } from "../../components/base";
 import ActivityRecordPanel from "../../components/ActivityRecordPanel.vue";
 import ExpertConfirmationPanel from "./ExpertConfirmationPanel.vue";
 import ExpertScoreSheetPanel from "./ExpertScoreSheetPanel.vue";
@@ -42,35 +40,21 @@ const {
   viewMaterials
 } = useExpertScoringPage();
 
-const showAvoidanceDialog = computed(() => Boolean(selectedProjectId.value) && Boolean(currentAssignment.value) && !confirmationCompleted.value);
-
-function keepDialogOpen() {
-  return;
-}
 </script>
 
 <template>
-  <section class="eds-section eds-print-area">
-    <EnterpriseDialog :open="showAvoidanceDialog" title="回避确认" @close="keepDialogOpen">
-      <p class="eds-meta">
-        专家进入评分前必须先完成回避、纪律与保密确认。确认后才开放材料查看、保存草稿和提交锁定。
-      </p>
-
-      <template #actions>
-        <EnterpriseButton type="primary" @click="confirmAll">确认并进入评分</EnterpriseButton>
-      </template>
-    </EnterpriseDialog>
-
+  <section class="eds-section eds-print-area g-hotel-page g-hotel-scoring-page">
     <ExpertScoringPageShell
       :selected-sheet="selectedSheet"
       :summary-items="summaryItems"
       :sheet-status-label="sheetStatusLabel"
       :sheet-status-tone="sheetStatusTone"
       @print-sheet="printSheet"
+      @view-materials="viewMaterials"
     />
 
-    <div class="eds-template-c-scoring-grid">
-      <aside class="eds-scoring-side">
+    <div class="eds-template-c-scoring-grid g-hotel-scoring-grid">
+      <aside class="eds-scoring-side g-hotel-scoring-side">
         <ExpertConfirmationPanel
           v-model:selected-project-id="selectedProjectId"
           :assignment-status-label="assignmentStatusLabel"
@@ -97,7 +81,7 @@ function keepDialogOpen() {
         <ExpertScoringMaterialsPanel :attachment-groups="attachmentGroups" :selected-sheet-detail="selectedSheetDetail" />
       </aside>
 
-      <section class="eds-scoring-main">
+      <section class="eds-scoring-main g-hotel-scoring-main">
         <ExpertScoreSheetPanel
           v-model:opinion="opinion"
           v-model:score-inputs="scoreInputs"

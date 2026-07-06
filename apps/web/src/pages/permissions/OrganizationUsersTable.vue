@@ -12,7 +12,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface v-if="rows.length || adminLoadError" title="组织账号" description="管理员可查看组织用户、角色、部门、岗位和账号状态。">
+  <EnterpriseSurface v-if="rows.length || adminLoadError" class="g-hotel-table-card" title="组织账号" description="管理员可查看组织用户、角色、部门、岗位和账号状态。">
     <p v-if="adminLoadError" class="eds-meta">{{ adminLoadError }}；当前角色只展示个人权限和审批规则。</p>
     <DataTable v-else :columns="userColumns" :rows="rows" row-key="id" empty-text="暂无组织账号">
       <template #roleId="{ row }">{{ roleText(row.roleId) }}</template>

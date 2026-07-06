@@ -10,7 +10,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="规则版本库" description="规则版本以版本号、校验状态和签名摘要作为治理字段。">
+  <EnterpriseSurface class="g-hotel-table-card" title="规则版本库" description="规则版本以版本号、校验状态和签名摘要作为治理字段。">
     <DataTable :columns="bpmnDefinitionColumns" :rows="rows" row-key="id" empty-text="暂无规则版本">
       <template #ruleVersion="{ row }">{{ row.processName }} / {{ row.processCode }}</template>
       <template #businessType="{ row }">{{ businessTypeText(row.businessType) }}</template>

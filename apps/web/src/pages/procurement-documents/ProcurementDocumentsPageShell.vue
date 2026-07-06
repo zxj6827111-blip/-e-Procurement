@@ -19,11 +19,11 @@ defineProps<{
 </script>
 
 <template>
-  <header class="eds-page-header eds-business-context">
+  <header class="eds-page-header eds-business-context g-hotel-page-header">
     <div class="eds-business-context-main">
       <p class="eds-business-eyebrow">采购准备 / 文件治理</p>
-      <h2>采购文件管理</h2>
-      <p>采购文件先完成内部编制、锁定和留痕，再进入公告与邀请，不让业务链路倒挂。</p>
+      <h2>采购文件</h2>
+      <p>管理招标文件、采购清单及合同范本草案，先完成内部编制、锁定和留痕，再进入公告与邀请。</p>
     </div>
     <div class="eds-business-context-aside">
       <span class="eds-meta">当前模式</span>
@@ -71,11 +71,18 @@ defineProps<{
     </RiskAlertPanel>
   </div>
 
-  <FilterBar>
+  <FilterBar class="g-hotel-filter-bar">
     <label>
-      文件范围
-      <select value="all" disabled>
-        <option value="all">全部采购文件</option>
+      搜索
+      <input placeholder="搜索文件名称或项目..." />
+    </label>
+    <label>
+      状态
+      <select>
+        <option>全部状态</option>
+        <option>草稿</option>
+        <option>待审核</option>
+        <option>已审核</option>
       </select>
     </label>
   </FilterBar>

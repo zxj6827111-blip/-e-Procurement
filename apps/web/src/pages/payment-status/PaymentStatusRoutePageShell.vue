@@ -33,7 +33,7 @@ const {
 </script>
 
 <template>
-  <section class="eds-section">
+  <section class="eds-section g-hotel-page g-hotel-payment-page">
     <PaymentStatusPageShell :can-maintain-funds="canMaintainFunds" :loading="loading" :message="message" :summary-items="summaryItems" />
 
     <ActivityRecordPanel

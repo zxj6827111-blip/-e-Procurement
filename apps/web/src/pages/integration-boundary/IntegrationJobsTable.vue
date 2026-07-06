@@ -14,7 +14,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface title="集成任务" description="外部调用任务的执行、重试、重推和取消操作集中在任务表格内完成。">
+  <EnterpriseSurface class="g-hotel-table-card" title="集成任务台账" description="外部调用任务的执行、重试、重推和取消操作集中在任务表格内完成。">
     <DataTable :columns="jobColumns" :rows="rows" row-key="id" empty-text="暂无集成任务">
       <template #job="{ row }">{{ jobId(row) }}</template>
       <template #business="{ row }">{{ row.businessType || "-" }} / {{ row.businessId || "-" }}</template>

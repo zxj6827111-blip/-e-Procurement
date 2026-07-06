@@ -13,7 +13,7 @@ defineProps<{
 </script>
 
 <template>
-  <EnterpriseSurface title="高优先待办" description="按截止时间、业务阶段和风险信号排列，优先处理最影响项目推进的事项。">
+  <EnterpriseSurface title="高优待处理任务" description="按状态、关联业务和时效风险排列，优先处理会阻塞采购推进的事项。">
     <template #actions>
       <RouterLink v-if="showEntry" class="eds-button" :to="entryLink.to">{{ entryLink.label }}</RouterLink>
     </template>
@@ -23,7 +23,7 @@ defineProps<{
         <StatusTag tone="warning">{{ row.status }}</StatusTag>
       </template>
       <template #action="{ row }">
-        <RouterLink class="eds-button eds-button-text" :to="row.to">处理</RouterLink>
+        <RouterLink class="eds-button eds-button-text" :to="row.to">去处理</RouterLink>
       </template>
     </DataTable>
   </EnterpriseSurface>

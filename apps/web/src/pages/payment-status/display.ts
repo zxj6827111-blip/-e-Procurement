@@ -2,32 +2,30 @@ import type { DataTableColumn } from "../../components/base";
 import { labelStatus } from "../../utils/status-labels";
 
 export const ACCOUNT_COLUMNS: DataTableColumn[] = [
-  { key: "account", label: "账户" },
-  { key: "status", label: "状态" },
-  { key: "balance", label: "余额" },
-  { key: "credit", label: "授信" },
-  { key: "occupied", label: "占用" },
+  { key: "account", label: "账户名称" },
+  { key: "status", label: "账户状态" },
+  { key: "balance", label: "可用余额" },
+  { key: "credit", label: "授信额度" },
+  { key: "occupied", label: "占用金额" },
   { key: "updatedAt", label: "更新时间" },
-  { key: "actions", label: "操作" }
+  { key: "actions", label: "处理" }
 ];
 
 export const PAYABLE_ORDER_COLUMNS: DataTableColumn[] = [
-  { key: "orderNo", label: "订单号" },
-  { key: "organization", label: "组织" },
-  { key: "orderStatus", label: "订单状态" },
-  { key: "paymentStatus", label: "付款状态" },
+  { key: "orderNo", label: "付款编号 / 订单编号" },
+  { key: "organization", label: "供应商 / 组织" },
   { key: "amount", label: "金额" },
-  { key: "reservedAmount", label: "占用金额" },
+  { key: "paymentStatus", label: "状态" },
   { key: "actions", label: "操作" }
 ];
 
 export const LEDGER_COLUMNS: DataTableColumn[] = [
   { key: "createdAt", label: "时间" },
-  { key: "account", label: "账户" },
-  { key: "direction", label: "方向" },
-  { key: "entryType", label: "类型" },
-  { key: "status", label: "状态" },
-  { key: "order", label: "订单" },
+  { key: "account", label: "账户名称" },
+  { key: "direction", label: "收支方向" },
+  { key: "entryType", label: "流水类型" },
+  { key: "status", label: "入账状态" },
+  { key: "order", label: "关联订单" },
   { key: "amount", label: "金额" },
   { key: "note", label: "备注" }
 ];

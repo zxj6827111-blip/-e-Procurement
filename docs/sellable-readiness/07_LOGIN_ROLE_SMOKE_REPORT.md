@@ -1,73 +1,73 @@
 # Login Role Smoke Report
 
-- Generated at: 2026-07-06T00:06:34.961Z
+- Generated at: 2026-07-06T13:01:33.857Z
 - Result: PASS
 
 | Check | Status | Evidence |
 | --- | --- | --- |
-| local-role-select-visible | PASS | 集团采购管理 / 集团采购管理部 / 采购经办 / 华东区域公司 / 平台运营 / 集团采购运营中心 / 酒店采购 / 上海滨江华礼酒店 / 酒店财务 / 上海滨江华礼酒店 / 财务审核 / 集团财务共享中心 / 供应商 / 上海棉织供应链有限公司 / 供应商管理员 / 上海棉织供应链有限公司 / 供应商报价员 / 上海棉织供应链有限公司 / 专家 / 集团评审专家库 / 审计监督 / 集团纪检审计部 / 系统管理员 / 集团信息中心 |
+| local-role-select-visible | PASS | 集团采购管理 / 采购经办 / 平台运营 / 酒店采购 / 酒店财务 / 财务审核 / 供应商 / 供应商管理员 / 供应商报价员 / 专家 / 审计监督 / 系统管理员 |
 | local-login-no-scroll-1366x768 | PASS | scrollHeight=768, viewport=768 |
 | role-entry-u1 | PASS | 集团采购管理人: finalPath=/, expected=/, shell=1 |
-| role-nav-u1 | PASS | 集团采购管理人: 我的待办 / 审批规则 / 需求审批 / 采购项目 / 报价进度 / 评审定标 / 评分模板 / 定标审批 / 供应商 / 商品目录 / 档案审计 |
+| role-nav-u1 | PASS | 集团采购管理人: 工作台 / 我的待办 / 消息中心 / 审批规则 / 需求审批 / 采购项目 / 采购文件 / 公告与邀请 / 报价进度 / 评审定标 / 评分模板 / 定标审批 / 供应商管理 / 商品目录 / 档案审计 |
 | role-bell-u1 | PASS | 集团采购管理人: bellButtons=1, expected=1 |
-| role-template-u1 | PASS | 集团采购管理人: expected=A, model=A, dom=A |
+| role-template-u1 | PASS | 集团采购管理人: roleModelTemplate=A, expectedPreserved=A, geminiShell=1 |
 | role-message-u1 | PASS | 集团采购管理人: finalPath=/messages, shell=1, bodyHasMessageCenter=true |
 | role-entry-u2 | PASS | 采购经办人: finalPath=/, expected=/, shell=1 |
-| role-nav-u2 | PASS | 采购经办人: 我的待办 / 采购申请 / 采购项目 / 商品目录 / 评审定标 / 定标审批 / 订单履约 / 档案审计 |
+| role-nav-u2 | PASS | 采购经办人: 工作台 / 我的待办 / 消息中心 / 采购申请 / 采购项目 / 采购文件 / 公告与邀请 / 商品目录 / 评审定标 / 定标审批 / 订单履约 / 档案审计 |
 | role-bell-u2 | PASS | 采购经办人: bellButtons=1, expected=1 |
-| role-template-u2 | PASS | 采购经办人: expected=A, model=A, dom=A |
+| role-template-u2 | PASS | 采购经办人: roleModelTemplate=A, expectedPreserved=A, geminiShell=1 |
 | role-message-u2 | PASS | 采购经办人: finalPath=/messages, shell=1, bodyHasMessageCenter=true |
 | role-entry-u10 | PASS | 平台运营: finalPath=/, expected=/, shell=1 |
-| role-nav-u10 | PASS | 平台运营: 我的待办 / 采购申请 / 采购项目 / 商品目录 / 评审定标 / 评分模板 / 定标审批 / 订单履约 / 档案审计 |
+| role-nav-u10 | PASS | 平台运营: 工作台 / 我的待办 / 消息中心 / 采购申请 / 采购项目 / 商品目录 / 评审定标 / 评分模板 / 定标审批 / 订单履约 / 档案审计 |
 | role-bell-u10 | PASS | 平台运营: bellButtons=1, expected=1 |
-| role-template-u10 | PASS | 平台运营: expected=A, model=A, dom=A |
+| role-template-u10 | PASS | 平台运营: roleModelTemplate=A, expectedPreserved=A, geminiShell=1 |
 | role-message-u10 | PASS | 平台运营: finalPath=/messages, shell=1, bodyHasMessageCenter=true |
 | role-entry-u8 | PASS | 酒店采购: finalPath=/procurement-requests, expected=/procurement-requests, shell=1 |
-| role-nav-u8 | PASS | 酒店采购: 工作台 / 我的待办 / 采购申请 / 商品目录 / 订单履约 |
+| role-nav-u8 | PASS | 酒店采购: 工作台 / 我的待办 / 消息中心 / 采购申请 / 商品目录 / 订单履约 |
 | role-bell-u8 | PASS | 酒店采购: bellButtons=1, expected=1 |
-| role-template-u8 | PASS | 酒店采购: expected=B, model=B, dom=n/a |
+| role-template-u8 | PASS | 酒店采购: roleModelTemplate=B, expectedPreserved=B, geminiShell=1 |
 | role-message-u8 | PASS | 酒店采购: finalPath=/messages, shell=1, bodyHasMessageCenter=true |
 | role-entry-u9 | PASS | 酒店财务: finalPath=/, expected=/, shell=1 |
-| role-nav-u9 | PASS | 酒店财务: 工作台 / 我的待办 / 结算付款 / 付款进度 |
+| role-nav-u9 | PASS | 酒店财务: 工作台 / 我的待办 / 消息中心 / 结算付款 / 付款进度 |
 | role-bell-u9 | PASS | 酒店财务: bellButtons=1, expected=1 |
-| role-template-u9 | PASS | 酒店财务: expected=B, model=B, dom=B |
+| role-template-u9 | PASS | 酒店财务: roleModelTemplate=B, expectedPreserved=B, geminiShell=1 |
 | role-message-u9 | PASS | 酒店财务: finalPath=/messages, shell=1, bodyHasMessageCenter=true |
 | role-entry-u13 | PASS | 财务审核: finalPath=/, expected=/, shell=1 |
-| role-nav-u13 | PASS | 财务审核: 工作台 / 我的待办 / 结算付款 / 付款进度 |
+| role-nav-u13 | PASS | 财务审核: 工作台 / 我的待办 / 消息中心 / 结算付款 / 付款进度 |
 | role-bell-u13 | PASS | 财务审核: bellButtons=1, expected=1 |
-| role-template-u13 | PASS | 财务审核: expected=B, model=B, dom=B |
+| role-template-u13 | PASS | 财务审核: roleModelTemplate=B, expectedPreserved=B, geminiShell=1 |
 | role-message-u13 | PASS | 财务审核: finalPath=/messages, shell=1, bodyHasMessageCenter=true |
 | role-entry-u3 | PASS | 供应商: finalPath=/, expected=/, shell=1 |
-| role-nav-u3 | PASS | 供应商: 我的待办 / 商品维护 / 供应商档案 / 报名资料 / 报价响应 / 中标结果 / 订单履约 / 结算材料 |
+| role-nav-u3 | PASS | 供应商: 工作台 / 我的待办 / 消息中心 / 商品维护 / 供应商档案 / 报名资料 / 报价响应 / 中标结果 / 订单履约 / 结算材料 |
 | role-bell-u3 | PASS | 供应商: bellButtons=1, expected=1 |
-| role-template-u3 | PASS | 供应商: expected=C, model=C, dom=C |
+| role-template-u3 | PASS | 供应商: roleModelTemplate=C, expectedPreserved=C, geminiShell=1 |
 | role-message-u3 | PASS | 供应商: finalPath=/messages, shell=1, bodyHasMessageCenter=true |
 | role-entry-u11 | PASS | 供应商管理员: finalPath=/, expected=/, shell=1 |
-| role-nav-u11 | PASS | 供应商管理员: 我的待办 / 商品维护 / 供应商档案 / 报名资料 / 报价响应 / 中标结果 / 订单履约 / 结算材料 |
+| role-nav-u11 | PASS | 供应商管理员: 工作台 / 我的待办 / 消息中心 / 商品维护 / 供应商档案 / 报名资料 / 报价响应 / 中标结果 / 订单履约 / 结算材料 |
 | role-bell-u11 | PASS | 供应商管理员: bellButtons=1, expected=1 |
-| role-template-u11 | PASS | 供应商管理员: expected=C, model=C, dom=C |
+| role-template-u11 | PASS | 供应商管理员: roleModelTemplate=C, expectedPreserved=C, geminiShell=1 |
 | role-message-u11 | PASS | 供应商管理员: finalPath=/messages, shell=1, bodyHasMessageCenter=true |
 | role-entry-u12 | PASS | 供应商报价人员: finalPath=/bidding, expected=/bidding, shell=1 |
-| role-nav-u12 | PASS | 供应商报价人员: 我的待办 / 商品维护 / 供应商档案 / 报名资料 / 报价响应 / 中标结果 / 订单履约 / 结算材料 |
+| role-nav-u12 | PASS | 供应商报价人员: 工作台 / 我的待办 / 消息中心 / 商品维护 / 供应商档案 / 报名资料 / 报价响应 / 中标结果 / 订单履约 / 结算材料 |
 | role-bell-u12 | PASS | 供应商报价人员: bellButtons=1, expected=1 |
-| role-template-u12 | PASS | 供应商报价人员: expected=C, model=C, dom=n/a |
+| role-template-u12 | PASS | 供应商报价人员: roleModelTemplate=C, expectedPreserved=C, geminiShell=1 |
 | role-message-u12 | PASS | 供应商报价人员: finalPath=/messages, shell=1, bodyHasMessageCenter=true |
 | role-entry-u7 | PASS | 专家: finalPath=/expert-scoring, expected=/expert-scoring, shell=1 |
-| role-nav-u7 | PASS | 专家: 工作台 / 我的待办 |
+| role-nav-u7 | PASS | 专家: 工作台 / 我的待办 / 消息中心 / 专家评分 |
 | role-bell-u7 | PASS | 专家: bellButtons=1, expected=1 |
-| role-template-u7 | PASS | 专家: expected=C, model=C, dom=n/a |
-| role-avoidance-u7 | PASS | dialogBefore=true, dialogAfter=0, materialsBefore=true, materialsAfter=false |
+| role-template-u7 | PASS | 专家: roleModelTemplate=C, expectedPreserved=C, geminiShell=1 |
+| role-avoidance-u7 | PASS | recusalBefore=true, scoringAfterConfirm=true |
 | role-message-u7 | PASS | 专家: finalPath=/messages, shell=1, bodyHasMessageCenter=true |
 | role-entry-u5 | PASS | 纪检审计: finalPath=/, expected=/, shell=1 |
-| role-nav-u5 | PASS | 纪检审计: 工作台 / 我的待办 / 审批规则 / 档案审计 / 采购监督 / 定标监督 / 供应商监督 / 操作日志 / 集成配置 |
+| role-nav-u5 | PASS | 纪检审计: 工作台 / 我的待办 / 消息中心 / 审批规则 / 档案审计 / 采购监督 / 定标监督 / 供应商监督 / 操作日志 / 集成配置 |
 | role-bell-u5 | PASS | 纪检审计: bellButtons=1, expected=1 |
-| role-template-u5 | PASS | 纪检审计: expected=D, model=D, dom=D |
+| role-template-u5 | PASS | 纪检审计: roleModelTemplate=D, expectedPreserved=D, geminiShell=1 |
 | role-message-u5 | PASS | 纪检审计: finalPath=/messages, shell=1, bodyHasMessageCenter=true |
 | role-entry-u6 | PASS | 系统管理员: finalPath=/permissions, expected=/permissions, shell=1 |
 | role-nav-u6 | PASS | 系统管理员: 审批规则 / 系统管理 / 系统设置 |
 | role-bell-u6 | PASS | 系统管理员: bellButtons=0, expected=0 |
-| role-template-u6 | PASS | 系统管理员: expected=D, model=D, dom=D |
-| production-hides-local-role-select | PASS | mode=production; roleSelectors=0; bodyHasProduction=true |
+| role-template-u6 | PASS | 系统管理员: roleModelTemplate=D, expectedPreserved=D, geminiShell=1 |
+| production-hides-local-role-select | PASS | mode=production; roleSelectors=0; loginLayout=1 |
 | production-blocks-role-switch-route | PASS | finalPath=/login; selectors=0 |
 | unknown-role-fail-closed | PASS | finalPath=/permission-denied, shell=0, denied=true |
 
