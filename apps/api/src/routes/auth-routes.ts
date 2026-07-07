@@ -17,6 +17,12 @@ const roleLabels: Record<string, string> = {
   admin: "系统管理员"
 };
 const localAccessUserIds = new Set(Array.from({ length: 17 }, (_, index) => `u${index + 1}`));
+const dynamicSupplierAccessRoles = new Set(["supplier_admin", "supplier_quotation"]);
+
+function isLocalAccessUser(user: { id: string; roleId: string; supplierId?: string }) {
+  if (localAccessUserIds.has(user.id)) return true;
+  return dynamicSupplierAccessRoles.has(user.roleId) && Boolean(user.supplierId);
+}
 
 function currentAccount(ctx: AppContext, userId: string) {
   return ctx.authStore.getAccountsByUserIds([userId])[0] ?? null;
@@ -214,7 +220,7 @@ export function authRoutes(ctx: AppContext) {
     }
     const users = ctx.state.users
       .filter((user) => user.roleId !== "system" && (user.status ?? "active") === "active")
-      .filter((user) => localAccessUserIds.has(user.id))
+      .filter(isLocalAccessUser)
       .map((user) => {
         const supplier = user.supplierId ? ctx.state.suppliers.find((item) => item.id === user.supplierId) : undefined;
         return {
