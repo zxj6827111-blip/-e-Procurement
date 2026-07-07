@@ -14,6 +14,10 @@ export interface GeminiShellAppProps {
   routeContext: RouteContext;
   permissionSnapshot: PermissionSnapshot;
   featureFlags: FrontendFeatureFlags;
+  canResetRuntimeData?: boolean;
+  resettingData?: boolean;
+  resetMessage?: string;
+  onResetRuntimeData?: () => Promise<boolean> | boolean;
   onNavigate: (path: string) => void;
   onLogout: () => void;
   onReportError?: (error: unknown) => void;
@@ -66,6 +70,10 @@ export function GeminiShellApp(props: GeminiShellAppProps) {
         routeContext={props.routeContext}
         permissionSnapshot={props.permissionSnapshot}
         featureFlags={props.featureFlags}
+        canResetRuntimeData={props.canResetRuntimeData}
+        resettingData={props.resettingData}
+        resetMessage={props.resetMessage}
+        onResetRuntimeData={props.onResetRuntimeData}
         onNavigate={props.onNavigate}
         onLogout={props.onLogout}
       >

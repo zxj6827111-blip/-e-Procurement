@@ -20,6 +20,7 @@ import {
   Megaphone,
   PackageSearch,
   PenTool,
+  RotateCcw,
   Settings,
   Shield,
   ShieldAlert,
@@ -60,6 +61,10 @@ export interface GeminiDashboardProps {
     review: number;
     abnormal: number;
   };
+  canResetRuntimeData?: boolean;
+  resettingData?: boolean;
+  resetMessage?: string;
+  onResetRuntimeData?: () => void;
   onNavigate: (to: string) => void;
   onLogout: () => void;
 }
@@ -228,12 +233,30 @@ export function GeminiDashboardApp(props: GeminiDashboardProps) {
           <div className="flex-1 overflow-y-auto p-6">
             <div className="mx-auto" style={{ maxWidth: "1440px" }}>
               <div data-ui-check="dashboard" className="space-y-6">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between gap-3 mb-2">
                   <h2 className="text-xl font-semibold text-slate-900">工作台概览</h2>
-                  <div className="text-sm text-slate-500 flex items-center gap-2">
+                  <div className="text-sm text-slate-500 flex items-center gap-3 flex-wrap justify-end">
                     <span>更新时间: {props.updatedAt}</span>
+                    {props.canResetRuntimeData && props.onResetRuntimeData ? (
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="sm"
+                        disabled={props.resettingData}
+                        onClick={props.onResetRuntimeData}
+                        className="shrink-0"
+                      >
+                        <RotateCcw className="w-4 h-4 mr-1.5" />
+                        {props.resettingData ? "正在恢复" : "恢复初始业务数据"}
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
+                {props.resetMessage ? (
+                  <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    {props.resetMessage}
+                  </div>
+                ) : null}
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <Card data-ui-check="summary-card" className="border-l-4 border-l-[#006666]">

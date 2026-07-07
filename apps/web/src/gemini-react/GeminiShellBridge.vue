@@ -22,6 +22,10 @@ function renderReactApp() {
       routeContext: props.routeContext,
       permissionSnapshot: props.permissionSnapshot,
       featureFlags: props.featureFlags,
+      canResetRuntimeData: props.canResetRuntimeData,
+      resettingData: props.resettingData,
+      resetMessage: props.resetMessage,
+      onResetRuntimeData: props.onResetRuntimeData,
       onNavigate: props.onNavigate,
       onLogout: props.onLogout,
       onReportError: props.onReportError
@@ -32,7 +36,16 @@ function renderReactApp() {
 onMounted(renderReactApp);
 
 watch(
-  () => [props.currentUser, props.currentView, props.currentProjectId, props.runtimeState, props.menuConfig],
+  () => [
+    props.currentUser,
+    props.currentView,
+    props.currentProjectId,
+    props.runtimeState,
+    props.menuConfig,
+    props.canResetRuntimeData,
+    props.resettingData,
+    props.resetMessage
+  ],
   renderReactApp,
   { deep: true }
 );

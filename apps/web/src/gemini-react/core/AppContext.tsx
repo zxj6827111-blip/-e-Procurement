@@ -126,6 +126,10 @@ interface AppContextType {
   routeContext?: RouteContext;
   permissionSnapshot?: PermissionSnapshot;
   featureFlags?: FrontendFeatureFlags;
+  canResetRuntimeData: boolean;
+  resettingData: boolean;
+  resetMessage: string;
+  resetRuntimeData: () => Promise<void>;
   notifications: NotificationMessage[];
   unreadNotifications: NotificationMessage[];
   markNotificationRead: (id: number) => void;
@@ -154,6 +158,10 @@ interface AppProviderProps {
   routeContext?: RouteContext;
   permissionSnapshot?: PermissionSnapshot;
   featureFlags?: FrontendFeatureFlags;
+  canResetRuntimeData?: boolean;
+  resettingData?: boolean;
+  resetMessage?: string;
+  onResetRuntimeData?: () => Promise<boolean> | boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -308,7 +316,11 @@ export function AppProvider({
   menuConfig,
   routeContext,
   permissionSnapshot,
-  featureFlags
+  featureFlags,
+  canResetRuntimeData = false,
+  resettingData = false,
+  resetMessage = '',
+  onResetRuntimeData
 }: AppProviderProps) {
   const [internalUser, setInternalUser] = useState<User | null>(null);
   const [internalView, setInternalView] = useState<ViewState>('LOGIN');
@@ -360,6 +372,20 @@ export function AppProvider({
 
   const rejectTodo = (id: string) => {
     setTodos((items) => items.filter((item) => item.id !== id));
+  };
+
+  const resetRuntimeData = async () => {
+    if (!onResetRuntimeData) return;
+    try {
+      const completed = await onResetRuntimeData();
+      if (!completed) return;
+      setNotifications(initialNotifications);
+      setTodos(initialTodos);
+      setSuppliers(initialSuppliers);
+      setRatingTemplates(initialRatingTemplates);
+    } catch {
+      // Vue Shell owns the reset API call and user-facing failure message.
+    }
   };
 
   const updateSupplierStatus = (id: string, nextStatus?: string) => {
@@ -441,6 +467,10 @@ export function AppProvider({
         routeContext,
         permissionSnapshot,
         featureFlags,
+        canResetRuntimeData,
+        resettingData,
+        resetMessage,
+        resetRuntimeData,
         notifications,
         unreadNotifications,
         markNotificationRead,

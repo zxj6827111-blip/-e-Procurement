@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
-import { apiGet } from "./api/http";
+import { apiGet, apiPost } from "./api/http";
 import { loadWorkflowNotifications, type R8WorkflowNotificationView } from "./api/workflow";
 import GeminiShellBridge from "./gemini-react/GeminiShellBridge.vue";
 import { geminiViewForPath, toGeminiUser } from "./gemini-react/route-mapping";
@@ -39,10 +39,13 @@ interface ShellNotificationItem {
 const session = useSessionStore();
 const route = useRoute();
 const router = useRouter();
+const runtimeDataResetRoles = new Set(["admin", "group_manager", "platform_operator"]);
 const bootstrapped = ref(false);
 const roleSwitchOptions = ref<Array<{ id: string; label: string }>>([]);
 const selectedRoleSwitchId = ref("");
 const notificationItems = ref<ShellNotificationItem[]>([]);
+const resetMessage = ref("");
+const resettingData = ref(false);
 
 const hasCurrentRoleProfile = computed(() => hasRoleProfile(session.roleId));
 const frontendFeatureFlags = computed(() => resolveFrontendFeatureFlags());
@@ -63,6 +66,7 @@ const environmentLabel = computed(() => {
   return "试用环境";
 });
 const roleSwitchEnabled = computed(() => session.mode !== "production" && session.mockAuthEnabled);
+const canResetRuntimeData = computed(() => session.mode !== "production" && runtimeDataResetRoles.has(session.roleId));
 const shellPageTitle = computed(() => {
   if (isPermissionDeniedRoute.value) return "无权限访问";
   if (isNotFoundRoute.value) return "页面无法加载";
@@ -206,6 +210,24 @@ async function logout() {
   await router.replace("/login");
 }
 
+async function resetRuntimeData() {
+  if (resettingData.value) return false;
+  const confirmed = window.confirm("确认恢复初始业务数据吗？当前新增流程、上传材料和业务处理记录会被清空。");
+  if (!confirmed) return false;
+  resettingData.value = true;
+  resetMessage.value = "";
+  try {
+    await apiPost<{ ok: true; auditLogId?: string }>("/api/runtime/reset-data", { confirm: true });
+    resetMessage.value = "已恢复初始业务数据，可以重新从需求发起开始跑完整流程。";
+    return true;
+  } catch {
+    resetMessage.value = "恢复失败，请稍后重试或联系系统管理员。";
+    return false;
+  } finally {
+    resettingData.value = false;
+  }
+}
+
 async function switchRole(userId: string) {
   if (!roleSwitchEnabled.value || !userId || userId === session.user?.id) {
     selectedRoleSwitchId.value = userId;
@@ -289,6 +311,10 @@ watch(
     :route-context="frontendRuntimeState.routeContext"
     :permission-snapshot="frontendRuntimeState.permissions"
     :feature-flags="frontendFeatureFlags"
+    :can-reset-runtime-data="canResetRuntimeData"
+    :resetting-data="resettingData"
+    :reset-message="resetMessage"
+    :on-reset-runtime-data="resetRuntimeData"
     :on-navigate="navigateFromReact"
     :on-logout="logout"
     :on-report-error="reportReactError"

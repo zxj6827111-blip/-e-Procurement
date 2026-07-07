@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { apiGet } from "../api/http";
+import { apiGet, apiPost } from "../api/http";
 import { loadProcessTasks, type ProcessTaskView } from "../api/process";
 import { loadWorkflowTasks, type R8WorkflowTaskView } from "../api/workflow";
 import GeminiDashboardBridge from "../gemini-react/GeminiDashboardBridge.vue";
@@ -14,12 +14,15 @@ import type { OrderRow, ProductRow, ProjectRow, WorkbenchPayload } from "./dashb
 
 const session = useSessionStore();
 const router = useRouter();
+const runtimeDataResetRoles = new Set(["admin", "group_manager", "platform_operator"]);
 
 const projects = ref<ProjectRow[]>([]);
 const products = ref<ProductRow[]>([]);
 const orders = ref<OrderRow[]>([]);
 const processTasks = ref<ProcessTaskView[]>([]);
 const workflowTasks = ref<R8WorkflowTaskView[]>([]);
+const resetMessage = ref("");
+const resettingData = ref(false);
 
 function uniqueNav(items: GeminiNavItem[]) {
   const seen = new Set<string>();
@@ -65,6 +68,8 @@ function fallbackTodoRows(): GeminiTodoRow[] {
 const roleLabel = computed(() => roleLabels[session.roleId as keyof typeof roleLabels] ?? "业务角色");
 const userName = computed(() => session.user?.name ?? "");
 const organization = computed(() => (session.user?.orgId === "org-hotel" ? "酒店采购中心" : "集团采购中心"));
+
+const canResetRuntimeData = computed(() => session.mode !== "production" && runtimeDataResetRoles.has(session.roleId));
 
 const navItems = computed(() =>
   uniqueNav([
@@ -156,6 +161,21 @@ async function logout() {
   await router.replace("/login");
 }
 
+async function resetRuntimeData() {
+  if (resettingData.value) return;
+  const confirmed = window.confirm("确认恢复初始业务数据吗？当前新增流程、上传材料和业务处理记录会被清空。");
+  if (!confirmed) return;
+  resettingData.value = true;
+  resetMessage.value = "";
+  try {
+    await apiPost<{ ok: true; auditLogId?: string }>("/api/runtime/reset-data", { confirm: true });
+    resetMessage.value = "已恢复初始业务数据，可以重新从需求发起开始跑完整流程。";
+    await loadDashboard();
+  } finally {
+    resettingData.value = false;
+  }
+}
+
 onMounted(loadDashboard);
 
 watch(
@@ -176,6 +196,10 @@ watch(
     :todo-rows="todoRows"
     :updated-at="updatedAt"
     :kpis="kpis"
+    :can-reset-runtime-data="canResetRuntimeData"
+    :resetting-data="resettingData"
+    :reset-message="resetMessage"
+    :on-reset-runtime-data="resetRuntimeData"
     :on-navigate="navigate"
     :on-logout="logout"
   />

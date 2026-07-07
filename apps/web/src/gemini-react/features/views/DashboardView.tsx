@@ -3,7 +3,7 @@ import { useApp } from '../../core/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../../shared/ui/Card';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
-import { AlertCircle, FileText, CheckSquare, Clock, ArrowRight, Plus, Upload, BookOpen, Activity, Users, FolderKanban, Settings, Database, ListTodo, ShieldCheck, Archive, UserCircle, PieChart, Edit2, X, Check, FileCheck, Store } from 'lucide-react';
+import { AlertCircle, FileText, CheckSquare, Clock, ArrowRight, Plus, Upload, BookOpen, Activity, Users, FolderKanban, Settings, Database, ListTodo, ShieldCheck, Archive, UserCircle, PieChart, Edit2, X, Check, FileCheck, Store, RotateCcw } from 'lucide-react';
 import { cn } from '../../shared/lib/utils';
 import { ViewState } from '../../shared/types';
 import { getGovernedMenuItems } from '../../core/AppShell';
@@ -13,7 +13,7 @@ import { ProcurementAnalytics } from '../components/ProcurementAnalytics';
 import { SmartRiskPanel } from '../components/SmartRiskPanel';
 
 export function DashboardView() {
-  const { currentUser, setCurrentView, todos, menuConfig } = useApp();
+  const { currentUser, setCurrentView, todos, menuConfig, canResetRuntimeData, resettingData, resetMessage, resetRuntimeData } = useApp();
   const [isEditingQuickActions, setIsEditingQuickActions] = useState(false);
 
   if (!currentUser) return null;
@@ -61,12 +61,30 @@ export function DashboardView() {
 
   return (
     <div data-ui-check="dashboard" className="space-y-6">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between gap-3 mb-2">
         <h2 className="text-xl font-semibold text-slate-900">工作台概览</h2>
-        <div className="text-sm text-slate-500 flex items-center gap-2">
+        <div className="text-sm text-slate-500 flex items-center gap-3 flex-wrap justify-end">
           <span>更新时间: {dashboardView.updatedAtLabel}</span>
+          {canResetRuntimeData ? (
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              disabled={resettingData}
+              onClick={() => void resetRuntimeData()}
+              className="shrink-0"
+            >
+              <RotateCcw className="w-4 h-4 mr-1.5" />
+              {resettingData ? "正在恢复" : "恢复初始业务数据"}
+            </Button>
+          ) : null}
         </div>
       </div>
+      {resetMessage ? (
+        <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {resetMessage}
+        </div>
+      ) : null}
 
       {/* Top 4 KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

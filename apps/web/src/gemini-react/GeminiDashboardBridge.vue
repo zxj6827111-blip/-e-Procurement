@@ -22,6 +22,10 @@ function renderReactApp() {
       todoRows: props.todoRows,
       updatedAt: props.updatedAt,
       kpis: props.kpis,
+      canResetRuntimeData: props.canResetRuntimeData,
+      resettingData: props.resettingData,
+      resetMessage: props.resetMessage,
+      onResetRuntimeData: props.onResetRuntimeData,
       onNavigate: props.onNavigate,
       onLogout: props.onLogout
     })
@@ -42,7 +46,10 @@ watch(
     props.kpis.todo,
     props.kpis.quoteDeadline,
     props.kpis.review,
-    props.kpis.abnormal
+    props.kpis.abnormal,
+    props.canResetRuntimeData,
+    props.resettingData,
+    props.resetMessage
   ],
   renderReactApp,
   { deep: true }
