@@ -57,6 +57,41 @@ export class AuthStore {
     }
   }
 
+  resetAccounts(users: User[], allowWeakAccounts: boolean) {
+    if (!allowWeakAccounts) return;
+    const activeUsers = users.filter((item) => item.roleId !== "system" && (item.status ?? "active") === "active");
+    const userIds = activeUsers.map((user) => user.id);
+    const placeholders = userIds.map(() => "?").join(", ");
+    const now = new Date().toISOString();
+    this.runtimeDb.db.exec("begin immediate transaction;");
+    try {
+      if (userIds.length > 0) {
+        this.runtimeDb.db.prepare(`delete from auth_sessions where user_id not in (${placeholders})`).run(...userIds);
+        this.runtimeDb.db.prepare(`delete from auth_accounts where user_id not in (${placeholders})`).run(...userIds);
+      } else {
+        this.runtimeDb.db.prepare("delete from auth_sessions").run();
+        this.runtimeDb.db.prepare("delete from auth_accounts").run();
+      }
+      const statement = this.runtimeDb.db.prepare(
+        `insert into auth_accounts (user_id, username, password_hash, status, password_change_required, created_at, updated_at)
+         values (?, ?, ?, 'active', 0, ?, ?)
+         on conflict(user_id) do update set
+           username = excluded.username,
+           password_hash = excluded.password_hash,
+           status = 'active',
+           password_change_required = 0,
+           updated_at = excluded.updated_at`
+      );
+      for (const user of activeUsers) {
+        statement.run(user.id, user.id, derivePasswordHash(`pass-${user.id}`), now, now);
+      }
+      this.runtimeDb.db.exec("commit;");
+    } catch (error) {
+      this.runtimeDb.db.exec("rollback;");
+      throw error;
+    }
+  }
+
   requirePasswordChange(userId: string) {
     this.runtimeDb.db.prepare("update auth_accounts set password_change_required = 1, updated_at = ? where user_id = ?").run(new Date().toISOString(), userId);
   }

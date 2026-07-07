@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { apiGet } from "../../api/http";
+import { apiGet, apiPost } from "../../api/http";
 import { loadProcessTasks, type ProcessTaskView } from "../../api/process";
 import PageHeader from "../../components/base/PageHeader.vue";
 import FeedbackMessage from "../../components/base/FeedbackMessage.vue";
 import EnterpriseSurface from "../../components/base/EnterpriseSurface.vue";
+import EnterpriseButton from "../../components/base/EnterpriseButton.vue";
 import StatusTag from "../../components/base/StatusTag.vue";
 import type { DataTableColumn, SummaryCardItem } from "../../components/base";
 import DashboardActivitySection from "./DashboardActivitySection.vue";
@@ -46,6 +47,7 @@ type DashboardRiskItem = {
   to: string;
 };
 
+const runtimeDataResetRoles = new Set(["admin", "group_manager", "platform_operator"]);
 const session = useSessionStore();
 const health = ref("检查中");
 const projects = ref<ProjectRow[]>([]);
@@ -57,6 +59,8 @@ const processTasks = ref<ProcessTaskView[]>([]);
 const workflowTasks = ref<R8WorkflowTaskView[]>([]);
 const workflowMessages = ref<R8WorkflowNotificationView[]>([]);
 const loadError = ref("");
+const resetMessage = ref("");
+const resettingData = ref(false);
 
 const timelineBuckets = [
   { label: "需求", statuses: ["project_created"] },
@@ -96,6 +100,7 @@ const landingTemplate = computed(() => roleTemplate(session.roleId));
 const roleWorkbench = computed(() => getRoleWorkbench(session.roleId));
 const quickActions = computed(() => roleWorkbench.value.primaryActions.slice(0, 6));
 const focusItems = computed(() => roleWorkbench.value.todayFocus.slice(0, 5));
+const canResetRuntimeData = computed(() => session.mode !== "production" && runtimeDataResetRoles.has(session.roleId));
 
 const pendingProcurementRequestCount = computed(() => {
   const seen = new Set<string>();
@@ -646,11 +651,30 @@ async function loadDashboard() {
   }
 }
 
+async function resetRuntimeData() {
+  if (resettingData.value) return;
+  const confirmed = window.confirm("确认恢复初始业务数据吗？当前新增流程、上传材料和业务处理记录会被清空。");
+  if (!confirmed) return;
+  resettingData.value = true;
+  resetMessage.value = "";
+  loadError.value = "";
+  try {
+    await apiPost<{ ok: true; auditLogId?: string }>("/api/runtime/reset-data", { confirm: true });
+    resetMessage.value = "已恢复初始业务数据，可以重新从需求发起开始跑完整流程。";
+    await loadDashboard();
+  } catch (error) {
+    loadError.value = error instanceof Error ? error.message : "恢复初始业务数据失败";
+  } finally {
+    resettingData.value = false;
+  }
+}
+
 onMounted(loadDashboard);
 
 watch(
   () => session.roleId,
   () => {
+    resetMessage.value = "";
     void loadDashboard();
   }
 );
@@ -660,15 +684,28 @@ watch(
   <section class="eds-section">
     <PageHeader v-if="landingTemplate !== 'A'" :title="roleTitle" eyebrow="工作台" :description="roleWorkbench.description">
       <template #actions>
+        <EnterpriseButton v-if="canResetRuntimeData" type="danger" :disabled="resettingData" @click="resetRuntimeData">
+          {{ resettingData ? "正在恢复" : "恢复初始业务数据" }}
+        </EnterpriseButton>
         <StatusTag :tone="health === '正常' ? 'success' : 'warning'">服务{{ health }}</StatusTag>
       </template>
     </PageHeader>
 
     <FeedbackMessage v-if="loadError" tone="error">{{ loadError }}</FeedbackMessage>
+    <FeedbackMessage v-else-if="resetMessage" tone="success">{{ resetMessage }}</FeedbackMessage>
 
     <template v-if="landingTemplate === 'A'">
       <div class="g-hotel-dashboard">
         <header class="g-hotel-dashboard-head">
+          <EnterpriseButton
+            v-if="canResetRuntimeData"
+            class="runtime-reset-action"
+            type="danger"
+            :disabled="resettingData"
+            @click="resetRuntimeData"
+          >
+            {{ resettingData ? "正在恢复" : "恢复初始业务数据" }}
+          </EnterpriseButton>
           <h2>工作台概览</h2>
           <span>更新时间: {{ dashboardUpdatedAt }}</span>
         </header>

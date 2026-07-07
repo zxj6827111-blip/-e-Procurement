@@ -25,6 +25,7 @@ import { processRoutes } from "./routes/process-routes.js";
 import { procurementParticipationRoutes } from "./routes/procurement-participation-routes.js";
 import { projectWorkbenchRoutes } from "./routes/project-workbench-routes.js";
 import { projectRoutes } from "./routes/project-routes.js";
+import { runtimeDataRoutes } from "./routes/runtime-data-routes.js";
 import { settlementFinanceRoutes } from "./routes/settlement-finance-routes.js";
 import { supplierRoutes } from "./routes/supplier-routes.js";
 import { workflowTaskRoutes } from "./routes/workflow-task-routes.js";
@@ -109,6 +110,7 @@ export function createApp(ctx: AppContext = createAppContext()) {
   api.use(projectWorkbenchRoutes(ctx));
   api.use(contractPerformanceRoutes(ctx));
   api.use(archiveRoutes(ctx));
+  api.use(runtimeDataRoutes(ctx));
   api.use(auditRoutes(ctx));
   api.use(integrationRoutes(ctx));
   api.use(internalEventRoutes(ctx));

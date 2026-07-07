@@ -14,8 +14,7 @@ export class RuntimeStateStore {
   loadState(seedOnBoot: boolean, options: { cleanBusinessData?: boolean } = {}): SeedState {
     const row = this.runtimeDb.db.prepare("select payload_json from runtime_state where state_key = ?").get(STATE_KEY) as { payload_json: string } | undefined;
     if (!row) {
-      const seed = options.cleanBusinessData ? createCleanBusinessSeedState() : createSeedState();
-      enrichSeedState(seed, options);
+      const seed = this.createInitialState(options);
       if (seedOnBoot) this.saveState(seed);
       else this.businessTableStore?.syncState(seed);
       return seed;
@@ -24,6 +23,16 @@ export class RuntimeStateStore {
     enrichSeedState(state, options);
     this.businessTableStore?.syncState(state);
     return state;
+  }
+
+  resetState(target: SeedState, options: { cleanBusinessData?: boolean } = {}): SeedState {
+    const seed = this.createInitialState(options);
+    const mutableTarget = target as unknown as Record<string, unknown>;
+    for (const key of Object.keys(mutableTarget)) delete mutableTarget[key];
+    Object.assign(mutableTarget, seed);
+    this.clearRuntimeBusinessTables();
+    this.saveState(target);
+    return target;
   }
 
   saveState(state: SeedState) {
@@ -36,5 +45,48 @@ export class RuntimeStateStore {
       )
       .run(STATE_KEY, JSON.stringify(state), now);
     this.businessTableStore?.syncState(state);
+  }
+
+  private createInitialState(options: { cleanBusinessData?: boolean }) {
+    const seed = options.cleanBusinessData ? createCleanBusinessSeedState() : createSeedState();
+    enrichSeedState(seed, options);
+    return seed;
+  }
+
+  private clearRuntimeBusinessTables() {
+    const rows = this.runtimeDb.db
+      .prepare("select name from sqlite_master where type = 'table' and (name like 'business_%' or name like 'r2_%')")
+      .all() as Array<{ name: string }>;
+    const tables = [
+      ...rows.map((row) => row.name),
+      "audit_logs",
+      "stored_files",
+      "integration_jobs",
+      "internal_event_handler_logs",
+      "internal_business_events",
+      "process_audit_logs",
+      "business_process_bindings",
+      "process_events",
+      "process_task_instances",
+      "process_instances",
+      "bpmn_pilot_runs"
+    ];
+    const uniqueTables = Array.from(new Set(tables));
+    this.runtimeDb.db.exec("begin immediate transaction;");
+    try {
+      for (const tableName of uniqueTables) {
+        if (!this.tableExists(tableName)) continue;
+        this.runtimeDb.db.prepare(`delete from ${tableName}`).run();
+      }
+      this.runtimeDb.db.exec("commit;");
+    } catch (error) {
+      this.runtimeDb.db.exec("rollback;");
+      throw error;
+    }
+  }
+
+  private tableExists(tableName: string) {
+    const row = this.runtimeDb.db.prepare("select name from sqlite_master where type = 'table' and name = ?").get(tableName);
+    return Boolean(row);
   }
 }
