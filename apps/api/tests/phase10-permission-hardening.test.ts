@@ -1,10 +1,10 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createApp } from "../src/app.js";
-import { createAppContext } from "../src/app-context.js";
+import { createIsolatedRuntime } from "./helpers/test-runtime.js";
 
 function boot() {
-  const ctx = createAppContext();
+  const runtime = createIsolatedRuntime("eproc-phase10-");
+  const { ctx } = runtime;
   ctx.state.bids.find((item) => item.id === "bid-award-1")!.responseFileMetadata = [
     {
       id: "rfm-award-1",
@@ -52,7 +52,7 @@ function boot() {
     reason: "contract amount 1286000 and evaluation stable delivery placeholder",
     createdAt: "2026-06-22T10:00:00.000Z"
   });
-  return { ctx, app: createApp(ctx) };
+  return runtime;
 }
 
 function expectDenied(response: request.Response, code: string, sensitiveTokens: string[] = []) {

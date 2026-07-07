@@ -1,12 +1,10 @@
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createApp } from "../src/app.js";
-import { createAppContext } from "../src/app-context.js";
+import { createIsolatedRuntime } from "./helpers/test-runtime.js";
 import type { SupplierRegistration } from "../src/types.js";
 
 function boot() {
-  const ctx = createAppContext();
-  return { ctx, app: createApp(ctx) };
+  return createIsolatedRuntime("eproc-phase2-");
 }
 
 function expectDenied(response: request.Response, code: string, sensitiveTokens: string[] = []) {
