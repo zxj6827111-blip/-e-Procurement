@@ -25,6 +25,7 @@
     "ui:commercial-check": "node scripts/ui-commercial-check.mjs",
     "ui:terminology-check": "node scripts/ui-terminology-check.mjs",
     "ui:visual-evidence": "node scripts/ui-visual-evidence.mjs",
+    "frontend:governance-check": "node scripts/frontend-governance-check.mjs",
     "ui:login-role-smoke": "node scripts/ui-second-pass-checks.mjs login-role-smoke",
     "ui:layout-check": "node scripts/ui-second-pass-checks.mjs layout-check",
     "ui:visual-review-pack": "node scripts/ui-second-pass-checks.mjs visual-review-pack",

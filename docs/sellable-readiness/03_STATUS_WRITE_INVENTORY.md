@@ -1,6 +1,6 @@
 # Sprint 3 Status Write Inventory
 
-- Generated at: 2026-07-06T13:04:12.890Z
+- Generated at: 2026-07-07T00:09:25.394Z
 - Scope: apps/api/src/routes only.
 - Repository SQL persistence and runtime table sync are intentionally excluded.
 - Direct route-level status writes found: 333

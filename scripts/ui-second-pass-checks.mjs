@@ -210,6 +210,12 @@ async function waitForUrl(url, timeoutMs = 60000) {
   throw new Error(`Timed out waiting for ${url}: ${lastError}`);
 }
 
+async function gotoApp(page, targetPath, readySelector = "body") {
+  await page.goto(`${webBaseUrl}${targetPath}`, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.waitForSelector(readySelector, { timeout: 12000 }).catch(() => undefined);
+  await page.waitForFunction(() => Boolean(document.body?.innerText?.trim().length), null, { timeout: 12000 }).catch(() => undefined);
+}
+
 function mdTable(headers, rows) {
   const escapeCell = (value) => String(value ?? "").replaceAll("\n", "<br>").replaceAll("|", "\\|");
   return [
@@ -476,7 +482,7 @@ async function runLoginRoleSmoke(browser) {
   const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
   const checks = [];
 
-  await page.goto(`${webBaseUrl}/login`, { waitUntil: "networkidle", timeout: 30000 });
+  await gotoApp(page, "/login", ".enterprise-login-layout, .g-hotel-login");
   const loginMetrics = await collectPageDiagnostics(page);
   const roleOptions = await page.locator(".g-hotel-role-accounts [data-user-id]").allTextContents();
   const roleOptionValues = await page.locator(".g-hotel-role-accounts [data-user-id]").evaluateAll((buttons) =>
@@ -494,7 +500,7 @@ async function runLoginRoleSmoke(browser) {
   });
 
   for (const role of roleCases) {
-    await page.goto(`${webBaseUrl}/login`, { waitUntil: "networkidle", timeout: 30000 });
+    await gotoApp(page, "/login", ".enterprise-login-layout, .g-hotel-login");
     await page.locator(`.g-hotel-role-accounts [data-user-id="${role.userId}"]`).click();
     await page.locator(".g-hotel-login-submit").click();
     await page.waitForFunction(() => !location.pathname.startsWith("/login"), null, { timeout: 10000 }).catch(() => undefined);
@@ -504,6 +510,7 @@ async function runLoginRoleSmoke(browser) {
     const navLabels = (await page.locator('[data-ui-check~="nav-item"], .enterprise-nav-label').allTextContents())
       .map((item) => item.trim())
       .filter(Boolean);
+    const expectedNav = roleModel.visibleNavItems(role.roleId).map((item) => item.label);
     const shellCount = metrics.shell;
     const blocked =
       metrics.bodyText.includes("请先登录") ||
@@ -518,8 +525,8 @@ async function runLoginRoleSmoke(browser) {
     });
     checks.push({
       key: `role-nav-${role.userId}`,
-      passed: sameItems(navLabels, role.expectedNav),
-      evidence: `${role.role}: ${navLabels.join(" / ")}`
+      passed: sameItems(navLabels, expectedNav),
+      evidence: `${role.role}: actual=${navLabels.join(" / ")}; expected=${expectedNav.join(" / ")}`
     });
     checks.push({
       key: `role-bell-${role.userId}`,
@@ -576,11 +583,11 @@ async function runLoginRoleSmoke(browser) {
       })
     });
   });
-  await productionPage.goto(`${webBaseUrl}/login`, { waitUntil: "networkidle", timeout: 30000 });
+  await gotoApp(productionPage, "/login", ".enterprise-login-layout, .g-hotel-login");
   const productionRoleSelectors = await productionPage.locator(".g-hotel-role-accounts").count();
   const productionMetrics = await collectPageDiagnostics(productionPage);
   const productionBodyText = await productionPage.locator("body").innerText();
-  await productionPage.goto(`${webBaseUrl}/role-switch`, { waitUntil: "networkidle", timeout: 30000 });
+  await gotoApp(productionPage, "/role-switch");
   const roleSwitchFinalPath = new URL(productionPage.url()).pathname;
   const roleSwitchSelectors = await productionPage.locator(".g-hotel-role-accounts, .eds-form-section select").count();
   const roleSwitchBodyText = await productionPage.locator("body").innerText();
@@ -611,7 +618,7 @@ async function runLoginRoleSmoke(browser) {
       })
     });
   });
-  await unknownRolePage.goto(`${webBaseUrl}/project-workbench`, { waitUntil: "networkidle", timeout: 30000 });
+  await gotoApp(unknownRolePage, "/project-workbench");
   const unknownRoleMetrics = await collectPageDiagnostics(unknownRolePage);
   const unknownRoleFinalPath = new URL(unknownRolePage.url()).pathname;
   await unknownRoleContext.close();
@@ -646,7 +653,7 @@ async function capture(page, entry) {
   await page.setViewportSize(entry.viewport);
   if (entry.userId) await applyUser(page, entry.userId);
   const targetPath = entry.dynamicProject ? await readFirstProjectPath(entry.userId, entry.dynamicProject) : entry.path;
-  await page.goto(`${webBaseUrl}${targetPath}`, { waitUntil: "networkidle", timeout: 30000 });
+  await gotoApp(page, targetPath);
   await page.waitForFunction(() => (document.body?.innerText.trim().length ?? 0) > 80, null, { timeout: 12000 }).catch(() => undefined);
   const fileName = `${entry.key}-${entry.viewport.width}x${entry.viewport.height}.png`;
   const filePath = path.join(reviewPackDir, fileName);

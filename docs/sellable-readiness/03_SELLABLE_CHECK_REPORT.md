@@ -1,6 +1,6 @@
 # Sprint 3 Sellable Check Report
 
-- Generated at: 2026-07-06T13:07:08.846Z
+- Generated at: 2026-07-07T00:11:08.259Z
 - Overall status: CONDITIONAL_GO
 - Blocking/failed commands: 0
 - Fail-closed production gates: 1
@@ -79,72 +79,72 @@
 
  Test Files  49 passed (49)
       Tests  306 passed (306)
-   Start at  20:53:22
-   Duration  384.17s (transform 9.63s, setup 0ms, import 52.83s, tests 1438.25s, environment 9ms)
+   Start at  08:02:33
+   Duration  252.45s (transform 9.43s, setup 0ms, import 41.78s, tests 939.80s, environment 6ms)
 ```
 
 - stderr tail:
 
 ```
-ure and might change at any time
+e and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:27472) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:58516) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:428) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:62508) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:52840) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:21432) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:39196) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:59088) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:6700) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:60136) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:53048) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:26228) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:62168) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:7848) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:52432) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:56284) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:59700) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:48364) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:46372) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:53768) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:61868) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:15476) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:64212) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:53576) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:61124) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:60024) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:54680) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:772) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:58764) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:29464) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:46372) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:53116) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:56620) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:57252) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:26900) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:14532) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:51376) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:16268) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:62848) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:55728) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:39272) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:58856) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:7224) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:45840) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:4272) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:58028) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:24880) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:39320) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:18036) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:3836) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:3812) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:19824) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:52500) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:25144) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:40388) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:40748) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:61024) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:27688) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 ```
 
@@ -371,7 +371,7 @@ UI compliance scan passed.
       "finalUrl": "http://127.0.0.1:5296/file-center",
       "finalPath": "/file-center",
       "routeMatched": true,
-      "bodyLength": 540,
+      "bodyLength": 520,
       "counts": {
         "[data-ui-check~=\"shell\"]": 1,
         "[data-ui-check~=\"sidebar\"]": 1,
@@ -390,7 +390,7 @@ UI compliance scan passed.
       "finalUrl": "http://127.0.0.1:5296/supply-mall",
       "finalPath": "/supply-mall",
       "routeMatched": true,
-      "bodyLength": 240,
+      "bodyLength": 235,
       "counts": {
         "[data-ui-check~=\"shell\"]": 1,
         "[data-ui-check~=\"sidebar\"]": 1,
@@ -409,7 +409,7 @@ UI compliance scan passed.
       "finalUrl": "http://127.0.0.1:5296/supply-mall/orders",
       "finalPath": "/supply-mall/orders",
       "routeMatched": true,
-      "bodyLength": 617,
+      "bodyLength": 612,
       "counts": {
         "[data-ui-check~=\"shell\"]": 1,
         "[data-ui-check~=\"sidebar\"]": 1,
@@ -428,7 +428,7 @@ UI compliance scan passed.
       "finalUrl": "http://127.0.0.1:5296/order-fulfillment",
       "finalPath": "/order-fulfillment",
       "routeMatched": true,
-      "bodyLength": 181,
+      "bodyLength": 161,
       "counts": {
         "[data-ui-check~=\"shell\"]": 1,
         "[data-ui-check~=\"sidebar\"]": 1,
@@ -447,7 +447,7 @@ UI compliance scan passed.
       "finalUrl": "http://127.0.0.1:5296/settlement-materials",
       "finalPath": "/settlement-materials",
       "routeMatched": true,
-      "bodyLength": 152,
+      "bodyLength": 147,
       "counts": {
         "[data-ui-check~=\"shell\"]": 1,
         "[data-ui-check~=\"sidebar\"]": 1,
@@ -466,7 +466,7 @@ UI compliance scan passed.
       "finalUrl": "http://127.0.0.1:5296/payment-status",
       "finalPath": "/payment-status",
       "routeMatched": true,
-      "bodyLength": 152,
+      "bodyLength": 147,
       "counts": {
         "[data-ui-check~=\"shell\"]": 1,
         "[data-ui-check~=\"sidebar\"]": 1,
@@ -485,7 +485,7 @@ UI compliance scan passed.
       "finalUrl": "http://127.0.0.1:5296/archive-audit",
       "finalPath": "/archive-audit",
       "routeMatched": true,
-      "bodyLength": 318,
+      "bodyLength": 313,
       "counts": {
         "[data-ui-check~=\"shell\"]": 1,
         "[data-ui-check~=\"sidebar\"]": 1,
@@ -504,7 +504,7 @@ UI compliance scan passed.
       "finalUrl": "http://127.0.0.1:5296/audit",
       "finalPath": "/audit",
       "routeMatched": true,
-      "bodyLength": 334,
+      "bodyLength": 329,
       "counts": {
         "[data-ui-check~=\"shell\"]": 1,
         "[data-ui-check~=\"sidebar\"]": 1,
@@ -551,14 +551,7 @@ UI compliance scan passed.
 - stdout tail:
 
 ```
-leErrors": [],
-      "httpErrors": []
-    },
-    {
-      "userId": "u2",
-      "label": "采购项目执行详情",
-      "path": "/project-workbench/p-new-5",
-      "requiredText": "酒店客房布草补采项目-1783343011334",
+9125",
       "finalPath": "/project-workbench/p-new-5",
       "renderMode": "gemini",
       "passed": true,
@@ -698,7 +691,10 @@ leErrors": [],
       "userId": "u7",
       "label": "专家评分页",
       "path": "/expert-scoring",
-      "requiredText": "评分",
+      "requiredText": "评审",
+      "actionSelector": "[data-ui-check~=\"expert-confirm-participation\"]",
+      "postActionSelector": "[data-ui-check~=\"expert-scoring-view\"]",
+      "postActionRequiredText": "评分",
       "finalPath": "/expert-scoring",
       "renderMode": "gemini",
       "passed": true,
@@ -914,7 +910,7 @@ leErrors": [],
 > node scripts/r10-backup-restore-drill.mjs
 
 {
-  "generatedAt": "2026-07-06T13:04:18.663Z",
+  "generatedAt": "2026-07-07T00:09:28.908Z",
   "scope": "M6-B local/UAT backup restore drill",
   "source": {
     "dataRoot": "E:\\Software Development\\‌e-Procurement\\output\\stage5-uat-data",
@@ -922,18 +918,18 @@ leErrors": [],
     "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\stage5-uat-data\\files"
   },
   "backup": {
-    "backupRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-06T13-04-18-655Z",
-    "sqliteFile": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-06T13-04-18-655Z\\runtime.sqlite",
-    "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-06T13-04-18-655Z\\files",
+    "backupRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-07T00-09-28-906Z",
+    "sqliteFile": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-07T00-09-28-906Z\\runtime.sqlite",
+    "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\backup-2026-07-07T00-09-28-906Z\\files",
     "copiedCompanionFiles": [
       "runtime.sqlite-wal",
       "runtime.sqlite-shm"
     ]
   },
   "restore": {
-    "restoreRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-06T13-04-18-655Z",
-    "sqliteFile": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-06T13-04-18-655Z\\runtime.sqlite",
-    "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-06T13-04-18-655Z\\files"
+    "restoreRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-07T00-09-28-906Z",
+    "sqliteFile": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-07T00-09-28-906Z\\runtime.sqlite",
+    "filesRoot": "E:\\Software Development\\‌e-Procurement\\output\\r10-backup-restore\\restore-2026-07-07T00-09-28-906Z\\files"
   },
   "checks": {
     "sourceSqliteExists": true,
@@ -991,7 +987,7 @@ leErrors": [],
 - stderr tail:
 
 ```
-(node:54236) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:27276) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 ```
 
@@ -1005,7 +1001,6 @@ leErrors": [],
 > e-procurement-mvp@0.1.0 m6c:browser-smoke
 > node scripts/m6c-browser-role-smoke.mjs
 
-[browser] validating 集团采购管理
 [api]
 > @eprocurement/api@0.1.0 dev
 > tsx watch src/server.ts
@@ -1014,11 +1009,11 @@ leErrors": [],
 > @eprocurement/web@0.1.0 dev
 > vite --host 127.0.0.1 --port 5276
 
-[web] Port 5276 is in use, trying another one...
 [web]
-  [32m[1mVITE[22m v6.4.3[39m  [2mready in [0m[1m2205[22m[2m[0m ms[22m
+  [32m[1mVITE[22m v6.4.3[39m  [2mready in [0m[1m1061[22m[2m[0m ms[22m
 
-[web]   [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5277[22m/[39m
+[web]   [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5276[22m/[39m
+[browser] validating 集团采购管理
 [browser] validating 采购经办
 [browser] validating 酒店采购
 [browser] validating 供应商管理员
@@ -1074,7 +1069,7 @@ leErrors": [],
 - stderr tail:
 
 ```
-[api] (node:24632) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+[api] (node:44764) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `node --trace-warnings ...` to show where the warning was created)
 [api] node:events:486
       throw er; // Unhandled 'error' event
@@ -1118,13 +1113,13 @@ Node.js v24.14.0
 
 [36mvite v6.4.3 [32mbuilding for production...[36m[39m
 transforming...
-[32m✓[39m 2948 modules transformed.
+[32m✓[39m 2963 modules transformed.
 rendering chunks...
 computing gzip size...
 [2mdist/[22m[32mindex.html                 [39m[1m[2m    0.48 kB[22m[1m[22m[2m │ gzip:   0.34 kB[22m
-[2mdist/[22m[35massets/index-C_P_Q8h6.css  [39m[1m[2m  143.97 kB[22m[1m[22m[2m │ gzip:  24.06 kB[22m
-[2mdist/[22m[36massets/index-DOASwyc2.js   [39m[1m[33m1,796.59 kB[39m[22m[2m │ gzip: 477.90 kB[22m
-[32m✓ built in 24.44s[39m
+[2mdist/[22m[35massets/index-DvgsatGk.css  [39m[1m[2m  146.42 kB[22m[1m[22m[2m │ gzip:  24.46 kB[22m
+[2mdist/[22m[36massets/index-BAkrlunA.js   [39m[1m[33m1,837.15 kB[39m[22m[2m │ gzip: 491.63 kB[22m
+[32m✓ built in 9.03s[39m
 ```
 
 - stderr tail:

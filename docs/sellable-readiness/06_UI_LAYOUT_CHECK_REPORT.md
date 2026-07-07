@@ -1,6 +1,6 @@
 # UI Layout Check Report
 
-- Generated at: 2026-07-06T13:32:17.518Z
+- Generated at: 2026-07-07T00:07:52.749Z
 - Result: PASS
 
 | Check | Status | Evidence |
@@ -11,7 +11,7 @@
 | login-balanced-portal-1440x900 | PASS | loginWidthRatio=1, brandRatio=0.5, cardRatio=0.5 |
 | app-shell-sidebar-width | PASS | sidebarWidth=220 |
 | app-shell-gemini-teal-sidebar | PASS | sidebarToken=#173F3D, computed=rgb(0, 102, 102) |
-| app-shell-actions-visible | PASS | navIcons=12, topbar=1, roleSwitches=1, bellButtons=1 |
+| app-shell-actions-visible | PASS | navIcons=8, topbar=1, roleSwitches=1, bellButtons=1 |
 | dashboard-gemini-template-a-architecture | PASS | templateA=1, gemini=1, riskPanels=1, templateB=0, templateC=0, templateD=0, quickCards=4, gantt=1, flow=1, summaryCards=4, tables=1 |
 | dashboard-no-wasted-middle-band | PASS | todoToTimelineGap=24, timelineStartsBeforeQuickEnds=false |
 | dashboard-action-density | PASS | quickCards=4, surfaces=4 |

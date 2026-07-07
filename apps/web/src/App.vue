@@ -4,10 +4,12 @@ import { RouterView, useRoute, useRouter } from "vue-router";
 import { apiGet } from "./api/http";
 import { loadWorkflowNotifications, type R8WorkflowNotificationView } from "./api/workflow";
 import GeminiShellBridge from "./gemini-react/GeminiShellBridge.vue";
-import { geminiViewForPath, routeForGeminiView, toGeminiUser } from "./gemini-react/route-mapping";
-import type { ViewState } from "./gemini-react/prototype/types";
+import { geminiViewForPath, toGeminiUser } from "./gemini-react/route-mapping";
 import AppShell from "./layouts/AppShell.vue";
 import AuthShell from "./layouts/AuthShell.vue";
+import { evaluateReactFeatureFlag, resolveFrontendFeatureFlags } from "./meta/feature-flags";
+import { createFrontendRuntimeState, resolveMenu, resolveRuntimeRoute } from "./meta/system-registry";
+import { recordFeatureFlagEvaluation, recordReactModuleError, recordRouteUsage } from "./observability/frontend-observability";
 import {
   hasRoleProfile,
   pageTitle,
@@ -15,9 +17,7 @@ import {
   roleHome,
   roleLabels,
   routeAllowed as isRouteAllowed,
-  supplierRoles,
-  visibleNavItems as resolveVisibleNavItems,
-  visibleUtilityItems as resolveVisibleUtilityItems
+  supplierRoles
 } from "./permissions/role-model";
 import { useSessionStore } from "./stores/session";
 
@@ -43,17 +43,19 @@ const bootstrapped = ref(false);
 const roleSwitchOptions = ref<Array<{ id: string; label: string }>>([]);
 const selectedRoleSwitchId = ref("");
 const notificationItems = ref<ShellNotificationItem[]>([]);
-const pendingGeminiProjectId = ref<string | null>(null);
 
 const hasCurrentRoleProfile = computed(() => hasRoleProfile(session.roleId));
+const frontendFeatureFlags = computed(() => resolveFrontendFeatureFlags());
+const runtimeRouteDecision = computed(() => resolveRuntimeRoute(route.path, session.roleId, frontendFeatureFlags.value));
+const registryMenuConfig = computed(() => resolveMenu(session.roleId));
 const currentRoleLabel = computed(() => {
   if (hasCurrentRoleProfile.value) return roleLabels[session.roleId as keyof typeof roleLabels];
   return session.user ? "角色异常" : "未登录";
 });
-const visibleItems = computed(() => resolveVisibleNavItems(session.roleId));
-const visibleUtilityItems = computed(() => resolveVisibleUtilityItems(session.roleId));
+const visibleItems = computed(() => registryMenuConfig.value.navItems);
+const visibleUtilityItems = computed(() => registryMenuConfig.value.utilityItems);
 const appShellUserLabel = computed(() => session.user?.name || "未登录");
-const currentPageTitle = computed(() => pageTitle(route.path, session.roleId));
+const currentPageTitle = computed(() => runtimeRouteDecision.value.pageTitle || pageTitle(route.path, session.roleId));
 const environmentLabel = computed(() => {
   if (session.mode === "production") return "";
   if (session.mode === "uat") return "UAT 环境";
@@ -81,7 +83,7 @@ const supplierPasswordChangeRequired = computed(
   () => session.passwordChangeRequired && ["supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId)
 );
 const geminiView = computed(() => geminiViewForPath(route.path, session.roleId));
-const geminiRenderableView = computed(() => geminiView.value);
+const geminiRenderableView = computed(() => (runtimeRouteDecision.value.canRenderReact ? geminiView.value : null));
 const geminiCurrentUser = computed(() => {
   if (!session.user) return null;
   return toGeminiUser({
@@ -98,22 +100,38 @@ const routeProjectId = computed(() => {
   if (typeof queryParam === "string") return queryParam;
   return null;
 });
-const geminiProjectId = computed(() => routeProjectId.value ?? pendingGeminiProjectId.value);
+const geminiProjectId = computed(() => routeProjectId.value);
+const frontendRuntimeState = computed(() =>
+  createFrontendRuntimeState({
+    route: route.path,
+    roleId: session.roleId,
+    session: {
+      userId: session.user?.id ?? "",
+      userName: session.user?.name ?? "",
+      orgId: session.user?.orgId,
+      mode: session.mode,
+      mockAuthEnabled: session.mockAuthEnabled,
+      passwordChangeRequired: session.passwordChangeRequired
+    },
+    uiContext: {
+      environmentLabel: environmentLabel.value,
+      projectId: geminiProjectId.value
+    },
+    flags: frontendFeatureFlags.value
+  })
+);
 
 function routeAllowed(path: string) {
   return isRouteAllowed(path, session.roleId, session.mockAuthEnabled);
 }
 
-function navigateGeminiView(view: ViewState) {
-  const target = routeForGeminiView(view, session.roleId, geminiProjectId.value);
-  if (!target || target === route.fullPath) return;
-  void router.push(target);
+function navigateFromReact(path: string) {
+  if (!path || path === route.fullPath) return;
+  void router.push(path);
 }
 
-function navigateGeminiProject(projectId: string | null) {
-  pendingGeminiProjectId.value = projectId;
-  if (!projectId) return;
-  void router.push(`/project-workbench/${encodeURIComponent(projectId)}`);
+function reportReactError(error: unknown) {
+  recordReactModuleError(route.path, session.roleId, error);
 }
 
 async function loadSwitchableUsers() {
@@ -245,11 +263,12 @@ watch(
 );
 
 watch(
-  () => routeProjectId.value,
-  (projectId) => {
-    if (projectId) pendingGeminiProjectId.value = projectId;
-  },
-  { immediate: true }
+  () => [session.roleId, route.path, runtimeRouteDecision.value.runtimeOwner],
+  () => {
+    if (!bootstrapped.value || !session.roleId) return;
+    recordRouteUsage(runtimeRouteDecision.value, session.roleId);
+    recordFeatureFlagEvaluation(evaluateReactFeatureFlag(route.path, session.roleId, frontendFeatureFlags.value));
+  }
 );
 </script>
 
@@ -265,9 +284,14 @@ watch(
     :current-user="geminiCurrentUser"
     :current-view="geminiRenderableView"
     :current-project-id="geminiProjectId"
-    :on-view-change="navigateGeminiView"
-    :on-project-id-change="navigateGeminiProject"
+    :runtime-state="frontendRuntimeState"
+    :menu-config="registryMenuConfig"
+    :route-context="frontendRuntimeState.routeContext"
+    :permission-snapshot="frontendRuntimeState.permissions"
+    :feature-flags="frontendFeatureFlags"
+    :on-navigate="navigateFromReact"
     :on-logout="logout"
+    :on-report-error="reportReactError"
   />
 
   <AppShell
@@ -294,7 +318,25 @@ watch(
     @update:selected-role-switch-id="selectedRoleSwitchId = $event"
     @switch-role="switchRole"
   >
-    <RouterView />
+    <section v-if="runtimeRouteDecision.runtimeOwner === 'vue-shell'" class="eds-state eds-state-warning enterprise-governance-fallback">
+      <span class="eds-state-icon" aria-hidden="true">!</span>
+      <p class="enterprise-governance-fallback-kicker">Frontend Governance</p>
+      <h2>业务界面暂不可用</h2>
+      <p>
+        当前路由未通过 React 渲染门禁，Vue Shell 仅保留会话、权限、导航和统一状态承载，不回退到旧 Vue 业务页面。
+      </p>
+      <dl class="enterprise-governance-fallback-meta">
+        <div>
+          <dt>Route</dt>
+          <dd class="enterprise-governance-fallback-code">{{ runtimeRouteDecision.route }}</dd>
+        </div>
+        <div>
+          <dt>Module</dt>
+          <dd>{{ runtimeRouteDecision.moduleId || "未登记" }}</dd>
+        </div>
+      </dl>
+    </section>
+    <RouterView v-else />
   </AppShell>
 
   <AuthShell v-else title="酒店供应链采购平台" subtitle="正在进入" />

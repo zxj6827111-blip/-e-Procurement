@@ -2,8 +2,8 @@
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
-import type { ViewState } from "./prototype/types";
-import { SupplierOnboardingRegisterView } from "./prototype/views/SupplierOnboardingRegisterView";
+import type { ViewState } from "./shared/types";
+import { SupplierOnboardingRegisterView } from "./features/views/SupplierOnboardingRegisterView";
 
 const props = defineProps<{
   view: Extract<ViewState, "SUPPLIER_ONBOARDING">;

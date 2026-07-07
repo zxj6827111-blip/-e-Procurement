@@ -555,7 +555,7 @@ async function checkRoleMenu(browser, roleModel) {
     const navLabels = (await page.locator('[data-ui-check~="nav-item"], .enterprise-nav-label').allInnerTexts())
       .map((item) => item.trim())
       .filter(Boolean);
-    const expectedNav = geminiExpectedNavByRole[role.roleId] ?? roleModel.visibleNavItems(role.roleId).map((item) => item.label);
+    const expectedNav = roleModel.visibleNavItems(role.roleId).map((item) => item.label);
     const bellVisible = (await page.locator('[data-ui-check~="bell-button"], .enterprise-bell-button[aria-label="消息中心"]').count()) > 0;
     const expectedBell = roleModel.roleHasMessageBell(role.roleId);
     const accountSecurityVisible = (await page.locator('.enterprise-account-popover a[href="/account-security"]').count()) > 0;
@@ -615,7 +615,15 @@ async function checkFlowPages(browser, flow) {
     { userId: flow.supplierAdminUserId, label: "供应商订单履约", path: "/order-fulfillment", requiredText: "履约" },
     { userId: flow.supplierAdminUserId, label: "供应商结算材料", path: "/settlement-materials", requiredText: "结算" },
     { userId: "u13", label: "财务结算审核", path: "/settlement-materials", requiredText: "结算" },
-    { userId: "u7", label: "专家评分页", path: "/expert-scoring", requiredText: "评分" },
+    {
+      userId: "u7",
+      label: "专家评分页",
+      path: "/expert-scoring",
+      requiredText: "评审",
+      actionSelector: '[data-ui-check~="expert-confirm-participation"]',
+      postActionSelector: '[data-ui-check~="expert-scoring-view"]',
+      postActionRequiredText: "评分"
+    },
     { userId: "u2", label: "采购经办定标详情", path: `/award-result/${encodeURIComponent(flow.projectId)}`, requiredText: "定标" },
     { userId: flow.supplierQuotationUserId, label: "供应商中标结果", path: `/award-result/${encodeURIComponent(flow.projectId)}`, requiredText: "结果" },
     { userId: "u2", label: "采购经办档案审计", path: "/archive-audit", requiredText: "档案" }
@@ -638,14 +646,29 @@ async function checkFlowPages(browser, flow) {
     await page
       .waitForFunction((requiredText) => document.body?.innerText?.includes(String(requiredText)), item.requiredText, { timeout: 10000 })
       .catch(() => undefined);
-    const text = await bodyText(page);
+    let text = await bodyText(page);
+    if (item.actionSelector) {
+      const action = page.locator(item.actionSelector).first();
+      if ((await action.count()) > 0) {
+        await action.click({ timeout: 10000 });
+      }
+      if (item.postActionSelector) {
+        await page.waitForSelector(item.postActionSelector, { timeout: 10000 }).catch(() => undefined);
+      }
+      if (item.postActionRequiredText) {
+        await page
+          .waitForFunction((requiredText) => document.body?.innerText?.includes(String(requiredText)), item.postActionRequiredText, { timeout: 10000 })
+          .catch(() => undefined);
+      }
+      text = await bodyText(page);
+    }
     const finalPath = new URL(page.url()).pathname;
     const geminiShellVisible = (await page.locator('[data-ui-check~="shell"]').count()) > 0;
     const legacyShellVisible = (await page.locator(".enterprise-shell").count()) > 0;
     const renderMode = geminiShellVisible ? "gemini" : legacyShellVisible ? "legacy-vue" : "unknown";
     const blocked = text.includes("请先登录") || text.includes("无权") || text.includes("加载失败");
     const pathLoaded = finalPath === item.path;
-    const contentLoaded = text.includes(item.requiredText);
+    const contentLoaded = text.includes(item.requiredText) && (!item.postActionRequiredText || text.includes(item.postActionRequiredText));
     const passed = pathLoaded && contentLoaded && !blocked && consoleErrors.length === 0 && httpErrors.length === 0;
     await page.screenshot({ path: join(outDir, `flow-${item.userId}-${item.label.replace(/[^\u4e00-\u9fa5A-Za-z0-9]+/g, "-")}.png`), fullPage: true });
     await context.close();

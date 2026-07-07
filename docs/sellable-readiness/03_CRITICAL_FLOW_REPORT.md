@@ -1,6 +1,6 @@
 # Sprint 3 Critical Flow Report
 
-- Generated at: 2026-07-06T13:04:12.905Z
+- Generated at: 2026-07-07T00:09:25.398Z
 - R8 Workflow remains the execution source.
 - Process Layer and BPMN are kept in shadow/configuration roles only.
 

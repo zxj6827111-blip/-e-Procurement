@@ -1,6 +1,6 @@
 # RBAC Role Audit Report
 
-- Generated at: 2026-07-06T13:04:08.976Z
+- Generated at: 2026-07-07T00:09:22.841Z
 - Step: 5 / 9
 - Result: PASS
 - Scope: 12 角色默认着陆页、版式映射、消息铃铛显隐、侧栏菜单，以及未知角色 fail-closed 审计。

@@ -1,6 +1,6 @@
 # Sprint 3 Critical Flow Test Report
 
-- Generated at: 2026-07-06T13:04:12.908Z
+- Generated at: 2026-07-07T00:09:25.401Z
 - Focused existing tests: p0-permissions.test.ts, m6c-final-security-ops.test.ts, r10-final-uat-production.test.ts, phase3-bidding.test.ts, phase4-expert-review.test.ts, phase5-award-result.test.ts, r6-order-fulfillment.test.ts, r7-settlement-finance.test.ts, m4d-fulfillment-settlement-archive-process.test.ts.
 - Sprint 3 focused verification passed locally: sellable-critical-boundaries.test.ts (9 tests) and affected boundary suite p0-permissions.test.ts, phase4-expert-review.test.ts, phase8-archive-audit.test.ts, phase11-hotel-closed-loop.test.ts, sellable-critical-boundaries.test.ts (50 tests).
 - Current full-suite result must be read from 03_SELLABLE_CHECK_REPORT.md after sellable:check runs.

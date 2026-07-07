@@ -1,6 +1,6 @@
 # Sprint 2 Readiness Strict Report
 
-- Generated at: 2026-07-06T13:04:16.334Z
+- Generated at: 2026-07-07T00:09:27.735Z
 - Production gate status: FAIL
 - Production gate failures: 15
 

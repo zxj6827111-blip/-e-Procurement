@@ -14,6 +14,7 @@ apps/web/dist/
 **/.data/
 output/
 tmp/
+.tmp/
 .codex/
 .codex-run/
 .playwright-mcp/

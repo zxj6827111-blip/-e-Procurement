@@ -1,4 +1,4 @@
-import type { Role, User, ViewState } from "./prototype/types";
+import type { Role, User, ViewState } from "./shared/types";
 
 const roleMap: Record<string, Role> = {
   group_manager: "GROUP_PROCUREMENT_MANAGER",

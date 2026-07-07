@@ -17,9 +17,14 @@ function renderReactApp() {
       currentUser: props.currentUser,
       currentView: props.currentView,
       currentProjectId: props.currentProjectId,
-      onViewChange: props.onViewChange,
-      onProjectIdChange: props.onProjectIdChange,
-      onLogout: props.onLogout
+      runtimeState: props.runtimeState,
+      menuConfig: props.menuConfig,
+      routeContext: props.routeContext,
+      permissionSnapshot: props.permissionSnapshot,
+      featureFlags: props.featureFlags,
+      onNavigate: props.onNavigate,
+      onLogout: props.onLogout,
+      onReportError: props.onReportError
     })
   );
 }
@@ -27,7 +32,7 @@ function renderReactApp() {
 onMounted(renderReactApp);
 
 watch(
-  () => [props.currentUser, props.currentView, props.currentProjectId],
+  () => [props.currentUser, props.currentView, props.currentProjectId, props.runtimeState, props.menuConfig],
   renderReactApp,
   { deep: true }
 );
