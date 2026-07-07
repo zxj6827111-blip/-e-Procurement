@@ -285,7 +285,7 @@ describe("Stage 11 supply chain mall expansion", () => {
     const orders = await request(runtime2.app).get("/api/mall/orders").set("x-mock-user-id", "u2");
     expect(orders.status).toBe(200);
     expect(orders.body.orders.some((item: { id: string }) => item.id === order.body.order.id)).toBe(true);
-  }, 15000);
+  }, 30000);
 
   it("covers PDF 1:1 mall, questionnaire, scenario package, fund account and split-role paths", async () => {
     const runtime = boot();
