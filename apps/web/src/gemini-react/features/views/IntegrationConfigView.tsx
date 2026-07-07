@@ -54,7 +54,7 @@ export function IntegrationConfigView() {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <button className="text-[#006666] hover:underline">测试连接</button>
+                    <button className="text-[#006666] hover:underline">校验连接</button>
                   </td>
                 </tr>
               ))}

@@ -98,7 +98,7 @@ export function SupplierOnboardingRegisterView() {
           <SectionTitle icon={<UserRound className="w-5 h-5" />} title="账号注册" />
           <div className="grid grid-cols-4 gap-4">
             <Field label="手机号" placeholder="用于接收注册验证码" />
-            <Field label="验证码" placeholder="123456" defaultValue="123456" />
+            <Field label="验证码" placeholder="请输入验证码" />
             <Field label="密码" type="password" />
             <Field label="确认密码" type="password" />
           </div>

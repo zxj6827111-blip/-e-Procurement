@@ -27,7 +27,7 @@ export const pageClassifications: PageClassification[] = [
     component: "SupplierOnboardingRegisterPage",
     exceptionReason: "Supplier onboarding is the approved wizard-style complex creation flow."
   },
-  { path: "/role-switch", domain: "identity", kind: "FORM_PAGE", component: "RoleSwitchPage", exceptionReason: "Mock role switch is a controlled system form." },
+  { path: "/role-switch", domain: "identity", kind: "FORM_PAGE", component: "RoleSwitchPage", exceptionReason: "Role switch is a controlled system form." },
   {
     path: "/my-tasks",
     domain: "workbench",

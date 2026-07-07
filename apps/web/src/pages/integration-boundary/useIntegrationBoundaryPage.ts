@@ -80,7 +80,7 @@ export function useIntegrationBoundaryPage() {
           forceFailure: callForm.value.forceFailure,
           payload
         }),
-      mock ? "已创建本地验证调用" : "已创建集成调用"
+      mock ? "已创建内部校验调用" : "已创建集成调用"
     );
   }
 

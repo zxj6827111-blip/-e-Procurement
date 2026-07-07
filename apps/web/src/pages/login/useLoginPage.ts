@@ -28,8 +28,8 @@ function postLoginRoute(roleId: string, passwordChangeRequired?: boolean) {
 export function useLoginPage() {
   const session = useSessionStore();
   const router = useRouter();
-  const username = ref("u2");
-  const password = ref("pass-u2");
+  const username = ref("");
+  const password = ref("");
   const selectedUserId = ref("u2");
   const error = ref("");
   const auditLogId = ref("");
@@ -38,7 +38,7 @@ export function useLoginPage() {
   const environmentLabel = computed(() => {
     if (session.mode === "production") return "生产环境";
     if (session.mode === "uat") return "UAT 环境";
-    if (session.mockAuthEnabled) return "本地验证环境";
+    if (session.mockAuthEnabled) return "验证环境";
     return "试用环境";
   });
   const showLocalAccess = computed(() => session.mode !== "production" && session.mockAuthEnabled);

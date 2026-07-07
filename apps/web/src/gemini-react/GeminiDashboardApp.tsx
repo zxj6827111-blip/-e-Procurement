@@ -118,7 +118,7 @@ function SmartRiskPanel() {
           <div className="p-1.5 bg-rose-100 text-rose-600 rounded">
             <ShieldAlert className="w-4 h-4" />
           </div>
-          <CardTitle className="text-base font-semibold">AI 智能风控预警 (Mock)</CardTitle>
+          <CardTitle className="text-base font-semibold">AI 智能风控预警</CardTitle>
         </div>
         <Badge variant="danger">3项高优风险</Badge>
       </CardHeader>

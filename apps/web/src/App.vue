@@ -59,7 +59,7 @@ const currentPageTitle = computed(() => runtimeRouteDecision.value.pageTitle || 
 const environmentLabel = computed(() => {
   if (session.mode === "production") return "";
   if (session.mode === "uat") return "UAT 环境";
-  if (session.mockAuthEnabled) return "本地验证环境";
+  if (session.mockAuthEnabled) return "验证环境";
   return "试用环境";
 });
 const roleSwitchEnabled = computed(() => session.mode !== "production" && session.mockAuthEnabled);

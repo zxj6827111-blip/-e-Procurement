@@ -16,6 +16,7 @@ const roleLabels: Record<string, string> = {
   auditor: "纪检 / 审计",
   admin: "系统管理员"
 };
+const localAccessUserIds = new Set(Array.from({ length: 17 }, (_, index) => `u${index + 1}`));
 
 function currentAccount(ctx: AppContext, userId: string) {
   return ctx.authStore.getAccountsByUserIds([userId])[0] ?? null;
@@ -213,6 +214,7 @@ export function authRoutes(ctx: AppContext) {
     }
     const users = ctx.state.users
       .filter((user) => user.roleId !== "system" && (user.status ?? "active") === "active")
+      .filter((user) => localAccessUserIds.has(user.id))
       .map((user) => {
         const supplier = user.supplierId ? ctx.state.suppliers.find((item) => item.id === user.supplierId) : undefined;
         return {

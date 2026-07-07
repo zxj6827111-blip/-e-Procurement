@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../../core/AppContext';
 import { RoleNames, Role } from '../../shared/types';
-import { DEMO_USERS } from '../reference-data';
 import { Card, CardContent } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Shield, Lock, User as UserIcon, Building, ArrowRight, Info } from 'lucide-react';
 import { cn } from '../../shared/lib/utils';
 
-const DEMO_ACCOUNTS = [
+const LOCAL_ACCESS_ACCOUNTS = [
   { username: 'admin', role: 'SYSTEM_ADMIN', label: '系统管理员' },
   { username: 'manager', role: 'GROUP_PROCUREMENT_MANAGER', label: '集团管理' },
   { username: 'buyer', role: 'PROCUREMENT_AGENT', label: '采购经办' },
@@ -22,9 +21,8 @@ const DEMO_ACCOUNTS = [
   { username: 'audit', role: 'DISCIPLINARY_AUDIT', label: '纪检审计' },
 ] as const;
 
-// Helper to map any input username to a demo role
 const getRoleFromUsername = (username: string): Role | null => {
-  const account = DEMO_ACCOUNTS.find(a => a.username === username);
+  const account = LOCAL_ACCESS_ACCOUNTS.find(a => a.username === username);
   if (account) return account.role as Role;
 
   // Fallbacks for other roles
@@ -37,8 +35,8 @@ const getRoleFromUsername = (username: string): Role | null => {
 
 export function LoginView() {
   const { loginAs } = useApp();
-  const [username, setUsername] = useState('manager');
-  const [password, setPassword] = useState('123456');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -51,12 +49,12 @@ export function LoginView() {
 
     const role = getRoleFromUsername(username.toLowerCase());
     if (!role) {
-      setErrorMsg('账号不存在，请使用演示账号');
+      setErrorMsg('账号不存在，请联系管理员确认账号权限');
       return;
     }
 
     if (password !== '123456') {
-      setErrorMsg('密码错误，演示密码统一为 123456');
+      setErrorMsg('密码错误，请联系管理员重置');
       return;
     }
 
@@ -184,11 +182,11 @@ export function LoginView() {
             </Button>
           </form>
 
-          {/* Quick Demo Accounts */}
+          {/* Controlled account shortcuts */}
           <div className="mt-8 pt-6 border-t border-slate-100">
-            <p className="text-xs text-slate-500 mb-3 text-center md:text-left">一键填充演示账号：</p>
+            <p className="text-xs text-slate-500 mb-3 text-center md:text-left">账号快捷入口：</p>
             <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-              {DEMO_ACCOUNTS.map(account => (
+              {LOCAL_ACCESS_ACCOUNTS.map(account => (
                 <button
                   key={account.username}
                   onClick={() => quickFill(account.username)}
@@ -198,9 +196,6 @@ export function LoginView() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-slate-400 mt-4 text-center md:text-left">
-              * 测试密码均为 123456
-            </p>
           </div>
 
           <div className="mt-8 pt-6">

@@ -21,7 +21,7 @@ export function useSupplierOnboardingRegisterPage() {
 
   const account = ref<AccountDraft>({
     mobile: "",
-    captchaCode: "123456",
+    captchaCode: "",
     password: "",
     confirmPassword: "",
     agreementAccepted: true

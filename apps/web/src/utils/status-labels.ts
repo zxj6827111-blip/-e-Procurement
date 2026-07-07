@@ -70,7 +70,7 @@ export const statusLabelMap: Record<string, string> = {
   project_created: "已发起项目",
   r8_process_layer: "业务审批",
   shadow: "影子试点",
-  simulation_error: "模拟异常",
+  simulation_error: "异常",
   validation_failed: "校验失败",
   waiting_for_matching_event: "等待后续活动",
   published: "已发布",

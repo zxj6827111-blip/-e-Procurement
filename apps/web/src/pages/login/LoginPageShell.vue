@@ -49,7 +49,7 @@ const state = useLoginPage();
             {{ row.role }}
           </button>
         </div>
-        <small>* 本地环境密码随账号自动填充</small>
+        <small>* 选择业务角色后将自动填入账号信息</small>
       </section>
 
       <ErrorAlert v-if="state.error.value" :message="state.error.value" />

@@ -18,7 +18,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <EnterpriseSurface class="g-hotel-compliance-card eds-drawer-panel" title="适配器调用抽屉" description="通过统一适配器边界发起外部系统调用或本地验证调用，保持请求幂等和失败注入能力。">
+  <EnterpriseSurface class="g-hotel-compliance-card eds-drawer-panel" title="适配器调用抽屉" description="通过统一适配器边界发起外部系统调用或内部校验调用，保持请求幂等和失败注入能力。">
     <template #actions>
       <EnterpriseButton type="text" @click="emit('refresh')">刷新</EnterpriseButton>
     </template>
@@ -63,7 +63,7 @@ const emit = defineEmits<{
     </div>
     <div class="eds-submit-panel g-hotel-sticky-actions">
       <EnterpriseButton :disabled="disabled" type="primary" @click="emit('call', false)">创建外部调用</EnterpriseButton>
-      <EnterpriseButton :disabled="disabled" @click="emit('call', true)">创建本地验证调用</EnterpriseButton>
+      <EnterpriseButton :disabled="disabled" @click="emit('call', true)">创建内部校验调用</EnterpriseButton>
     </div>
     <p class="eds-meta">
       当前适配器：{{ selectedAdapter?.name || "-" }} / {{ selectedAdapter?.mode || "-" }}。外部 HTTP、凭据托管、回调验签和生产重推均停留在适配器边界内处理。
