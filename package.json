@@ -32,6 +32,7 @@
     "ui:scan:test": "node scripts/ui-violation-scan.test.mjs",
     "ui:smoke": "node scripts/ui-page-kind-smoke.mjs",
     "ui:role-flow": "node scripts/ui-role-flow-regression.mjs",
+    "ui:abnormal-path": "node scripts/ui-abnormal-path-regression.mjs",
     "role:menu-snapshot": "node scripts/sellable-readiness.mjs role-menu-snapshot",
     "role:rbac-audit": "node scripts/sellable-readiness.mjs rbac-role-audit",
     "permission:align": "node scripts/sellable-readiness.mjs permission-align",

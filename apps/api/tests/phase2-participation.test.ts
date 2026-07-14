@@ -16,6 +16,14 @@ function expectDenied(response: request.Response, code: string, sensitiveTokens:
   }
 }
 
+function qualificationAttachment(fileName: string) {
+  return {
+    fileName,
+    contentType: "text/plain",
+    contentBase64: Buffer.from(fileName, "utf8").toString("base64")
+  };
+}
+
 async function createLockedDocument(runtime: ReturnType<typeof boot>, projectId = "p-pre") {
   const created = await request(runtime.app)
     .post(`/api/projects/${projectId}/procurement-documents`)
@@ -59,6 +67,12 @@ describe("Phase 2 procurement documents, announcements and supplier registration
 
   beforeEach(() => {
     runtime = boot();
+    const supplier = runtime.ctx.state.suppliers.find((item) => item.id === "sup-2");
+    const authorization = supplier?.categoryAuthorizations?.find((item) => item.category === "客房一次性用品");
+    if (supplier && authorization) {
+      authorization.expiresAt = "2099-12-31T23:59:59.000Z";
+      runtime.ctx.r3SupplierProductRepository.upsertSupplier(supplier);
+    }
   });
 
   it("locks procurement documents after publish and creates a new version on later edits", async () => {
@@ -135,7 +149,13 @@ describe("Phase 2 procurement documents, announcements and supplier registration
     const admission = await request(runtime.app)
       .post("/api/suppliers/admissions")
       .set("x-mock-user-id", "u1")
-      .send({ name: "待准入供应商", category: "客房一次性用品", contactName: "待准入联系人", contactPhone: "13900001234" });
+      .send({
+        name: "待准入供应商",
+        category: "客房一次性用品",
+        contactName: "待准入联系人",
+        contactPhone: "13900001234",
+        qualificationAttachments: [qualificationAttachment("pending-supplier-license.txt")]
+      });
     expect(admission.status).toBe(201);
     expect(admission.body.supplier.admissionStatus).toBe("pending");
     const supplierId = admission.body.supplier.id as string;

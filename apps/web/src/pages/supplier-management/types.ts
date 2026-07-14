@@ -92,6 +92,7 @@ export interface Supplier {
   contactName?: string;
   contactPhone?: string;
   contactEmail?: string;
+  supplierType?: string;
   supplierSource?: string;
   socialCreditCode?: string;
   businessLicenseNo?: string;

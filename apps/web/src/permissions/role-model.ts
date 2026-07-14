@@ -103,7 +103,7 @@ export const roleProfiles: Record<RoleId, RoleProfile> = {
   },
   hotel_buyer: {
     label: "酒店采购",
-    home: "/procurement-requests",
+    home: "/",
     template: "B",
     sidebar: ["dashboard", "myTasks", "procurementRequests", "supplyMall", "orderFulfillment"],
     showMessageBell: true
@@ -138,14 +138,14 @@ export const roleProfiles: Record<RoleId, RoleProfile> = {
   },
   supplier_quotation: {
     label: "供应商报价人员",
-    home: "/bidding",
+    home: "/",
     template: "C",
     sidebar: ["myTasks", "supplyMallMaintain", "supplierPortal", "supplierRegistration", "bidding", "awardResultSupplier", "orderFulfillment", "settlementMaterials"],
     showMessageBell: true
   },
   expert: {
     label: "专家",
-    home: "/expert-scoring",
+    home: "/",
     template: "C",
     sidebar: ["dashboard", "myTasks"],
     showMessageBell: true
@@ -159,7 +159,7 @@ export const roleProfiles: Record<RoleId, RoleProfile> = {
   },
   admin: {
     label: "系统管理员",
-    home: "/permissions",
+    home: "/",
     template: "D",
     sidebar: ["approvalRules", "modules", "permissions"],
     showMessageBell: false
@@ -251,7 +251,11 @@ export function visibleNavItems(roleId: string) {
   if (!hasRoleProfile(roleId)) return [];
   const profile = roleProfiles[roleId];
   if (!profile) return [];
-  return profile.sidebar.map((itemId) => navCatalog[itemId]).filter(Boolean);
+  const items = profile.sidebar.map((itemId) => navCatalog[itemId]).filter((item): item is NavItem => Boolean(item));
+  if (!items.some((item) => item.id === "dashboard")) {
+    return [navCatalog.dashboard, ...items];
+  }
+  return items;
 }
 
 export function visibleUtilityItems(roleId: string) {
@@ -270,7 +274,7 @@ export function roleTemplate(roleId: string) {
 export function routeAllowed(path: string, roleId: string, mockAuthEnabled = false) {
   if (!hasRoleProfile(roleId)) return false;
   if (path === roleHome(roleId)) return true;
-  if (path === "/" && businessRoles.includes(roleId as RoleId)) return true;
+  if (path === "/") return true;
   const rule = routeAccessRules.find((item) => item.test(path));
   if (rule) return (!rule.mockOnly || mockAuthEnabled) && rule.roles.includes(roleId);
   return visibleNavItems(roleId).some((item) => item.to === path);

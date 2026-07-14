@@ -40,7 +40,21 @@ function assertAdminWriter(ctx: AppContext, req: Request, res: Response, resourc
 }
 
 function isRoleId(value: string): value is RoleId {
-  return ["group_manager", "buyer", "supplier", "expert", "auditor", "admin", "system"].includes(value);
+  return [
+    "group_manager",
+    "buyer",
+    "hotel_buyer",
+    "hotel_finance",
+    "platform_operator",
+    "supplier",
+    "supplier_admin",
+    "supplier_quotation",
+    "expert",
+    "finance_reviewer",
+    "auditor",
+    "admin",
+    "system"
+  ].includes(value);
 }
 
 function isUserStatus(value: string): value is NonNullable<User["status"]> {

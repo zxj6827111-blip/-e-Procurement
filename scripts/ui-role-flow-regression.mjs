@@ -1,5 +1,5 @@
 import { createWriteStream, mkdirSync, writeFileSync } from "node:fs";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { join } from "node:path";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -70,7 +70,7 @@ function stopProcessTree(child) {
   if (!child?.pid) return;
   try {
     if (process.platform === "win32") {
-      spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+      spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
     } else {
       process.kill(-child.pid, "SIGTERM");
     }
@@ -81,6 +81,10 @@ function stopProcessTree(child) {
       // best-effort cleanup
     }
   }
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+  child.stdin?.destroy();
+  child.unref();
 }
 
 async function waitForUrl(url, timeoutMs = 60000) {
@@ -471,9 +475,44 @@ async function runApiFlow() {
   await postAs(actors.buyer, `/api/projects/${projectId}/archive-seal`);
   trace.push("buyer:archive check and seal");
 
+  const pendingApprovalRequestTitle = `集团待审可见性验证-${suffix}`;
+  const pendingApprovalRequest = await postAs(
+    actors.hotelBuyer,
+    "/api/procurement-requests",
+    {
+      title: pendingApprovalRequestTitle,
+      orgId: "org-hotel",
+      requestDepartment: "客房部",
+      requesterName: "酒店采购",
+      category: selectedSupplier.category,
+      budgetAmount: 60000,
+      purpose: "验证酒店提交后集团需求审批列表可见",
+      expectedArrivalAt: "2026-07-21",
+      receivingLocation: "上海滨江华礼酒店仓库",
+      lineItems: [
+        {
+          itemName: `${selectedSupplier.category}审批可见性验证`,
+          category: selectedSupplier.category,
+          specification: "标准规格",
+          quantity: 10,
+          unit: "套",
+          estimatedUnitPrice: 6000,
+          budgetAmount: 60000,
+          requiredByDate: "2026-07-21"
+        }
+      ]
+    },
+    201
+  );
+  const pendingApprovalRequestId = pendingApprovalRequest.procurementRequest.id;
+  await postAs(actors.hotelBuyer, `/api/procurement-requests/${pendingApprovalRequestId}/submit`);
+  trace.push("hotel:submit pending request for group approval visibility");
+
   return {
     requestId,
     requestTitle,
+    pendingApprovalRequestId,
+    pendingApprovalRequestTitle,
     projectId,
     projectName,
     awardId,
@@ -604,6 +643,7 @@ async function checkForbiddenRoute(page, path) {
 async function checkFlowPages(browser, flow) {
   const pages = [
     { userId: "u8", label: "酒店采购申请列表", path: "/procurement-requests", requiredText: "采购申请" },
+    { userId: "u1", label: "集团待审申请列表", path: "/procurement-requests", requiredText: flow.pendingApprovalRequestTitle },
     { userId: "u1", label: "集团需求审批详情", path: `/procurement-requests/${encodeURIComponent(flow.requestId)}`, requiredText: "需求" },
     { userId: "u2", label: "采购项目执行详情", path: `/project-workbench/${encodeURIComponent(flow.projectId)}`, requiredText: flow.projectName },
     { userId: "u2", label: "招采执行详情", path: `/project-workbench/${encodeURIComponent(flow.projectId)}/sourcing`, requiredText: "招采" },

@@ -1,195 +1,276 @@
-import React, { useState } from 'react';
-import { useApp, type TodoItem, type TodoPriority } from '../../core/AppContext';
-import { Card, CardContent, CardHeader, CardTitle } from '../../shared/ui/Card';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useApp } from '../../core/AppContext';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
-import { ListTodo, Filter, Search, ArrowRight, ArrowLeft, Save, Archive } from 'lucide-react';
-import type { ViewState } from '../../shared/types';
+import { Card, CardContent, CardHeader, CardTitle } from '../../shared/ui/Card';
+import { ArrowLeft, ArrowRight, CheckCircle2, Filter, ListTodo, Search, XCircle } from 'lucide-react';
+import { formatDateTime, loadUnifiedTasks, runTaskAction, type UnifiedTaskView } from './workflow-runtime';
 
-function priorityDot(priority: TodoPriority) {
-  if (priority === 'URGENT') return 'bg-rose-500';
-  if (priority === 'HIGH') return 'bg-amber-500';
-  return 'bg-blue-500';
+type StatusFilter = 'all' | 'pending' | 'completed' | 'cancelled';
+
+function statusVariant(status: string): 'default' | 'success' | 'warning' | 'outline' {
+  if (status === 'completed') return 'success';
+  if (status === 'pending') return 'warning';
+  if (status === 'cancelled') return 'outline';
+  return 'default';
 }
 
-function priorityBadge(priority: TodoPriority) {
-  if (priority === 'URGENT') return <Badge variant="danger">紧急</Badge>;
-  if (priority === 'HIGH') return <Badge variant="warning">高</Badge>;
-  return <Badge variant="default">普通</Badge>;
+function actionLabel(task: UnifiedTaskView) {
+  if (task.approvalInstanceId) return '审批处理';
+  if (task.actionTaskId) return '完成任务';
+  return '查看业务';
 }
 
 export function TodoView() {
-  const { todos, completeTodo, rejectTodo, setCurrentView } = useApp();
-  const [selectedTodo, setSelectedTodo] = useState<TodoItem | null>(null);
-  const [opinion, setOpinion] = useState('');
+  const { currentUser, navigateToPath } = useApp();
+  const [tasks, setTasks] = useState<UnifiedTaskView[]>([]);
+  const [selectedTask, setSelectedTask] = useState<UnifiedTaskView | null>(null);
+  const [keyword, setKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [opinion, setOpinion] = useState('页面处理意见：资料已核对。');
+  const [loading, setLoading] = useState(true);
+  const [actionBusy, setActionBusy] = useState('');
+  const [error, setError] = useState('');
+  const [hint, setHint] = useState('');
 
-  const submitTodo = (todo: TodoItem, nextView?: ViewState) => {
-    completeTodo(todo.id);
-    setSelectedTodo(null);
-    setOpinion('');
-    if (nextView) setCurrentView(nextView);
+  const load = async () => {
+    if (!currentUser?.id) {
+      setTasks([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const result = await loadUnifiedTasks(currentUser.id);
+      setTasks(result.tasks);
+      setHint(result.errorMessage);
+    } catch (err) {
+      setTasks([]);
+      setHint('');
+      setError(err instanceof Error ? err.message : '待办任务加载失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const returnTodo = (todo: TodoItem, nextView?: ViewState) => {
-    rejectTodo(todo.id);
-    setSelectedTodo(null);
-    setOpinion('');
-    if (nextView) setCurrentView(nextView);
+  useEffect(() => {
+    void load();
+  }, [currentUser?.id]);
+
+  const filteredTasks = useMemo(() => {
+    const text = keyword.trim().toLowerCase();
+    return tasks.filter((task) => {
+      const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
+      const matchesKeyword =
+        !text ||
+        [task.title, task.businessId, task.businessTypeLabel, task.taskTypeLabel, task.assigneeLabel]
+          .join(' ')
+          .toLowerCase()
+          .includes(text);
+      return matchesStatus && matchesKeyword;
+    });
+  }, [keyword, statusFilter, tasks]);
+
+  const handleTaskAction = async (task: UnifiedTaskView, action: 'approve' | 'reject' | 'complete') => {
+    if (!currentUser?.id) return;
+    setActionBusy(`${action}:${task.id}`);
+    setError('');
+    try {
+      await runTaskAction(task, action, opinion, currentUser.id);
+      await load();
+      setSelectedTask(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '任务处理失败');
+    } finally {
+      setActionBusy('');
+    }
   };
 
-  if (selectedTodo) {
+  if (selectedTask) {
+    const actionKey = (action: 'approve' | 'reject' | 'complete') => `${action}:${selectedTask.id}`;
     return (
-      <div className="h-full flex flex-col space-y-6 max-w-5xl mx-auto pb-20">
+      <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" className="p-2 hover:bg-slate-100" onClick={() => setSelectedTodo(null)}>
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
+          <Button variant="ghost" className="p-2 hover:bg-slate-100" onClick={() => setSelectedTask(null)}>
+            <ArrowLeft className="h-5 w-5 text-slate-600" />
           </Button>
           <div>
-            <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
-              <ListTodo className="w-5 h-5 text-slate-700" />
+            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+              <ListTodo className="h-5 w-5 text-slate-700" />
               任务处理
             </h2>
-            <p className="text-sm text-slate-500 mt-1">任务编号: {selectedTodo.id} | {selectedTodo.time}</p>
+            <p className="mt-1 text-sm text-slate-500">
+              {selectedTask.businessTypeLabel} / {selectedTask.taskTypeLabel}
+            </p>
           </div>
         </div>
 
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="bg-slate-50 border-b border-slate-100 py-4">
-            <CardTitle className="text-base font-semibold text-slate-800">任务基础信息</CardTitle>
+        {error ? <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
+
+        <Card>
+          <CardHeader className="border-b border-slate-100 bg-slate-50 py-4">
+            <CardTitle className="text-base font-semibold text-slate-800">任务信息</CardTitle>
           </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-              <div>
-                <p className="text-sm font-medium text-slate-500 mb-1">任务名称</p>
-                <p className="text-base font-medium text-slate-900">{selectedTodo.title}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500 mb-1">关联单据 / 项目</p>
-                <p className="text-base font-medium text-slate-900 font-mono">{selectedTodo.target}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500 mb-1">任务发起人</p>
-                <p className="text-base font-medium text-slate-900">{selectedTodo.sender}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500 mb-1">任务优先级</p>
-                <div>{priorityBadge(selectedTodo.priority)}</div>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500 mb-1">处理状态</p>
-                <p className="text-base font-medium text-slate-900">{selectedTodo.statusLabel}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-500 mb-1">截止时间</p>
-                <p className="text-base font-medium text-slate-900">{selectedTodo.deadline}</p>
-              </div>
+          <CardContent className="grid gap-6 p-6 md:grid-cols-2">
+            <div>
+              <p className="mb-1 text-sm text-slate-500">任务标题</p>
+              <p className="font-medium text-slate-900">{selectedTask.title}</p>
             </div>
-
-            <div className="mt-8">
-              <p className="text-sm font-medium text-slate-500 mb-2">任务内容详情与审批意见</p>
-              <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-slate-700 text-sm leading-relaxed">
-                您收到来自 {selectedTodo.sender} 的任务分配：<strong>{selectedTodo.title}</strong>。
-                <br /><br />
-                请核对关联单据的内容，并根据系统要求进行处理。提交后该任务会从待办列表移除，并进入对应业务页面继续处理。
-              </div>
+            <div>
+              <p className="mb-1 text-sm text-slate-500">关联业务</p>
+              <p className="font-medium text-slate-900">
+                {selectedTask.businessId}
+                {selectedTask.projectId ? ` / ${selectedTask.projectId}` : ''}
+              </p>
             </div>
-
-            <div className="mt-6">
-              <label className="block text-sm font-medium text-slate-700 mb-2">您的处理意见（选填）</label>
+            <div>
+              <p className="mb-1 text-sm text-slate-500">当前状态</p>
+              <Badge variant={statusVariant(selectedTask.status)}>{selectedTask.statusLabel}</Badge>
+            </div>
+            <div>
+              <p className="mb-1 text-sm text-slate-500">处理角色</p>
+              <p className="font-medium text-slate-900">{selectedTask.assigneeLabel || '-'}</p>
+            </div>
+            <div>
+              <p className="mb-1 text-sm text-slate-500">创建时间</p>
+              <p className="font-medium text-slate-900">{formatDateTime(selectedTask.createdAt)}</p>
+            </div>
+            <div>
+              <p className="mb-1 text-sm text-slate-500">业务入口</p>
+              <Button variant="outline" onClick={() => navigateToPath(selectedTask.targetPath)}>
+                打开 {selectedTask.targetLabel}
+              </Button>
+            </div>
+            {selectedTask.nodeLabel ? (
+              <div className="md:col-span-2">
+                <p className="mb-1 text-sm text-slate-500">流程节点</p>
+                <p className="font-medium text-slate-900">
+                  {selectedTask.nodeLabel}
+                  {selectedTask.processStatusLabel ? ` / ${selectedTask.processStatusLabel}` : ''}
+                </p>
+              </div>
+            ) : null}
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-slate-700">处理意见</label>
               <textarea
-                className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-slate-400 focus:outline-none"
                 rows={4}
                 value={opinion}
                 onChange={(event) => setOpinion(event.target.value)}
-                placeholder="请输入同意或驳回的详细意见..."
+                className="w-full rounded-lg border border-slate-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+                placeholder="请输入审批或处理意见"
               />
             </div>
           </CardContent>
         </Card>
 
-        <div className="fixed bottom-0 left-[220px] right-0 p-4 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 flex justify-end gap-4 pr-12">
-          <Button variant="outline" className="px-6 h-11 text-base font-medium min-w-[120px]" onClick={() => setSelectedTodo(null)}>
-            取消
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={() => navigateToPath(selectedTask.targetPath)}>
+            查看业务页面
           </Button>
-          <Button
-            variant="outline"
-            className="px-6 h-11 text-base font-medium min-w-[120px] border-rose-600 text-rose-600 hover:bg-rose-50"
-            onClick={() => returnTodo(selectedTodo, 'TODO')}
-          >
-            <Archive className="w-5 h-5 mr-2" />
-            驳回 / 拒绝
-          </Button>
-          <Button
-            variant="primary"
-            className="px-8 h-11 text-base font-bold min-w-[180px]"
-            onClick={() => submitTodo(selectedTodo, selectedTodo.nextView)}
-          >
-            <Save className="w-5 h-5 mr-2" />
-            同意并提交
-          </Button>
+          {selectedTask.approvalInstanceId ? (
+            <>
+              <Button
+                variant="outline"
+                className="border-rose-200 text-rose-600 hover:bg-rose-50"
+                disabled={actionBusy.length > 0}
+                onClick={() => void handleTaskAction(selectedTask, 'reject')}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                {actionBusy === actionKey('reject') ? '处理中...' : '驳回'}
+              </Button>
+              <Button disabled={actionBusy.length > 0} onClick={() => void handleTaskAction(selectedTask, 'approve')}>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                {actionBusy === actionKey('approve') ? '处理中...' : '同意'}
+              </Button>
+            </>
+          ) : selectedTask.actionTaskId ? (
+            <Button disabled={actionBusy.length > 0} onClick={() => void handleTaskAction(selectedTask, 'complete')}>
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              {actionBusy === actionKey('complete') ? '处理中...' : '标记完成'}
+            </Button>
+          ) : null}
         </div>
       </div>
     );
   }
 
   return (
-    <div data-ui-check="todo-view" className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6" data-ui-check="todo-view">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900 tracking-tight flex items-center gap-2">
-            <ListTodo className="w-6 h-6 text-slate-700" />
-            我的待办任务
+          <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+            <ListTodo className="h-6 w-6 text-slate-700" />
+            我的待办
           </h2>
-          <p className="text-sm text-slate-500 mt-1">集中处理需要您确认、审批或执行的业务，当前共 {todos.length} 条。</p>
+          <p className="mt-1 text-sm text-slate-500">这里展示当前账号真实可处理的业务任务和审批任务。</p>
         </div>
+        <Button variant="outline" onClick={() => void load()} disabled={loading}>
+          刷新
+        </Button>
       </div>
 
+      {hint ? <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">{hint}</div> : null}
+      {error ? <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
+
       <Card data-ui-check="todo-list">
-        <div className="p-4 border-b border-slate-100 flex gap-4 bg-slate-50/50 rounded-t-lg">
-          <div className="flex-1 relative">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <div className="flex gap-4 border-b border-slate-100 bg-slate-50/50 p-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="搜索待办标题、业务单号"
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="搜索任务标题、业务单号、项目号"
+              className="w-full rounded-md border border-slate-300 py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
             />
           </div>
-          <Button variant="outline" className="gap-2">
-            <Filter className="w-4 h-4" /> 状态筛选
-          </Button>
+          <div className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3">
+            <Filter className="h-4 w-4 text-slate-400" />
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+              className="h-10 border-0 bg-transparent text-sm focus:outline-none"
+            >
+              <option value="all">全部状态</option>
+              <option value="pending">待处理</option>
+              <option value="completed">已完成</option>
+              <option value="cancelled">已取消</option>
+            </select>
+          </div>
         </div>
         <div className="divide-y divide-slate-100">
-          {todos.map((todo) => (
-            <div data-ui-check="todo-row" key={todo.id} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between">
-              <div className="flex items-start gap-4">
-                <div className="mt-1">
-                  <div className={`w-2.5 h-2.5 rounded-full ${priorityDot(todo.priority)}`} />
+          {loading ? (
+            <div className="p-12 text-center text-slate-500">正在加载待办任务...</div>
+          ) : filteredTasks.length === 0 ? (
+            <div className="p-12 text-center text-slate-500" data-ui-check="todo-empty-state">当前没有可展示的待办任务。</div>
+          ) : (
+            filteredTasks.map((task) => (
+              <div key={task.id} className="flex items-center justify-between p-4 transition-colors hover:bg-slate-50" data-ui-check="todo-row">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{task.sourceLabel}</Badge>
+                    <Badge variant={statusVariant(task.status)}>{task.statusLabel}</Badge>
+                    <span className="font-medium text-slate-900">{task.title}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                    <span>{task.businessTypeLabel}</span>
+                    <span>{task.businessId}</span>
+                    {task.projectId ? <span>{task.projectId}</span> : null}
+                    <span>{formatDateTime(task.createdAt)}</span>
+                  </div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">{todo.type}</span>
-                    <h3 className="font-medium text-slate-900">{todo.title}</h3>
-                  </div>
-                  <div className="text-sm text-slate-500 flex items-center gap-3">
-                    <span>关联单据: {todo.target}</span>
-                    <span className="text-slate-300">|</span>
-                    <span>发起人: {todo.sender}</span>
-                    <span className="text-slate-300">|</span>
-                    <span>到达时间: {todo.time}</span>
-                    <span className="text-slate-300">|</span>
-                    <span>截止时间: {todo.deadline}</span>
-                  </div>
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" size="sm" onClick={() => navigateToPath(task.targetPath)}>
+                    打开业务
+                  </Button>
+                  <Button size="sm" onClick={() => setSelectedTask(task)}>
+                    {actionLabel(task)}
+                    <ArrowRight className="ml-1 h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-              <Button variant="primary" size="sm" className="shrink-0 gap-1" onClick={() => setSelectedTodo(todo)}>
-                去处理 <ArrowRight className="w-4 h-4" />
-              </Button>
-            </div>
-          ))}
-          {todos.length === 0 && (
-            <div className="p-12 text-center text-slate-500">
-              当前暂无待办事项
-            </div>
+            ))
           )}
         </div>
       </Card>

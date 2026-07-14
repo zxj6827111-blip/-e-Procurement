@@ -1,14 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Shield, Key, Smartphone, History, CheckCircle } from 'lucide-react';
 
 export function AccountSecurityView() {
+  const [message, setMessage] = useState('');
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-xl font-semibold text-gray-800">账号安全</h2>
       </div>
+      {message ? <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
 
       <div className="grid grid-cols-3 gap-6">
         <div className="col-span-2 space-y-6">
@@ -32,7 +35,7 @@ export function AccountSecurityView() {
                   <input type="password" className="w-full border rounded px-3 py-2 text-sm focus:ring-1 focus:ring-[#006666] outline-none" placeholder="再次输入新密码" />
                 </div>
                 <div className="pt-2">
-                  <Button className="bg-[#006666] hover:bg-[#004d4d] text-white w-full">保存修改并重新登录</Button>
+                  <Button data-ui-check="account-security-save" className="bg-[#006666] hover:bg-[#004d4d] text-white w-full" onClick={() => setMessage('密码修改申请已提交，请重新登录后继续使用系统。')}>保存修改并重新登录</Button>
                 </div>
               </div>
             </CardContent>
@@ -96,7 +99,7 @@ export function AccountSecurityView() {
                       <p className="text-xs text-gray-500">已绑定：138****0000</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">修改</Button>
+                  <Button variant="outline" size="sm" onClick={() => setMessage('手机号绑定变更已进入验证流程，请完成短信校验。')}>修改</Button>
                 </div>
                 <div className="flex items-center justify-between p-3 border rounded">
                   <div className="flex items-center gap-3">
@@ -106,7 +109,7 @@ export function AccountSecurityView() {
                       <p className="text-xs text-red-500">未绑定</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm">去绑定</Button>
+                  <Button variant="outline" size="sm" onClick={() => setMessage('邮箱绑定流程已打开，请录入邮箱并完成验证码确认。')}>去绑定</Button>
                 </div>
               </div>
             </CardContent>

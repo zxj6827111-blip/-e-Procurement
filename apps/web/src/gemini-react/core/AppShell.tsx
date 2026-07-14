@@ -1,14 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from './AppContext';
 import { RoleNames, type ViewState } from '../shared/types';
-import type { RegistryMenuConfig } from '../../meta/menu-adapter';
-import {
-  Shield, LayoutDashboard, ListTodo, FolderKanban, Users, Settings,
-  LogOut, Activity, FileText, PackageSearch, PenTool, CheckSquare,
-  Store, Archive, FileSpreadsheet, HandCoins, Building, FileCheck,
-  Bell, Check, Megaphone
-} from 'lucide-react';
+import { loadNotifications, markNotificationsRead, markNotificationRead as markRuntimeNotificationRead } from '../features/views/workflow-runtime';
+import { Shield, LogOut, FileText, Bell } from 'lucide-react';
 import { cn } from '../shared/lib/utils';
+import { getGovernedMenuItems } from './governed-menu';
 import { LoginView } from '../features/views/LoginView';
 import { DashboardView } from '../features/views/DashboardView';
 import { ProjectListView } from '../features/views/ProjectListView';
@@ -56,75 +52,20 @@ import { SupplierOnboardingRegisterView } from '../features/views/SupplierOnboar
 import { ExternalTradeView } from '../features/views/ExternalTradeView';
 import { FileCenterView } from '../features/views/FileCenterView';
 
-type MenuItem = {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  route: string;
-  menuKey: string;
-};
-
-const menuIconsByView: Partial<Record<ViewState, React.ReactNode>> = {
-  DASHBOARD: <LayoutDashboard className="w-5 h-5" />,
-  TODO: <ListTodo className="w-5 h-5" />,
-  MESSAGES: <Bell className="w-5 h-5" />,
-  APPROVAL_RULES: <CheckSquare className="w-5 h-5" />,
-  REQUEST_APPROVE: <FileCheck className="w-5 h-5" />,
-  PURCHASE_REQUEST: <FileText className="w-5 h-5" />,
-  PROJECTS: <FolderKanban className="w-5 h-5" />,
-  PROCUREMENT_DOCUMENT: <FileText className="w-5 h-5" />,
-  ANNOUNCEMENT: <Megaphone className="w-5 h-5" />,
-  QUOTE_PROGRESS: <Activity className="w-5 h-5" />,
-  REVIEW_AWARD: <Users className="w-5 h-5" />,
-  RATING_TEMPLATE: <PenTool className="w-5 h-5" />,
-  AWARD_APPROVE: <FileCheck className="w-5 h-5" />,
-  SUPPLIERS: <Building className="w-5 h-5" />,
-  ITEM_CATALOG: <Store className="w-5 h-5" />,
-  ORDER_FULFILLMENT: <PackageSearch className="w-5 h-5" />,
-  SETTLEMENT: <FileSpreadsheet className="w-5 h-5" />,
-  PAYMENT_PROGRESS: <HandCoins className="w-5 h-5" />,
-  AUDIT_LOG: <Archive className="w-5 h-5" />,
-  ITEM_MAINTENANCE: <Store className="w-5 h-5" />,
-  SUPPLIER_PROFILE: <Building className="w-5 h-5" />,
-  REGISTRATION: <FileText className="w-5 h-5" />,
-  QUOTE_RESPONSE: <FileText className="w-5 h-5" />,
-  AWARD_RESULT: <FolderKanban className="w-5 h-5" />,
-  SETTLEMENT_MATS: <FileSpreadsheet className="w-5 h-5" />,
-  AUDIT_SUPERVISION: <Activity className="w-5 h-5" />,
-  AWARD_SUPERVISION: <CheckSquare className="w-5 h-5" />,
-  SUPPLIER_SUPERVISION: <Building className="w-5 h-5" />,
-  OPERATION_LOGS: <Archive className="w-5 h-5" />,
-  INTEGRATION: <Settings className="w-5 h-5" />,
-  SYS_MANAGE: <Settings className="w-5 h-5" />,
-  SYSTEM_SETTINGS: <Settings className="w-5 h-5" />,
-  EXPERT_RATING: <PenTool className="w-5 h-5" />
-};
-
-export const getGovernedMenuItems = (menuConfig?: RegistryMenuConfig): MenuItem[] => {
-  return (menuConfig?.navItems ?? [])
-    .filter((item) => item.viewId)
-    .map((item) => ({
-      id: item.viewId as ViewState,
-      label: item.label,
-      route: item.to,
-      menuKey: item.menuKey,
-      icon: menuIconsByView[item.viewId as ViewState] ?? <FileText className="w-5 h-5" />
-    }));
-};
-
 export function AppShell() {
   const {
     currentUser,
     currentView,
     setCurrentView,
+    navigateToPath,
     logout,
-    menuConfig,
-    unreadNotifications,
-    markAllNotificationsRead,
-    markNotificationRead
+    menuConfig
   } = useApp();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Awaited<ReturnType<typeof loadNotifications>>>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const unreadNotifications = notifications.filter((item) => !item.read);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -135,6 +76,41 @@ export function AppShell() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!currentUser?.id) {
+      setNotifications([]);
+      return;
+    }
+    setLoadingNotifications(true);
+    void loadNotifications(currentUser.id)
+      .then((items) => setNotifications(items))
+      .catch(() => setNotifications([]))
+      .finally(() => setLoadingNotifications(false));
+  }, [currentUser?.id]);
+
+  const handleMarkNotificationRead = async (messageId: string) => {
+    if (!currentUser?.id) return;
+    try {
+      const updated = await markRuntimeNotificationRead(messageId, currentUser.id);
+      setNotifications((items) => items.map((item) => (item.id === updated.id ? updated : item)));
+    } catch {
+      // ignore read-state refresh failures in topbar
+    }
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    if (!currentUser?.id) return;
+    const pendingIds = unreadNotifications.map((item) => item.id);
+    if (!pendingIds.length) return;
+    try {
+      const updatedItems = await markNotificationsRead(pendingIds, currentUser.id);
+      const updatedMap = new Map(updatedItems.map((item) => [item.id, item]));
+      setNotifications((items) => items.map((item) => updatedMap.get(item.id) ?? item));
+    } catch {
+      // ignore read-state refresh failures in topbar
+    }
+  };
 
   if (!currentUser) {
     return <LoginView />;
@@ -322,9 +298,12 @@ export function AppShell() {
                   <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50 overflow-hidden">
                     <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                       <span className="font-medium text-slate-700">消息通知</span>
-                      <button className="text-xs text-[#006666] hover:underline" onClick={markAllNotificationsRead}>全部已读</button>
+                      <button className="text-xs text-[#006666] hover:underline" onClick={() => void handleMarkAllNotificationsRead()}>全部已读</button>
                     </div>
                     <div className="max-h-80 overflow-y-auto">
+                      {loadingNotifications ? (
+                        <div className="px-4 py-4 text-center text-sm text-slate-400">正在加载消息...</div>
+                      ) : null}
                       {unreadNotifications.length === 0 ? (
                         <div className="px-4 py-8 text-center text-sm text-slate-400">暂无未读消息</div>
                       ) : (
@@ -333,16 +312,17 @@ export function AppShell() {
                             key={message.id}
                             className="px-4 py-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors"
                             onClick={() => {
-                              markNotificationRead(message.id);
-                              setShowNotifications(false);
-                              setCurrentView('TODO');
+                              void handleMarkNotificationRead(message.id).finally(() => {
+                                setShowNotifications(false);
+                                navigateToPath(message.targetPath || '/messages');
+                              });
                             }}
                           >
                             <div className="flex justify-between items-start mb-1">
-                              <span className="text-sm font-medium text-slate-800">{message.type}</span>
-                              <span className="text-xs text-slate-400">{message.time}</span>
+                              <span className="text-sm font-medium text-slate-800">{message.eventTypeLabel}</span>
+                              <span className="text-xs text-slate-400">{message.createdAt.replace('T', ' ').slice(5, 16)}</span>
                             </div>
-                            <p className="text-xs text-slate-500 line-clamp-2">{message.content}</p>
+                            <p className="text-xs text-slate-500 line-clamp-2">{message.contentSummary}</p>
                           </div>
                         ))
                       )}

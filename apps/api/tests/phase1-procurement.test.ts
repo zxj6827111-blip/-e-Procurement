@@ -92,7 +92,14 @@ describe("Phase 1 supplier, procurement request and project initiation", () => {
     const admission = await request(runtime.app)
       .post("/api/suppliers/admissions")
       .set("x-mock-user-id", "u1")
-      .send({ name: "杭州新供测试公司", category: "食材供应", qualification: "有效", contactName: "杭供联系人", contactPhone: "13900009999" });
+      .send({
+        name: "杭州新供测试公司",
+        category: "食材供应",
+        qualification: "有效",
+        contactName: "杭供联系人",
+        contactPhone: "13900009999",
+        qualificationAttachments: [qualificationAttachment("hangzhou-new-supplier-license.txt")]
+      });
 
     expect(admission.status).toBe(201);
     expect(admission.body.accounts.admin.username).toMatch(/^u-supplier-admin-sup-/);
@@ -140,7 +147,14 @@ describe("Phase 1 supplier, procurement request and project initiation", () => {
     const admission = await request(runtime.app)
       .post("/api/suppliers/admissions")
       .set("x-mock-user-id", "u1")
-      .send({ name: "杭州账号找回公司", category: "食材供应", qualification: "有效", contactName: "账号联系人", contactPhone: "13900008888" });
+      .send({
+        name: "杭州账号找回公司",
+        category: "食材供应",
+        qualification: "有效",
+        contactName: "账号联系人",
+        contactPhone: "13900008888",
+        qualificationAttachments: [qualificationAttachment("account-recovery-supplier-license.txt")]
+      });
 
     expect(admission.status).toBe(201);
     const supplierId = admission.body.supplier.id as string;
@@ -183,7 +197,12 @@ describe("Phase 1 supplier, procurement request and project initiation", () => {
     const admission = await request(runtime.app)
       .post("/api/suppliers/admissions")
       .set("x-mock-user-id", "u1")
-      .send({ name: "集团治理供应商", category: "客房一次性用品", qualification: "有效" });
+      .send({
+        name: "集团治理供应商",
+        category: "客房一次性用品",
+        qualification: "有效",
+        qualificationAttachments: [qualificationAttachment("governed-supplier-license.txt")]
+      });
     expect(admission.status).toBe(201);
 
     const supplierId = admission.body.supplier.id as string;
@@ -223,7 +242,14 @@ describe("Phase 1 supplier, procurement request and project initiation", () => {
     const admission = await request(runtime.app)
       .post("/api/suppliers/admissions")
       .set("x-mock-user-id", "u1")
-      .send({ name: "杭州自助改密公司", category: "客房一次性用品", qualification: "有效", contactName: "改密联系人", contactPhone: "13900007777" });
+      .send({
+        name: "杭州自助改密公司",
+        category: "客房一次性用品",
+        qualification: "有效",
+        contactName: "改密联系人",
+        contactPhone: "13900007777",
+        qualificationAttachments: [qualificationAttachment("self-service-supplier-license.txt")]
+      });
 
     expect(admission.status).toBe(201);
     const supplierId = admission.body.supplier.id as string;
@@ -282,7 +308,12 @@ describe("Phase 1 supplier, procurement request and project initiation", () => {
     const admission = await request(runtime.app)
       .post("/api/suppliers/admissions")
       .set("x-mock-user-id", "u1")
-      .send({ name: "Mistaken Supplier", category: "amenities", qualification: "有效" });
+      .send({
+        name: "Mistaken Supplier",
+        category: "amenities",
+        qualification: "有效",
+        qualificationAttachments: [qualificationAttachment("mistaken-supplier-license.txt")]
+      });
 
     expect(admission.status).toBe(201);
     const supplierId = admission.body.supplier.id;

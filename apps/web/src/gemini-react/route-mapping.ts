@@ -128,17 +128,17 @@ export function routeForGeminiView(view: ViewState, roleId: string, projectId?: 
     case "PROJECT_FULFILLMENT":
       return projectId ? `/project-workbench/${encodeURIComponent(projectId)}/fulfillment` : "/project-workbench";
     case "PROCUREMENT_DOCUMENT":
-      return "/procurement-documents";
+      return projectId ? `/procurement-documents?projectId=${encodeURIComponent(projectId)}` : "/procurement-documents";
     case "ANNOUNCEMENT":
-      return "/announcements-invitations";
+      return projectId ? `/announcements-invitations?projectId=${encodeURIComponent(projectId)}` : "/announcements-invitations";
     case "REGISTRATION":
-      return "/supplier-registration";
+      return projectId ? `/supplier-registration?projectId=${encodeURIComponent(projectId)}` : "/supplier-registration";
     case "QUOTE_RESPONSE":
-      return "/bidding";
+      return projectId ? `/bidding?projectId=${encodeURIComponent(projectId)}` : "/bidding";
     case "QUOTE_PROGRESS":
-      return "/bid-control";
+      return projectId ? `/bid-control?projectId=${encodeURIComponent(projectId)}` : "/bid-control";
     case "REVIEW_AWARD":
-      return "/expert-review";
+      return projectId ? `/expert-review?projectId=${encodeURIComponent(projectId)}` : "/expert-review";
     case "RATING_TEMPLATE":
       return "/scoring-templates";
     case "EXPERT_RATING":
@@ -146,7 +146,7 @@ export function routeForGeminiView(view: ViewState, roleId: string, projectId?: 
     case "AWARD_APPROVE":
     case "AWARD_RESULT":
     case "AWARD_SUPERVISION":
-      return "/award-result";
+      return projectId ? `/award-result?projectId=${encodeURIComponent(projectId)}` : "/award-result";
     case "AWARD_RESULT_DETAIL":
       return projectId ? `/award-result/${encodeURIComponent(projectId)}` : "/award-result";
     case "SUPPLIERS":
@@ -166,14 +166,14 @@ export function routeForGeminiView(view: ViewState, roleId: string, projectId?: 
     case "SUPPLY_MALL":
       return "/supply-mall/catalog";
     case "ORDER_FULFILLMENT":
-      return "/order-fulfillment";
+      return projectId ? `/order-fulfillment?projectId=${encodeURIComponent(projectId)}` : "/order-fulfillment";
     case "SETTLEMENT":
     case "SETTLEMENT_MATS":
-      return "/settlement-materials";
+      return projectId ? `/settlement-materials?projectId=${encodeURIComponent(projectId)}` : "/settlement-materials";
     case "PAYMENT_PROGRESS":
-      return "/payment-status";
+      return projectId ? `/payment-status?projectId=${encodeURIComponent(projectId)}` : "/payment-status";
     case "AUDIT_LOG":
-      return "/archive-audit";
+      return projectId ? `/archive-audit?projectId=${encodeURIComponent(projectId)}` : "/archive-audit";
     case "OPERATION_LOGS":
       return "/audit";
     case "INTEGRATION":
@@ -183,6 +183,6 @@ export function routeForGeminiView(view: ViewState, roleId: string, projectId?: 
     case "FILE_CENTER":
       return "/file-center";
     default:
-      return roleId === "admin" ? "/permissions" : "/";
+      return "/";
   }
 }

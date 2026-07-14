@@ -699,7 +699,7 @@ watch(
         <header class="g-hotel-dashboard-head">
           <EnterpriseButton
             v-if="canResetRuntimeData"
-            class="runtime-reset-action"
+            class="g-hotel-runtime-reset-action"
             type="danger"
             :disabled="resettingData"
             @click="resetRuntimeData"

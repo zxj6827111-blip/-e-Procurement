@@ -248,8 +248,8 @@ export function toProcessTaskView(task: ProcessTaskDto): ProcessTaskView {
   };
 }
 
-export async function loadProcessTasks() {
-  const data = await apiGet<{ processTasks: ProcessTaskDto[] }>("/api/process/tasks");
+export async function loadProcessTasks(userId?: string) {
+  const data = await apiGet<{ processTasks: ProcessTaskDto[] }>("/api/process/tasks", userId);
   return data.processTasks.map(toProcessTaskView);
 }
 

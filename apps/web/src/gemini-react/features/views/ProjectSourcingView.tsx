@@ -1,104 +1,186 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Card, CardContent } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
-import { CheckCircle, ShieldAlert, FileText, Users, Handshake } from 'lucide-react';
-import { ProjectContract } from '../../../contracts';
+import { Badge } from '../../shared/ui/Badge';
+import { CheckCircle, FileText, Handshake, ShieldAlert, Trophy, Users } from 'lucide-react';
+import { useApp } from '../../core/AppContext';
+import {
+  downloadTextFile,
+  formatCurrency,
+  formatDateTime,
+  humanizeStatus,
+  resolveSupplierName,
+  sortByNewest,
+  statusBadgeVariant,
+  useProjectWorkbenchData
+} from './project-workbench-data';
 
 export function ProjectSourcingView() {
-  const projectView = ProjectContract.toWorkbenchViewModel({
-    id: 'p-sourcing-001',
-    code: 'PROJ-202607-001',
-    name: '2026年Q3客房布草集中采购项目',
-    method: '公开招标',
-    stage: '专家评审中',
-    budget: 150000,
-    archiveCompleteness: 72,
-    supplierRiskLevel: '低',
-    quotationVersion: 'V2'
-  }).viewModel;
+  const { currentProjectId, setCurrentProjectId, setCurrentView } = useApp();
+  const { workbench, resolvedProjectId, loading, error } = useProjectWorkbenchData(currentProjectId);
+
+  useEffect(() => {
+    if (!currentProjectId && resolvedProjectId) {
+      setCurrentProjectId(resolvedProjectId);
+    }
+  }, [currentProjectId, resolvedProjectId, setCurrentProjectId]);
+
+  const supplierRows = useMemo(() => {
+    if (!workbench) return [];
+    return [...(workbench.comparisonReport?.comparisonRows ?? [])].sort((left, right) => left.rank - right.rank);
+  }, [workbench]);
+
+  const scoreAverage = useMemo(() => {
+    if (!supplierRows.length) return null;
+    return supplierRows.reduce((sum, item) => sum + (item.finalScore ?? 0), 0) / supplierRows.length;
+  }, [supplierRows]);
+
+  const latestDocument = useMemo(
+    () => (workbench ? sortByNewest(workbench.procurementDocuments, (item) => item.lockedAt ?? item.updatedAt)[0] ?? null : null),
+    [workbench]
+  );
+  const latestAnnouncement = useMemo(
+    () => (workbench ? sortByNewest(workbench.announcements, (item) => item.publishedAt ?? item.updatedAt)[0] ?? null : null),
+    [workbench]
+  );
+
+  const generateReviewReport = () => {
+    if (!workbench) return;
+    const lines = [
+      `项目编号：${workbench.project.code}`,
+      `项目名称：${workbench.project.name}`,
+      `采购申请：${workbench.procurementRequest?.code ?? '-'}`,
+      `评审报告：${workbench.comparisonReport?.reportNo ?? '-'}`,
+      `推荐供应商：${resolveSupplierName(workbench, workbench.comparisonReport?.recommendedSupplierId)}`,
+      `公告：${latestAnnouncement?.title ?? '-'}`,
+      '供应商排名：',
+      ...supplierRows.map((item) => `${item.rank}. ${item.supplierName} / 报价 ${formatCurrency(item.amount)} / 得分 ${item.finalScore ?? '-'}`)
+    ];
+    downloadTextFile(`${workbench.project.code}-review-summary.txt`, lines.join('\n'));
+  };
+
+  if (loading && !workbench) {
+    return <div className="rounded-lg border border-slate-200 bg-white p-8 text-slate-500">招采执行数据加载中...</div>;
+  }
+
+  if (error && !workbench) {
+    return <div className="rounded-lg border border-rose-200 bg-rose-50 p-8 text-rose-700">{error}</div>;
+  }
+
+  if (!workbench || !resolvedProjectId) {
+    return <div className="rounded-lg border border-slate-200 bg-white p-8 text-slate-500">当前没有可查看的项目。</div>;
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xl font-semibold text-gray-800">项目招采执行</h2>
+      <div className="mb-2 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900">项目招采执行</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {workbench.project.code} / {workbench.project.name}
+          </p>
+        </div>
         <div className="flex gap-3">
-          <Button variant="outline">生成评审报告</Button>
-          <Button className="bg-[#006666] hover:bg-[#004d4d] text-white">进入定标阶段</Button>
+          <Button variant="outline" onClick={generateReviewReport}>
+            生成评审摘要
+          </Button>
+          <Button
+            className="bg-[#006666] text-white hover:bg-[#004d4d]"
+            onClick={() => {
+              setCurrentProjectId(resolvedProjectId);
+              setCurrentView('AWARD_APPROVE');
+            }}
+          >
+            进入定标阶段
+          </Button>
         </div>
       </div>
 
       <Card className="bg-[#006666] text-white">
         <CardContent className="p-6">
-          <div className="flex justify-between items-end">
+          <div className="flex flex-col gap-6">
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="px-2 py-1 bg-white/20 rounded text-xs font-medium">{projectView.procurementMethod}</span>
-                <span className="px-2 py-1 bg-yellow-500/20 text-yellow-300 rounded text-xs font-medium border border-yellow-500/30">专家评审中</span>
+              <div className="mb-2 flex items-center gap-3">
+                <Badge variant="warning">{humanizeStatus(workbench.project.status)}</Badge>
+                <span className="rounded bg-white/15 px-2 py-1 text-xs font-medium">{workbench.project.type}</span>
               </div>
-              <h3 className="text-2xl font-semibold mb-1">{projectView.name}</h3>
-              <p className="text-white/70 text-sm">项目编号：{projectView.code} | 预算金额：{projectView.budgetAmount.display} | 截标时间：2026-07-20 18:00</p>
+              <h3 className="text-2xl font-semibold">{workbench.project.name}</h3>
+              <p className="mt-2 text-sm text-white/80">
+                采购文件 {workbench.procurementDocuments.length} 份，供应商报名 {workbench.registrations.length} 家，报价 {workbench.bids.length} 家，评分表 {workbench.scoringSheets.length} 份。
+              </p>
             </div>
-          </div>
 
-          <div className="mt-8 flex items-center justify-between">
-            {['采购文件', '公告邀请', '报名审核', '报价响应', '专家评审', '定标审批'].map((step, idx) => (
-              <div key={idx} className="flex flex-col items-center flex-1 relative">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs z-10 ${idx < 4 ? 'bg-yellow-500 text-white' : idx === 4 ? 'bg-white text-[#006666] border-2 border-yellow-500' : 'bg-[#004d4d] text-white/50'}`}>
-                  {idx < 4 ? <CheckCircle className="w-4 h-4" /> : idx + 1}
-                </div>
-                <span className={`text-xs mt-2 ${idx === 4 ? 'font-medium text-white' : 'text-white/70'}`}>{step}</span>
-                {idx < 5 && <div className={`absolute top-3 left-[50%] w-full h-[2px] ${idx < 4 ? 'bg-yellow-500' : 'bg-[#004d4d]'}`}></div>}
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-lg bg-white/10 p-4">
+                <div className="text-xs text-white/70">比价报告</div>
+                <div className="mt-2 text-lg font-semibold">{workbench.comparisonReport?.reportNo ?? '-'}</div>
               </div>
-            ))}
+              <div className="rounded-lg bg-white/10 p-4">
+                <div className="text-xs text-white/70">推荐供应商</div>
+                <div className="mt-2 text-lg font-semibold">{resolveSupplierName(workbench, workbench.comparisonReport?.recommendedSupplierId)}</div>
+              </div>
+              <div className="rounded-lg bg-white/10 p-4">
+                <div className="text-xs text-white/70">平均得分</div>
+                <div className="mt-2 text-lg font-semibold">{scoreAverage === null ? '-' : scoreAverage.toFixed(1)}</div>
+              </div>
+              <div className="rounded-lg bg-white/10 p-4">
+                <div className="text-xs text-white/70">报价截止</div>
+                <div className="mt-2 text-lg font-semibold">{formatDateTime(workbench.project.quoteDeadlineAt)}</div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardContent className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-medium flex items-center gap-2"><Users className="w-5 h-5 text-[#006666]" />报价响应与评审</h3>
-                <Button variant="outline" size="sm">抽取评审专家</Button>
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="flex items-center gap-2 font-medium text-slate-900">
+                  <Users className="h-5 w-5 text-[#006666]" />
+                  报名、报价与评审汇总
+                </h3>
               </div>
+
               <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 text-slate-600 border-b">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b bg-slate-50 text-slate-600">
                     <tr>
-                      <th className="py-3 px-4 font-medium">供应商名称</th>
-                      <th className="py-3 px-4 font-medium">报价总金额(¥)</th>
-                      <th className="py-3 px-4 font-medium">技术评分</th>
-                      <th className="py-3 px-4 font-medium">商务评分</th>
-                      <th className="py-3 px-4 font-medium">综合总分</th>
-                      <th className="py-3 px-4 font-medium">排名</th>
+                      <th className="px-4 py-3 font-medium">供应商</th>
+                      <th className="px-4 py-3 font-medium">报名状态</th>
+                      <th className="px-4 py-3 font-medium">报价金额</th>
+                      <th className="px-4 py-3 font-medium">交付天数</th>
+                      <th className="px-4 py-3 font-medium">最终得分</th>
+                      <th className="px-4 py-3 font-medium">排名</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <tr className="border-b bg-yellow-50/30">
-                      <td className="py-3 px-4 font-medium">南通纺织供应链有限公司</td>
-                      <td className="py-3 px-4 text-red-600 font-medium">138,500.00</td>
-                      <td className="py-3 px-4">42.5 / 50</td>
-                      <td className="py-3 px-4">45.0 / 50</td>
-                      <td className="py-3 px-4 font-bold text-[#006666]">87.5</td>
-                      <td className="py-3 px-4"><span className="w-6 h-6 rounded-full bg-yellow-500 text-white flex items-center justify-center text-xs">1</span></td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-3 px-4 font-medium">江苏梦百合酒店用品</td>
-                      <td className="py-3 px-4">142,000.00</td>
-                      <td className="py-3 px-4">45.0 / 50</td>
-                      <td className="py-3 px-4">40.0 / 50</td>
-                      <td className="py-3 px-4 font-bold text-[#006666]">85.0</td>
-                      <td className="py-3 px-4"><span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs">2</span></td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-3 px-4 font-medium">上海康乃馨布草制造</td>
-                      <td className="py-3 px-4">135,000.00</td>
-                      <td className="py-3 px-4">38.0 / 50</td>
-                      <td className="py-3 px-4">46.0 / 50</td>
-                      <td className="py-3 px-4 font-bold text-[#006666]">84.0</td>
-                      <td className="py-3 px-4"><span className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs">3</span></td>
-                    </tr>
+                  <tbody className="divide-y divide-slate-100">
+                    {supplierRows.map((row) => {
+                      const registration = workbench.registrations.find((item) => item.supplierId === row.supplierId);
+                      return (
+                        <tr key={row.supplierId} className={row.rank === 1 ? 'bg-yellow-50/40' : ''}>
+                          <td className="px-4 py-3 font-medium text-slate-900">{row.supplierName}</td>
+                          <td className="px-4 py-3">
+                            <Badge variant={statusBadgeVariant(registration?.status)}>{humanizeStatus(registration?.status)}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{formatCurrency(row.amount)}</td>
+                          <td className="px-4 py-3 text-slate-600">{row.deliveryDays} 天</td>
+                          <td className="px-4 py-3 font-medium text-[#006666]">{row.finalScore?.toFixed(1) ?? '-'}</td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={
+                                row.rank === 1
+                                  ? 'inline-flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-xs text-white'
+                                  : 'inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-xs text-slate-600'
+                              }
+                            >
+                              {row.rank}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -107,28 +189,37 @@ export function ProjectSourcingView() {
 
           <Card>
             <CardContent className="p-6">
-              <h3 className="font-medium mb-4 flex items-center gap-2"><FileText className="w-5 h-5 text-[#006666]" />采购文件与公告记录</h3>
+              <h3 className="mb-4 flex items-center gap-2 font-medium text-slate-900">
+                <FileText className="h-5 w-5 text-[#006666]" />
+                采购文件与公告
+              </h3>
+
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 border rounded hover:bg-slate-50">
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <p className="text-sm font-medium">公开招标采购文件_V1.pdf</p>
-                      <p className="text-xs text-gray-500">发布时间：2026-07-05 10:00</p>
+                {latestDocument ? (
+                  <div className="flex items-center justify-between rounded border p-3 hover:bg-slate-50">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-gray-400" />
+                      <div>
+                        <p className="text-sm font-medium">{latestDocument.title}</p>
+                        <p className="text-xs text-gray-500">更新时间：{formatDateTime(latestDocument.updatedAt)}</p>
+                      </div>
                     </div>
+                    <Badge variant={statusBadgeVariant(latestDocument.status)}>{humanizeStatus(latestDocument.status)}</Badge>
                   </div>
-                  <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">已发布</span>
-                </div>
-                <div className="flex items-center justify-between p-3 border rounded hover:bg-slate-50">
-                  <div className="flex items-center gap-3">
-                    <Handshake className="w-5 h-5 text-gray-400" />
-                    <div>
-                      <p className="text-sm font-medium">招标公告（中国招标投标公共服务平台同步）</p>
-                      <p className="text-xs text-gray-500">发布时间：2026-07-05 10:30</p>
+                ) : null}
+
+                {latestAnnouncement ? (
+                  <div className="flex items-center justify-between rounded border p-3 hover:bg-slate-50">
+                    <div className="flex items-center gap-3">
+                      <Handshake className="h-5 w-5 text-gray-400" />
+                      <div>
+                        <p className="text-sm font-medium">{latestAnnouncement.title}</p>
+                        <p className="text-xs text-gray-500">发布时间：{formatDateTime(latestAnnouncement.publishedAt ?? latestAnnouncement.updatedAt)}</p>
+                      </div>
                     </div>
+                    <Badge variant={statusBadgeVariant(latestAnnouncement.status)}>{humanizeStatus(latestAnnouncement.status)}</Badge>
                   </div>
-                  <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">同步成功</span>
-                </div>
+                ) : null}
               </div>
             </CardContent>
           </Card>
@@ -137,17 +228,50 @@ export function ProjectSourcingView() {
         <div className="space-y-6">
           <Card>
             <CardContent className="p-6">
-              <h3 className="font-medium mb-4 flex items-center gap-2"><ShieldAlert className="w-5 h-5 text-amber-500" />合规与风险提醒</h3>
+              <h3 className="mb-4 flex items-center gap-2 font-medium text-slate-900">
+                <ShieldAlert className="h-5 w-5 text-amber-500" />
+                合规与风险
+              </h3>
               <div className="space-y-4">
-                <div className="p-3 bg-slate-50 border rounded">
-                  <p className="text-sm font-medium mb-1">围串标风险检测</p>
-                  <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> 未发现IP/MAC地址重合</p>
-                  <p className="text-xs text-green-600 flex items-center gap-1 mt-1"><CheckCircle className="w-3 h-3"/> 报价呈合理正态分布</p>
+                <div className="rounded border bg-slate-50 p-3">
+                  <p className="mb-1 text-sm font-medium">评分一致性</p>
+                  <p className="flex items-center gap-1 text-xs text-emerald-600">
+                    <CheckCircle className="h-3 w-3" />
+                    已形成冻结比价报告，推荐供应商为 {resolveSupplierName(workbench, workbench.comparisonReport?.recommendedSupplierId)}
+                  </p>
                 </div>
-                <div className="p-3 bg-slate-50 border rounded">
-                  <p className="text-sm font-medium mb-1">专家回避原则校验</p>
-                  <p className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3"/> 评审组内无利益相关方</p>
+                <div className="rounded border bg-slate-50 p-3">
+                  <p className="mb-1 text-sm font-medium">供应商参与度</p>
+                  <p className="text-xs text-slate-600">
+                    共 {workbench.invitations.length} 家受邀，{workbench.registrations.filter((item) => item.status === 'qualified').length} 家资格通过，{workbench.bids.length} 家完成报价。
+                  </p>
                 </div>
+                <div className="rounded border bg-slate-50 p-3">
+                  <p className="mb-1 text-sm font-medium">定标准备</p>
+                  <p className="text-xs text-slate-600">当前项目已有 {workbench.awardApprovals.length} 条定标审批记录，可直接进入定标页面查看。</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <h3 className="mb-4 flex items-center gap-2 font-medium text-slate-900">
+                <Trophy className="h-5 w-5 text-[#006666]" />
+                专家评分记录
+              </h3>
+              <div className="space-y-3">
+                {workbench.scoringSheets.map((sheet) => (
+                  <div key={sheet.id} className="rounded border bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="font-medium text-slate-900">{sheet.supplierName ?? resolveSupplierName(workbench, sheet.supplierId)}</div>
+                      <Badge variant={statusBadgeVariant(sheet.status)}>{humanizeStatus(sheet.status)}</Badge>
+                    </div>
+                    <div className="mt-2 text-xs text-slate-500">
+                      专家：{sheet.expertName ?? sheet.expertId} · 技术 {sheet.technical} / 服务 {sheet.service} / 价格 {sheet.price} / 总分 {sheet.total}
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

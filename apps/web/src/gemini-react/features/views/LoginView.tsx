@@ -118,7 +118,7 @@ export function LoginView() {
             <p className="text-sm text-slate-500">请输入您的账号密码进入系统工作台</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
+          <form data-ui-check="login-form" onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700 block">系统账号</label>
               <div className="relative">
@@ -126,6 +126,7 @@ export function LoginView() {
                   <UserIcon className="w-5 h-5" />
                 </div>
                 <input
+                  data-ui-check="login-username-input"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -145,6 +146,7 @@ export function LoginView() {
                   <Lock className="w-5 h-5" />
                 </div>
                 <input
+                  data-ui-check="login-password-input"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -162,6 +164,7 @@ export function LoginView() {
             )}
 
             <Button
+              data-ui-check="login-submit"
               type="submit"
               className="w-full py-6 text-base font-medium bg-[#006666] hover:bg-[#005252] text-white shadow-lg shadow-[#006666]/20 mt-4 transition-all"
               disabled={isLoggingIn}

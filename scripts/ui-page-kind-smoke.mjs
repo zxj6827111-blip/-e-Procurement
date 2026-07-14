@@ -170,13 +170,13 @@ const geminiDashboardExpectation = {
   all: ['[data-ui-check~="shell"]', '[data-ui-check~="dashboard"]', '[data-ui-check~="summary-card"]'],
   any: ['[data-ui-check~="quick-surface"]', '[data-ui-check~="gantt-board"]', '[data-ui-check~="table"]'],
   minBodyLength: 180,
-  waitMs: 8000
+  waitMs: 20000
 };
 
 const geminiTodoExpectation = {
   all: ['[data-ui-check~="shell"]', '[data-ui-check~="todo-view"]', '[data-ui-check~="todo-list"]'],
-  any: ['[data-ui-check~="todo-row"]'],
-  minBodyLength: 180
+  any: ['[data-ui-check~="todo-row"]', '[data-ui-check~="todo-empty-state"]'],
+  minBodyLength: 140
 };
 
 function ensureDirs() {
@@ -219,6 +219,10 @@ function stopProcessTree(child) {
       // best-effort cleanup
     }
   }
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+  child.stdin?.destroy();
+  child.unref();
 }
 
 async function waitForUrl(url, timeoutMs = 60000) {

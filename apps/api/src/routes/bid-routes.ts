@@ -341,6 +341,7 @@ function publicBidShape(req: Request, project: ProcurementProject, bid: Bid) {
       taxRate: bid.taxRate,
       taxInclusive: bid.taxInclusive,
       taxNote: bid.taxNote,
+      lineItems: bid.lineItems ?? [],
       deliveryDays: bid.deliveryDays,
       responseSummary: bid.responseSummary,
       serviceCommitment: bid.serviceCommitment,

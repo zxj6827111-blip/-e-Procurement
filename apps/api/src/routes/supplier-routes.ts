@@ -918,14 +918,12 @@ export function supplierRoutes(ctx: AppContext) {
       evaluationScore: null
     };
     if ((supplier.qualificationAttachments ?? []).length === 0) {
-      supplier.qualificationAttachments = [
-        {
-          id: `sqa-${ctx.state.suppliers.length + 1}`,
-          fileName: String(req.body?.fileName ?? "供应商资质证明.pdf"),
-          qualificationType: String(req.body?.qualificationType ?? "营业执照/资质证明"),
-          uploadedAt: now
+      return res.status(400).json({
+        error: {
+          code: "SUPPLIER_QUALIFICATION_REQUIRED",
+          message: "At least one supplier qualification attachment is required."
         }
-      ];
+      });
     }
     persistSupplierToR3(ctx, supplier);
     ctx.state.suppliers.push(supplier);

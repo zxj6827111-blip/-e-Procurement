@@ -45,13 +45,20 @@ export function workflowUserContext(session: WorkflowSessionLike): R8WorkflowUse
   };
 }
 
-export async function loadWorkflowTasks(session: WorkflowSessionLike, businessType: "all" | R8ApprovalBusinessType = "all") {
-  const data = await apiGet<{ tasks: R8WorkflowTaskDto[] }>("/api/workflow/tasks");
+export async function loadWorkflowTasks(
+  session: WorkflowSessionLike,
+  businessType: "all" | R8ApprovalBusinessType = "all",
+  userId = session.user?.id
+) {
+  const data = await apiGet<{ tasks: R8WorkflowTaskDto[] }>("/api/workflow/tasks", userId);
   return filterR8BusinessType(data.tasks, businessType).map((task) => toR8WorkflowTaskView(task, workflowUserContext(session)));
 }
 
-export async function loadWorkflowNotifications(businessType: "all" | R8ApprovalBusinessType = "all") {
-  const data = await apiGet<{ notifications: R8WorkflowNotificationDto[] }>("/api/workflow/notifications");
+export async function loadWorkflowNotifications(
+  businessType: "all" | R8ApprovalBusinessType = "all",
+  userId?: string
+) {
+  const data = await apiGet<{ notifications: R8WorkflowNotificationDto[] }>("/api/workflow/notifications", userId);
   return filterR8BusinessType(data.notifications, businessType).map(toR8WorkflowNotificationView);
 }
 
@@ -81,27 +88,27 @@ export async function updateApprovalRule(ruleId: string, patch: Partial<R8Approv
   };
 }
 
-export async function completeWorkflowTask(taskId: string) {
-  const data = await apiPost<{ task: R8WorkflowTaskDto; auditLogId?: string }>(`/api/workflow/tasks/${taskId}/complete`, {});
+export async function completeWorkflowTask(taskId: string, userId?: string) {
+  const data = await apiPost<{ task: R8WorkflowTaskDto; auditLogId?: string }>(`/api/workflow/tasks/${taskId}/complete`, {}, userId);
   return data;
 }
 
-export async function approveWorkflowInstance(instanceId: string, opinion: string) {
+export async function approveWorkflowInstance(instanceId: string, opinion: string, userId?: string) {
   return apiPost<{ approvalInstance: R8ApprovalInstanceDto; auditLogId?: string }>(`/api/workflow/approval-instances/${instanceId}/actions`, {
     action: "approve",
     opinion
-  });
+  }, userId);
 }
 
-export async function rejectWorkflowInstance(instanceId: string, opinion: string) {
+export async function rejectWorkflowInstance(instanceId: string, opinion: string, userId?: string) {
   return apiPost<{ approvalInstance: R8ApprovalInstanceDto; auditLogId?: string }>(`/api/workflow/approval-instances/${instanceId}/actions`, {
     action: "reject",
     opinion
-  });
+  }, userId);
 }
 
-export async function markNotificationRead(messageId: string) {
-  const data = await apiPost<{ notification: R8WorkflowNotificationDto }>(`/api/workflow/notifications/${messageId}/read`, {});
+export async function markNotificationRead(messageId: string, userId?: string) {
+  const data = await apiPost<{ notification: R8WorkflowNotificationDto }>(`/api/workflow/notifications/${messageId}/read`, {}, userId);
   return toR8WorkflowNotificationView(data.notification);
 }
 

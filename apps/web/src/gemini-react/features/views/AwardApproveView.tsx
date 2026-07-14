@@ -1,161 +1,216 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
-import { FileCheck, Search, Filter, AlertCircle, CheckCircle2, XCircle, Clock, ShieldCheck, TrendingDown, Users } from 'lucide-react';
+import { Badge } from '../../shared/ui/Badge';
+import { CheckCircle2, Clock, FileCheck, Search, ShieldCheck, TrendingDown, Users } from 'lucide-react';
+import { useApp } from '../../core/AppContext';
+import {
+  AwardApprovalRecord,
+  formatCurrency,
+  formatDateTime,
+  humanizeStatus,
+  resolveSupplierName,
+  sortByNewest,
+  statusBadgeVariant,
+  useProjectWorkbenchData
+} from './project-workbench-data';
 
 export function AwardApproveView() {
+  const { currentProjectId, setCurrentProjectId, setCurrentView } = useApp();
+  const { workbench, resolvedProjectId, loading, error } = useProjectWorkbenchData(currentProjectId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [statusMap, setStatusMap] = useState<Record<string, string>>({});
 
-  const projects = [
-    { id: 'PROJ-2026-002', name: '大堂家具更新项目', winner: '上海阳光家具有限公司', score: '92.5', quote: '¥480,000', status: '待审批', date: '2026-07-06' },
-    { id: 'PROJ-2026-004', name: '安保外包服务采购', winner: '深圳市安防科技有限公司', score: '88.0', quote: '¥210,000', status: '待审批', date: '2026-07-05' }
-  ];
+  useEffect(() => {
+    if (!currentProjectId && resolvedProjectId) {
+      setCurrentProjectId(resolvedProjectId);
+    }
+  }, [currentProjectId, resolvedProjectId, setCurrentProjectId]);
 
-  const handleApprove = (id: string, result: string) => {
-    setStatusMap(prev => ({ ...prev, [id]: result }));
-    setSelectedId(null);
-  };
+  const approvals = useMemo(
+    () => (workbench ? sortByNewest(workbench.awardApprovals, (item) => item.approvedAt ?? item.submittedAt ?? item.createdAt) : []),
+    [workbench]
+  );
+  const selectedApproval = approvals.find((item) => item.id === selectedId) ?? approvals[0] ?? null;
+
+  useEffect(() => {
+    if (!selectedId && approvals[0]) {
+      setSelectedId(approvals[0].id);
+    }
+  }, [approvals, selectedId]);
+
+  function awardSummary(approval: AwardApprovalRecord | null) {
+    if (!approval || !workbench) return null;
+    const selectedBid = workbench.bids.find((item) => item.supplierId === approval.selectedSupplierId);
+    const comparisonRow = workbench.comparisonReport?.comparisonRows?.find((item) => item.supplierId === approval.selectedSupplierId);
+    return {
+      supplierName: resolveSupplierName(workbench, approval.selectedSupplierId),
+      amount: selectedBid?.amount,
+      score: comparisonRow?.finalScore,
+      rank: comparisonRow?.rank,
+      approvedAt: approval.approvedAt ?? approval.submittedAt ?? approval.createdAt
+    };
+  }
+
+  const summary = awardSummary(selectedApproval);
+
+  if (loading && !workbench) {
+    return <div className="rounded-lg border border-slate-200 bg-white p-8 text-slate-500">定标审批数据加载中...</div>;
+  }
+
+  if (error && !workbench) {
+    return <div className="rounded-lg border border-rose-200 bg-rose-50 p-8 text-rose-700">{error}</div>;
+  }
+
+  if (!workbench || !resolvedProjectId) {
+    return <div className="rounded-lg border border-slate-200 bg-white p-8 text-slate-500">当前没有可查看的项目。</div>;
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
-            <FileCheck className="w-6 h-6 text-[#006666]" />
+          <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-900">
+            <FileCheck className="h-6 w-6 text-[#006666]" />
             定标审批
           </h2>
-          <p className="text-sm text-slate-500 mt-1">项目中标结果的复核与最终定标审批</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {workbench.project.code} / {workbench.project.name}
+          </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" className="text-slate-600">
-            <Filter className="w-4 h-4 mr-2" /> 筛选条件
+          <Button variant="outline" onClick={() => setCurrentView('PROJECT_DETAIL')}>
+            返回项目详情
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader className="py-4 border-b border-slate-100">
+          <CardHeader className="border-b border-slate-100 py-4">
             <div className="flex items-center justify-between">
               <div className="relative w-72">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="搜索项目编号或名称..."
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-[#006666]/20 focus:border-[#006666]"
+                  value={workbench.project.code}
+                  readOnly
+                  className="w-full rounded-md border border-slate-200 py-2 pl-9 pr-4 text-sm text-slate-500"
                 />
               </div>
+              <div className="text-sm text-slate-500">共 {approvals.length} 条审批记录</div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-600 font-medium">
                 <tr>
-                  <th className="px-6 py-4 border-b border-slate-200">项目编号/名称</th>
-                  <th className="px-6 py-4 border-b border-slate-200">推荐中标人</th>
-                  <th className="px-6 py-4 border-b border-slate-200">综合得分/报价</th>
-                  <th className="px-6 py-4 border-b border-slate-200">状态</th>
-                  <th className="px-6 py-4 border-b border-slate-200">操作</th>
+                  <th className="border-b border-slate-200 px-6 py-4">审批编号</th>
+                  <th className="border-b border-slate-200 px-6 py-4">推荐 / 定标供应商</th>
+                  <th className="border-b border-slate-200 px-6 py-4">综合得分 / 报价</th>
+                  <th className="border-b border-slate-200 px-6 py-4">状态</th>
+                  <th className="border-b border-slate-200 px-6 py-4">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {projects.map(p => {
-                  const currentStatus = statusMap[p.id] || p.status;
+                {approvals.map((approval) => {
+                  const selectedBid = workbench.bids.find((item) => item.supplierId === approval.selectedSupplierId);
+                  const comparisonRow = workbench.comparisonReport?.comparisonRows?.find((item) => item.supplierId === approval.selectedSupplierId);
                   return (
-                    <tr key={p.id} className="hover:bg-slate-50/50">
+                    <tr key={approval.id} className="hover:bg-slate-50/50">
                       <td className="px-6 py-4">
-                        <div className="font-medium text-slate-900">{p.id}</div>
-                        <div className="text-xs text-slate-500">{p.name}</div>
+                        <div className="font-medium text-slate-900">{approval.id}</div>
+                        <div className="text-xs text-slate-500">{formatDateTime(approval.approvedAt ?? approval.submittedAt ?? approval.createdAt)}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-slate-700">{p.winner}</div>
+                        <div className="text-slate-700">{resolveSupplierName(workbench, approval.recommendedSupplierId)}</div>
+                        <div className="text-xs text-slate-500">定标：{resolveSupplierName(workbench, approval.selectedSupplierId)}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-[#006666] font-medium">{p.score}分</div>
-                        <div className="text-xs text-slate-500">{p.quote}</div>
+                        <div className="font-medium text-[#006666]">{comparisonRow?.finalScore?.toFixed(1) ?? '-'}</div>
+                        <div className="text-xs text-slate-500">{formatCurrency(selectedBid?.amount)}</div>
                       </td>
                       <td className="px-6 py-4">
-                        {currentStatus === '待审批' && <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-amber-50 text-amber-600 border border-amber-200"><Clock className="w-3 h-3 mr-1" />待审批</span>}
-                        {currentStatus === '已定标' && <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-200"><CheckCircle2 className="w-3 h-3 mr-1" />已定标</span>}
-                        {currentStatus === '退回复核' && <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200"><AlertCircle className="w-3 h-3 mr-1" />退回复核</span>}
+                        <Badge variant={statusBadgeVariant(approval.approvalStatus)}>{humanizeStatus(approval.approvalStatus)}</Badge>
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          className="text-[#006666] hover:underline font-medium text-xs"
-                          onClick={() => setSelectedId(p.id)}
-                        >
-                          定标审查
+                        <button className="text-xs font-medium text-[#006666] hover:underline" onClick={() => setSelectedId(approval.id)}>
+                          审批详情
                         </button>
                       </td>
                     </tr>
-                  )
+                  );
                 })}
               </tbody>
             </table>
           </CardContent>
         </Card>
 
-        {/* 定标审查侧边栏 */}
-        <Card className="lg:col-span-1 bg-slate-50/50 h-fit">
-          <CardHeader className="py-4 border-b border-slate-100 bg-white">
-            <CardTitle className="text-base font-medium">定标合规审查</CardTitle>
+        <Card className="h-fit bg-slate-50/50 lg:col-span-1">
+          <CardHeader className="border-b border-slate-100 bg-white py-4">
+            <CardTitle className="text-base font-medium">定标审查详情</CardTitle>
           </CardHeader>
           <CardContent className="p-4">
-            {selectedId ? (
+            {selectedApproval && summary ? (
               <div className="space-y-6">
                 <div>
-                  <h4 className="text-sm font-medium text-slate-900 mb-2">合规检查项</h4>
+                  <h4 className="mb-2 text-sm font-medium text-slate-900">审查结论</h4>
+                  <div className="rounded border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-700">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" />
+                      当前审批状态：{humanizeStatus(selectedApproval.approvalStatus)}
+                    </div>
+                    <div className="mt-2 text-xs text-emerald-700/90">审批完成时间：{formatDateTime(summary.approvedAt)}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="mb-2 text-sm font-medium text-slate-900">拟定标供应商</h4>
+                  <div className="rounded border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                    <div className="font-medium text-slate-900">{summary.supplierName}</div>
+                    <div className="mt-2">报价金额：{formatCurrency(summary.amount)}</div>
+                    <div>综合得分：{summary.score?.toFixed(1) ?? '-'}</div>
+                    <div>排名：{summary.rank ?? '-'}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="mb-2 text-sm font-medium text-slate-900">合规检查项</h4>
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-slate-700 bg-emerald-50 text-emerald-700 p-2 rounded border border-emerald-100">
-                      <ShieldCheck className="w-4 h-4 shrink-0" />
-                      专家评分偏离度正常 (最大极差 2.5分)
+                    <div className="flex items-center gap-2 rounded border border-emerald-100 bg-emerald-50 p-2 text-sm text-emerald-700">
+                      <ShieldCheck className="h-4 w-4 shrink-0" />
+                      比价报告已冻结，专家评分已锁定。
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-slate-700 bg-emerald-50 text-emerald-700 p-2 rounded border border-emerald-100">
-                      <TrendingDown className="w-4 h-4 shrink-0" />
-                      中标价低于预算金额 (结余率 4.0%)
+                    <div className="flex items-center gap-2 rounded border border-emerald-100 bg-emerald-50 p-2 text-sm text-emerald-700">
+                      <TrendingDown className="h-4 w-4 shrink-0" />
+                      中标报价低于预算 {formatCurrency(workbench.procurementRequest?.budgetAmount ?? workbench.project.budgetAmount)}。
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-slate-700 bg-emerald-50 text-emerald-700 p-2 rounded border border-emerald-100">
-                      <Users className="w-4 h-4 shrink-0" />
-                      满足有效投标人数 (已参与: 4家)
+                    <div className="flex items-center gap-2 rounded border border-emerald-100 bg-emerald-50 p-2 text-sm text-emerald-700">
+                      <Users className="h-4 w-4 shrink-0" />
+                      有效报价供应商 {workbench.bids.length} 家，满足定标依据。
                     </div>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="text-sm font-medium text-slate-900 mb-2">专家组定标建议</h4>
-                  <div className="p-3 bg-white border border-slate-200 rounded text-sm text-slate-600 leading-relaxed">
-                    综合排名第一的供应商在技术响应与售后服务承诺上表现突出，报价合理，建议选定其为中标单位。
+                  <h4 className="mb-2 text-sm font-medium text-slate-900">后续执行</h4>
+                  <div className="rounded border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                    <div>价目报告：{workbench.pricingReports?.[0]?.reportNo ?? '-'}</div>
+                    <div>采购订单：{workbench.purchaseOrders[0]?.orderNo ?? '-'}</div>
+                    <div>订单状态：{humanizeStatus(workbench.purchaseOrders[0]?.status)}</div>
                   </div>
                 </div>
 
-                {(!statusMap[selectedId] || statusMap[selectedId] === '待审批') ? (
-                  <div>
-                    <h4 className="text-sm font-medium text-slate-900 mb-2">定标决议</h4>
-                    <textarea
-                      className="w-full border border-slate-200 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#006666]/20 focus:border-[#006666] mb-3"
-                      rows={3}
-                      placeholder="请输入定标意见..."
-                      defaultValue="流程合规，同意定标。"
-                    ></textarea>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm py-2" onClick={() => handleApprove(selectedId, '已定标')}>同意定标</Button>
-                      <Button variant="outline" className="text-slate-600 text-sm py-2" onClick={() => handleApprove(selectedId, '退回复核')}>退回复核</Button>
-                    </div>
+                <div className="rounded border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-slate-400" />
+                    本页展示的是后端真实审批记录，不再使用静态样例。
                   </div>
-                ) : (
-                  <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-md">
-                    <p className="text-sm text-emerald-700 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4" /> 审批完成，定标结果已记录
-                    </p>
-                  </div>
-                )}
+                </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                <FileCheck className="w-12 h-12 mb-3 text-slate-200" />
-                <p className="text-sm">点击左侧列表查看合规审查详情</p>
+                <FileCheck className="mb-3 h-12 w-12 text-slate-200" />
+                <p className="text-sm">当前项目还没有定标审批记录。</p>
               </div>
             )}
           </CardContent>

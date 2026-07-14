@@ -45,7 +45,7 @@ function getHome(roleId) {
 const roleSmokeCases = [
   { roleId: "group_manager", home: "/", requiredMenus: ["demandApproval", "projectWorkbench"] },
   { roleId: "buyer", home: "/", requiredMenus: ["procurementRequests", "projectWorkbench"] },
-  { roleId: "hotel_buyer", home: "/procurement-requests", requiredMenus: ["dashboard", "procurementRequests", "supplyMall", "orderFulfillment"] }
+  { roleId: "hotel_buyer", home: "/", requiredMenus: ["dashboard", "procurementRequests", "supplyMall", "orderFulfillment"] }
 ];
 const failedRoleSmoke = roleSmokeCases
   .map((role) => {

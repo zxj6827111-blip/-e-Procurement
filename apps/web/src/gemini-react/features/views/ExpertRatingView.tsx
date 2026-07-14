@@ -1,217 +1,583 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../shared/ui/Card';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
-import { AlertCircle, CheckCircle2, FileText, Info, Send, UserX } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FileText, Save, Send } from 'lucide-react';
+import { apiGet, apiPost } from '../../../api/http';
 import { cn } from '../../shared/lib/utils';
+import { useApp } from '../../core/AppContext';
+import { formatCurrency, formatDateTime, humanizeStatus, statusBadgeVariant } from './project-workbench-data';
+
+type ScoringCategory = 'technical' | 'service' | 'price';
+
+interface AssignmentRecord {
+  id: string;
+  projectId: string;
+  expertName?: string;
+  status: string;
+  avoidanceConfirmed: boolean;
+  disciplineConfirmed: boolean;
+  confidentialityConfirmed: boolean;
+  confirmedAt?: string | null;
+}
+
+interface ScoringItemRecord {
+  id: string;
+  category: ScoringCategory;
+  categoryLabel: string;
+  label: string;
+  reference: string;
+  evidence: string;
+  maxScore: number;
+}
+
+interface ScoreDetail {
+  score: number;
+  comment?: string;
+}
+
+interface ScoringSheetRecord {
+  id: string;
+  projectId: string;
+  projectCode?: string;
+  projectName?: string;
+  supplierId: string;
+  supplierName?: string;
+  technical: number;
+  service: number;
+  price: number;
+  total: number;
+  status: string;
+  opinion: string;
+  versionNo: number;
+  submittedAt?: string | null;
+  lockedAt?: string | null;
+  scoringItems?: ScoringItemRecord[];
+  details?: Record<string, ScoreDetail>;
+  materials?: {
+    registrationMaterials: Array<{ id: string; fileName: string; uploadedAt?: string }>;
+    supplementMaterials: Array<{ id: string; fileName: string; uploadedAt?: string }>;
+    bidMaterials: Array<{ id: string; fileName: string; uploadedAt?: string }>;
+    bidSummary?: {
+      amount: number;
+      deliveryDays?: number | null;
+      responseSummary?: string;
+      serviceCommitment?: string;
+      fileName?: string;
+    } | null;
+  };
+}
+
+interface ScoreInputState {
+  score: string;
+  comment: string;
+}
+
+function editableSheetStatus(status?: string | null) {
+  return ['scoring', 'saved', 'reevaluation_approved'].includes(String(status ?? ''));
+}
 
 export function ExpertRatingView() {
-  const [hasConfirmed, setHasConfirmed] = useState(false);
-  const [recusalSubmitted, setRecusalSubmitted] = useState(false);
+  const { currentProjectId, currentUser } = useApp();
+  const [assignments, setAssignments] = useState<AssignmentRecord[]>([]);
+  const [sheets, setSheets] = useState<ScoringSheetRecord[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState(currentProjectId ?? '');
+  const [selectedSheetId, setSelectedSheetId] = useState('');
+  const [selectedSheetDetail, setSelectedSheetDetail] = useState<ScoringSheetRecord | null>(null);
+  const [scoreInputs, setScoreInputs] = useState<Record<string, ScoreInputState>>({});
+  const [opinion, setOpinion] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [busyAction, setBusyAction] = useState<'confirming' | 'saving' | 'submitting' | null>(null);
 
-  const criteria = [
-    { id: 'c1', name: '商务部分 (30%)', items: [
-      { id: 'c1-1', name: '注册资本与财务状况', weight: 10, maxScore: 10, desc: '考察近三年审计报告与流动比率' },
-      { id: 'c1-2', name: '同类项目业绩', weight: 20, maxScore: 20, desc: '考察近三年三甲酒店类似成功案例，每个案例4分' }
-    ]},
-    { id: 'c2', name: '技术部分 (50%)', items: [
-      { id: 'c2-1', name: '技术方案科学性', weight: 25, maxScore: 25, desc: '方案是否满足采购需求，技术架构是否先进合理' },
-      { id: 'c2-2', name: '实施与交付计划', weight: 15, maxScore: 15, desc: '进度安排是否紧凑、人员配置是否充足' },
-      { id: 'c2-3', name: '售后服务承诺', weight: 10, maxScore: 10, desc: '响应时间、备件支持、免费维保期限' }
-    ]},
-    { id: 'c3', name: '报价得分 (20%)', items: [
-      { id: 'c3-1', name: '客观分计算', weight: 20, maxScore: 20, desc: '系统根据基准价自动测算，专家无需手填', auto: true }
-    ]}
-  ];
+  const currentAssignment = useMemo(
+    () => assignments.find((item) => item.projectId === selectedProjectId) ?? null,
+    [assignments, selectedProjectId]
+  );
+  const projectSheets = useMemo(
+    () => sheets.filter((item) => item.projectId === selectedProjectId),
+    [selectedProjectId, sheets]
+  );
+  const selectedSheet = useMemo(
+    () => projectSheets.find((item) => item.id === selectedSheetId) ?? projectSheets[0] ?? null,
+    [projectSheets, selectedSheetId]
+  );
+  const scoringItems = selectedSheetDetail?.scoringItems ?? [];
+  const confirmationCompleted = Boolean(
+    currentAssignment?.avoidanceConfirmed && currentAssignment?.disciplineConfirmed && currentAssignment?.confidentialityConfirmed
+  );
 
-  const suppliers = [
-    { id: 's1', name: '上海网智科技有限公司' },
-    { id: 's2', name: '北京星云数智集团' },
-    { id: 's3', name: '杭州绿谷智能系统' },
-  ];
-
-  if (recusalSubmitted) {
-    return (
-      <div data-ui-check="expert-recusal-submitted" className="max-w-3xl mx-auto mt-20">
-        <Card className="text-center py-16 shadow-lg border-emerald-100">
-          <CardContent className="space-y-6">
-            <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="w-10 h-10 text-emerald-600" />
-            </div>
-            <h2 className="text-2xl font-bold text-slate-900">回避申请已提交</h2>
-            <p className="text-slate-600 text-lg max-w-md mx-auto">
-              您的回避申请已成功提交，正在等待平台重新分配专家。感谢您对采购合规工作的支持。
-            </p>
-            <div className="pt-6">
-              <Button
-                className="bg-[#006666] hover:bg-[#005252] text-white px-8 py-2 h-11 text-base font-medium"
-                onClick={() => window.location.reload()}
-              >
-                返回工作台
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+  const categoryTotals = useMemo(() => {
+    return scoringItems.reduce(
+      (totals, item) => {
+        const value = Number(scoreInputs[item.id]?.score ?? 0);
+        totals[item.category] += value;
+        totals.total += value;
+        return totals;
+      },
+      { technical: 0, service: 0, price: 0, total: 0 }
     );
-  }
+  }, [scoreInputs, scoringItems]);
 
-  if (!hasConfirmed) {
-    return (
-      <div data-ui-check="expert-recusal-view" className="max-w-4xl mx-auto mt-8">
-        <Card className="shadow-2xl border-rose-100 overflow-hidden">
-          <div className="bg-rose-600 p-6 text-white flex items-start gap-4">
-            <AlertCircle className="w-8 h-8 shrink-0 mt-1" />
-            <div>
-              <h2 className="text-xl font-bold tracking-tight mb-2">专家回避制度确认书</h2>
-              <p className="text-rose-100 text-sm">PROJ-2026-0034 大堂智能机器人采购项目</p>
-            </div>
-          </div>
-          <div className="p-8 space-y-6 bg-white">
-            <p className="text-slate-700 leading-relaxed font-medium text-base">
-              尊敬的评标专家：<br/><br/>
-              您好！根据《中华人民共和国招标投标法》及集团采购管理规定，如果您与本项目以下投标供应商存在利益冲突或利害关系（包括但不限于近三年内曾在该单位任职、担任顾问、有股权关系或存在直系亲属关系），请务必主动申请回避。
-            </p>
-            <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
-              <h3 className="font-semibold text-slate-800 mb-3 text-base">本项目投标供应商名单：</h3>
-              <ul className="grid grid-cols-2 gap-3 text-sm text-slate-600 list-disc list-inside">
-                <li>上海网智科技有限公司</li>
-                <li>北京星云数智集团</li>
-                <li>杭州绿谷智能系统</li>
-              </ul>
-            </div>
-            <div className="flex gap-4 pt-6">
-              <Button
-                variant="outline"
-                data-ui-check="expert-recusal-submit"
-                className="flex-1 h-14 text-lg font-bold border-rose-200 text-rose-700 hover:bg-rose-50"
-                onClick={() => setRecusalSubmitted(true)}
-              >
-                <UserX className="w-5 h-5 mr-2" />
-                我存在利害关系，申请回避
-              </Button>
-              <Button
-                data-ui-check="expert-confirm-participation"
-                className="flex-1 h-14 text-lg font-bold bg-[#006666] text-white hover:bg-[#005252]"
-                onClick={() => setHasConfirmed(true)}
-              >
-                <CheckCircle2 className="w-5 h-5 mr-2" />
-                无利害关系，确认参与评审
-              </Button>
-            </div>
-          </div>
-        </Card>
-      </div>
+  const rankingRows = useMemo(
+    () =>
+      [...projectSheets]
+        .sort((left, right) => right.total - left.total)
+        .map((item, index) => ({ ...item, rank: index + 1 })),
+    [projectSheets]
+  );
+
+  const projectOptions = useMemo(() => {
+    const ids = new Set<string>();
+    assignments.forEach((item) => ids.add(item.projectId));
+    sheets.forEach((item) => ids.add(item.projectId));
+    return [...ids].map((projectId) => {
+      const sheet = sheets.find((item) => item.projectId === projectId);
+      return {
+        id: projectId,
+        label: `${sheet?.projectCode ?? projectId} / ${sheet?.projectName ?? projectId}`
+      };
+    });
+  }, [assignments, sheets]);
+
+  const hydrateEditableSheet = (sheet: ScoringSheetRecord | null) => {
+    if (!sheet) {
+      setScoreInputs({});
+      setOpinion('');
+      return;
+    }
+    const nextInputs: Record<string, ScoreInputState> = {};
+    for (const item of sheet.scoringItems ?? []) {
+      const detail = sheet.details?.[item.id];
+      nextInputs[item.id] = {
+        score: String(detail?.score ?? 0),
+        comment: detail?.comment ?? ''
+      };
+    }
+    setScoreInputs(nextInputs);
+    setOpinion(sheet.opinion ?? '');
+  };
+
+  const loadBaseData = async () => {
+    if (!currentUser) return;
+    setLoading(true);
+    setError('');
+    try {
+      const [assignmentResult, sheetResult] = await Promise.all([
+        apiGet<{ assignments: AssignmentRecord[] }>('/api/expert-review/my-assignments', currentUser.id),
+        apiGet<{ scoringSheets: ScoringSheetRecord[] }>('/api/expert-review/my-scoring-sheets', currentUser.id)
+      ]);
+      const nextAssignments = assignmentResult.assignments ?? [];
+      const nextSheets = sheetResult.scoringSheets ?? [];
+      setAssignments(nextAssignments);
+      setSheets(nextSheets);
+
+      const availableProjectIds = new Set<string>();
+      nextAssignments.forEach((item) => availableProjectIds.add(item.projectId));
+      nextSheets.forEach((item) => availableProjectIds.add(item.projectId));
+      const nextProjectId =
+        currentProjectId && availableProjectIds.has(currentProjectId)
+          ? currentProjectId
+          : nextSheets[0]?.projectId ?? nextAssignments[0]?.projectId ?? '';
+      setSelectedProjectId(nextProjectId);
+
+      const nextProjectSheets = nextSheets.filter((item) => item.projectId === nextProjectId);
+      setSelectedSheetId(nextProjectSheets[0]?.id ?? '');
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : '专家评分页面加载失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadBaseData();
+  }, [currentProjectId, currentUser?.id]);
+
+  useEffect(() => {
+    const projectSheet = projectSheets.find((item) => item.id === selectedSheetId) ?? projectSheets[0] ?? null;
+    if (!projectSheet) {
+      setSelectedSheetDetail(null);
+      hydrateEditableSheet(null);
+      return;
+    }
+    if (!editableSheetStatus(projectSheet.status)) {
+      setSelectedSheetDetail(null);
+      hydrateEditableSheet(null);
+      return;
+    }
+
+    let active = true;
+    setError('');
+    apiGet<{ scoringSheet: ScoringSheetRecord }>(`/api/scoring-sheets/${projectSheet.id}`, currentUser?.id)
+      .then((result) => {
+        if (!active) return;
+        setSelectedSheetDetail(result.scoringSheet);
+        hydrateEditableSheet(result.scoringSheet);
+      })
+      .catch((loadError) => {
+        if (!active) return;
+        setSelectedSheetDetail(null);
+        hydrateEditableSheet(null);
+        setError(loadError instanceof Error ? loadError.message : '评分详情加载失败');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [currentUser?.id, projectSheets, selectedSheetId]);
+
+  const confirmAssignment = async () => {
+    if (!currentAssignment || !currentUser) return;
+    setBusyAction('confirming');
+    setError('');
+    setMessage('');
+    try {
+      for (const type of ['avoidance', 'discipline', 'confidentiality']) {
+        await apiPost(`/api/expert-assignments/${currentAssignment.id}/confirm`, { type }, currentUser.id);
+      }
+      setMessage('专家回避、纪律和保密确认已完成。');
+      await loadBaseData();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : '确认失败');
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const buildScorePayload = () => {
+    const details = Object.fromEntries(
+      scoringItems.map((item) => [
+        item.id,
+        {
+          score: Number(scoreInputs[item.id]?.score ?? 0),
+          comment: scoreInputs[item.id]?.comment ?? ''
+        }
+      ])
     );
-  }
+    return {
+      details,
+      technical: categoryTotals.technical,
+      service: categoryTotals.service,
+      price: categoryTotals.price,
+      opinion
+    };
+  };
+
+  const saveScore = async () => {
+    if (!selectedSheetDetail || !currentUser) return;
+    setBusyAction('saving');
+    setError('');
+    setMessage('');
+    try {
+      await apiPost(`/api/scoring-sheets/${selectedSheetDetail.id}/save`, buildScorePayload(), currentUser.id);
+      setMessage('评分进度已保存。');
+      await loadBaseData();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : '评分保存失败');
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const submitScore = async () => {
+    if (!selectedSheetDetail || !currentUser) return;
+    setBusyAction('submitting');
+    setError('');
+    setMessage('');
+    try {
+      await apiPost(`/api/scoring-sheets/${selectedSheetDetail.id}/submit-lock`, buildScorePayload(), currentUser.id);
+      setMessage('评分已提交并锁定。');
+      await loadBaseData();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : '评分提交失败');
+    } finally {
+      setBusyAction(null);
+    }
+  };
 
   return (
-    <div data-ui-check="expert-scoring-view" className="max-w-7xl mx-auto space-y-6 pb-20">
-      <div className="flex items-center justify-between">
+    <div className="max-w-6xl mx-auto space-y-6 pb-20">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
             <FileText className="w-5 h-5 text-[#006666]" />
-            专家评审打分台
+            专家评分
           </h2>
-          <p className="text-sm text-slate-500 mt-1">PROJ-2026-0034 | 大堂智能机器人采购项目综合打分</p>
+          <p className="text-sm text-slate-500 mt-1">
+            {(selectedSheet?.projectCode ?? selectedProjectId) || '-'} / {selectedSheet?.projectName ?? '当前项目'}
+          </p>
         </div>
-        <div className="flex gap-3">
-           <Button variant="outline" className="bg-white">查看招标文件</Button>
-           <Button variant="outline" className="bg-white">查看所有投标文件</Button>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          <Badge variant={statusBadgeVariant(currentAssignment?.status)}>{currentAssignment ? `专家任务：${humanizeStatus(currentAssignment.status)}` : '暂无任务'}</Badge>
+          {selectedSheet ? <Badge variant={statusBadgeVariant(selectedSheet.status)}>{`评分状态：${humanizeStatus(selectedSheet.status)}`}</Badge> : null}
         </div>
       </div>
 
-      <Card className="shadow-md border-t-4 border-t-[#006666]">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-100 border-b border-slate-200">
-                <th className="p-4 text-left font-medium text-slate-700 w-48 border-r border-slate-200">评分维度</th>
-                <th className="p-4 text-left font-medium text-slate-700 w-64 border-r border-slate-200">打分项及标准</th>
-                <th className="p-4 text-center font-medium text-slate-700 w-24 border-r border-slate-200">满分</th>
-                {suppliers.map(s => (
-                  <th key={s.id} className="p-4 text-center font-bold text-[#006666] bg-slate-50 min-w-[160px] border-r border-slate-200 last:border-0">
-                    {s.name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {criteria.map((cat, i) => (
-                <React.Fragment key={cat.id}>
-                  {cat.items.map((item, j) => (
-                    <tr key={item.id} className="hover:bg-slate-50/30 transition-colors group">
-                      {j === 0 && (
-                        <td rowSpan={cat.items.length} className="p-4 font-semibold text-slate-800 bg-white border-r border-slate-200 align-top">
-                          {cat.name}
-                        </td>
-                      )}
-                      <td className="p-4 border-r border-slate-200 align-top">
-                        <div className="font-medium text-slate-900 mb-1">{item.name}</div>
-                        <div className="text-xs text-slate-500 leading-relaxed">{item.desc}</div>
-                      </td>
-                      <td className="p-4 text-center font-medium text-slate-700 border-r border-slate-200 bg-slate-50/50 align-top">
-                        {item.maxScore}
-                      </td>
-                      {suppliers.map(s => (
-                        <td key={s.id} className="p-4 border-r border-slate-200 last:border-0 align-top bg-white">
-                          {"auto" in item && item.auto ? (
-                            <div className="w-full h-10 flex items-center justify-center bg-slate-100 border border-slate-200 rounded text-slate-400 font-mono text-sm cursor-not-allowed">
-                              系统自动计算
-                            </div>
-                          ) : (
-                            <div>
-                              <input
-                                type="number"
-                                min="0"
-                                max={item.maxScore}
-                                className="w-full text-center border border-slate-300 rounded px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-[#FFC107] focus:border-[#FFC107] bg-amber-50/30 transition-shadow"
-                                placeholder={`0-${item.maxScore}`}
-                              />
-                            </div>
-                          )}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </React.Fragment>
-              ))}
-
-              {/* 总分行 */}
-              <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
-                <td colSpan={2} className="p-4 text-right text-slate-800 border-r border-slate-200">
-                  专家主观评分小计 (不含系统客观分)
-                </td>
-                <td className="p-4 text-center text-slate-800 border-r border-slate-200">
-                  80
-                </td>
-                {suppliers.map(s => (
-                  <td key={s.id} className="p-4 text-center text-2xl text-[#006666] border-r border-slate-200 last:border-0 bg-white">
-                    0.0
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
+      {(message || error) && (
+        <div className={cn('rounded-md border px-4 py-3 text-sm', error ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700')}>
+          {error || message}
         </div>
+      )}
+
+      <Card>
+        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <label className="text-sm text-slate-600 md:col-span-2">
+            选择评审项目
+            <select
+              value={selectedProjectId}
+              onChange={(event) => {
+                setSelectedProjectId(event.target.value);
+                const firstSheet = sheets.find((item) => item.projectId === event.target.value);
+                setSelectedSheetId(firstSheet?.id ?? '');
+              }}
+              className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+            >
+              <option value="">暂无评审项目</option>
+              {projectOptions.map((option) => (
+                <option key={option.id} value={option.id}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <div className="text-sm text-slate-600">
+            <div className="font-medium text-slate-900">确认状态</div>
+            <div className="mt-1">{confirmationCompleted ? '已完成回避/纪律/保密确认' : '待完成专家确认'}</div>
+            <div className="text-xs text-slate-500 mt-1">确认时间：{formatDateTime(currentAssignment?.confirmedAt)}</div>
+          </div>
+        </CardContent>
       </Card>
 
-      <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 flex items-start gap-3">
-        <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-800">
-          <p>请注意：每项得分不得超过该项满分。评分一旦【提交签名】，将采用区块链技术上链固化，无法进行任何修改。</p>
-        </div>
-      </div>
+      {!confirmationCompleted && currentAssignment ? (
+        <Card className="border-rose-200" data-ui-check="expert-recusal-view">
+          <CardHeader className="py-4 border-b border-rose-100">
+            <CardTitle className="text-base font-semibold text-rose-700 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              专家确认尚未完成
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-5 space-y-4 text-sm text-slate-600">
+            <p>当前项目还未完成回避、纪律和保密确认，确认后系统才会正式生成可编辑评分单。</p>
+            <Button data-ui-check="expert-confirm-participation" disabled={busyAction !== null} onClick={() => void confirmAssignment()}>
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              {busyAction === 'confirming' ? '确认中...' : '一次性完成专家确认'}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
-      {/* Bottom Sticky Action Bar */}
-      <div className="fixed bottom-0 left-[220px] right-0 p-4 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 flex justify-end gap-4 pr-12">
-        <Button variant="outline" className="px-6 h-11 text-base font-medium min-w-[140px] border-[#006666] text-[#006666]">
-          保存评分进度
-        </Button>
-        <Button variant="primary" className="px-8 h-11 text-base font-bold min-w-[180px] bg-[#006666] text-white hover:bg-[#005252]">
-          <Send className="w-5 h-5 mr-2" />
-          确认无误，提交签名
-        </Button>
+      <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-6">
+        <Card>
+          <CardHeader className="py-4 border-b border-slate-100">
+            <CardTitle className="text-base font-semibold text-slate-800">
+              {selectedSheetDetail ? '评分明细录入' : '评分结果汇总'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-5">
+            {loading ? (
+              <div className="py-12 text-center text-slate-500">正在加载专家任务...</div>
+            ) : selectedSheetDetail ? (
+              <div className="space-y-5" data-ui-check="expert-scoring-view">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <div className="text-sm text-slate-500">当前评分单</div>
+                    <div className="font-medium text-slate-900 mt-1">
+                      {selectedSheetDetail.supplierName ?? selectedSheetDetail.supplierId}
+                    </div>
+                  </div>
+                  <label className="text-sm text-slate-600">
+                    选择供应商评分单
+                    <select
+                      value={selectedSheetId}
+                      onChange={(event) => setSelectedSheetId(event.target.value)}
+                      className="mt-1 border border-slate-300 rounded px-3 py-2 text-sm"
+                    >
+                      {projectSheets.map((sheet) => (
+                        <option key={sheet.id} value={sheet.id}>
+                          {sheet.supplierName ?? sheet.supplierId}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="space-y-4">
+                  {scoringItems.map((item) => (
+                    <div key={item.id} className="rounded-lg border border-slate-200 p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="font-medium text-slate-900">{item.label}</div>
+                          <div className="text-xs text-slate-500 mt-1">{item.reference}</div>
+                          <div className="text-xs text-slate-400 mt-1">取证材料：{item.evidence}</div>
+                        </div>
+                        <Badge variant="outline">{item.categoryLabel} / 满分 {item.maxScore}</Badge>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-3">
+                        <label className="text-sm text-slate-600">
+                          分数
+                          <input
+                            type="number"
+                            min={0}
+                            max={item.maxScore}
+                            value={scoreInputs[item.id]?.score ?? '0'}
+                            onChange={(event) =>
+                              setScoreInputs((current) => ({
+                                ...current,
+                                [item.id]: {
+                                  score: event.target.value,
+                                  comment: current[item.id]?.comment ?? ''
+                                }
+                              }))
+                            }
+                            className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                          />
+                        </label>
+                        <label className="text-sm text-slate-600">
+                          评分意见
+                          <textarea
+                            rows={3}
+                            value={scoreInputs[item.id]?.comment ?? ''}
+                            onChange={(event) =>
+                              setScoreInputs((current) => ({
+                                ...current,
+                                [item.id]: {
+                                  score: current[item.id]?.score ?? '0',
+                                  comment: event.target.value
+                                }
+                              }))
+                            }
+                            className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <label className="text-sm text-slate-600 block">
+                  综合意见
+                  <textarea
+                    rows={4}
+                    value={opinion}
+                    onChange={(event) => setOpinion(event.target.value)}
+                    className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                  />
+                </label>
+
+                <div className="flex items-center justify-between gap-4 flex-wrap rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <div className="text-slate-600">
+                    技术分 {categoryTotals.technical} / 商务分 {categoryTotals.service} / 价格分 {categoryTotals.price}
+                  </div>
+                  <div className="font-semibold text-slate-900">合计 {categoryTotals.total}</div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3">
+                  <Button variant="outline" disabled={busyAction !== null} onClick={() => void saveScore()}>
+                    <Save className="w-4 h-4 mr-2" />
+                    {busyAction === 'saving' ? '保存中...' : '保存评分'}
+                  </Button>
+                  <Button disabled={busyAction !== null} onClick={() => void submitScore()}>
+                    <Send className="w-4 h-4 mr-2" />
+                    {busyAction === 'submitting' ? '提交中...' : '提交并锁定'}
+                  </Button>
+                </div>
+              </div>
+            ) : rankingRows.length ? (
+              <div className="space-y-4">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-500">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium">供应商</th>
+                        <th className="px-4 py-3 text-left font-medium">技术分</th>
+                        <th className="px-4 py-3 text-left font-medium">商务分</th>
+                        <th className="px-4 py-3 text-left font-medium">价格分</th>
+                        <th className="px-4 py-3 text-left font-medium">总分</th>
+                        <th className="px-4 py-3 text-left font-medium">排名</th>
+                        <th className="px-4 py-3 text-left font-medium">提交时间</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {rankingRows.map((sheet) => (
+                        <tr key={sheet.id}>
+                          <td className="px-4 py-3 font-medium text-slate-900">{sheet.supplierName ?? sheet.supplierId}</td>
+                          <td className="px-4 py-3 text-slate-600">{sheet.technical}</td>
+                          <td className="px-4 py-3 text-slate-600">{sheet.service}</td>
+                          <td className="px-4 py-3 text-slate-600">{sheet.price}</td>
+                          <td className="px-4 py-3 text-slate-900 font-semibold">{sheet.total}</td>
+                          <td className="px-4 py-3 text-slate-600">第 {sheet.rank} 名</td>
+                          <td className="px-4 py-3 text-slate-600">{formatDateTime(sheet.submittedAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  当前项目评分已锁定。推荐供应商：{rankingRows[0]?.supplierName ?? '-'}，总分 {rankingRows[0]?.total ?? '-'}。
+                </div>
+              </div>
+            ) : (
+              <div className="py-12 text-center text-slate-500" data-ui-check="expert-empty-state">当前角色暂无可展示的评分任务。</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="py-4 border-b border-slate-100">
+            <CardTitle className="text-base font-semibold text-slate-800">评分参考资料</CardTitle>
+          </CardHeader>
+          <CardContent className="p-5 space-y-5 text-sm">
+            {selectedSheetDetail?.materials?.bidSummary ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 space-y-2">
+                <div className="font-medium text-slate-900">报价摘要</div>
+                <div className="text-slate-600">报价金额：{formatCurrency(selectedSheetDetail.materials.bidSummary.amount)}</div>
+                <div className="text-slate-600">承诺交付：{selectedSheetDetail.materials.bidSummary.deliveryDays ?? '-'} 天</div>
+                <div className="text-slate-600">响应文件：{selectedSheetDetail.materials.bidSummary.fileName ?? '未上传'}</div>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-slate-600">
+                当前项目已完成评分锁定，页面展示汇总结果，不再开放单家供应商评分录入。
+              </div>
+            )}
+
+            {selectedSheetDetail ? (
+              <>
+                <div>
+                  <div className="font-medium text-slate-900 mb-2">报名资料</div>
+                  <ul className="space-y-2 text-slate-600">
+                    {(selectedSheetDetail.materials?.registrationMaterials ?? []).map((item) => (
+                      <li key={item.id}>• {item.fileName}（{formatDateTime(item.uploadedAt)}）</li>
+                    ))}
+                    {!(selectedSheetDetail.materials?.registrationMaterials ?? []).length ? <li>• 无</li> : null}
+                  </ul>
+                </div>
+                <div>
+                  <div className="font-medium text-slate-900 mb-2">响应文件</div>
+                  <ul className="space-y-2 text-slate-600">
+                    {(selectedSheetDetail.materials?.bidMaterials ?? []).map((item) => (
+                      <li key={item.id}>• {item.fileName}（{formatDateTime(item.uploadedAt)}）</li>
+                    ))}
+                    {!(selectedSheetDetail.materials?.bidMaterials ?? []).length ? <li>• 无</li> : null}
+                  </ul>
+                </div>
+              </>
+            ) : null}
+
+            {rankingRows.length ? (
+              <div className="rounded-lg border border-slate-200 px-4 py-3">
+                <div className="font-medium text-slate-900 mb-2">评分结果概览</div>
+                <div className="space-y-2">
+                  {rankingRows.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3">
+                      <span className="text-slate-600">{item.supplierName ?? item.supplierId}</span>
+                      <span className="font-medium text-slate-900">{item.total} 分</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

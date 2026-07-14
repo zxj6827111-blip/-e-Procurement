@@ -1,7 +1,7 @@
-import { createContext, useContext, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { User, ViewState } from '../shared/types';
 import { DEMO_USERS } from '../features/reference-data';
-import { routeForGeminiView } from '../route-mapping';
+import { geminiViewForPath, routeForGeminiView } from '../route-mapping';
 import type { FrontendFeatureFlags } from '../../meta/feature-flags';
 import type { FrontendRuntimeState, PermissionSnapshot, RouteContext } from '../../meta/frontend-state-contract';
 import type { RegistryMenuConfig } from '../../meta/menu-adapter';
@@ -119,6 +119,7 @@ interface AppContextType {
   setCurrentUser: (user: User | null) => void;
   currentView: ViewState;
   setCurrentView: (view: ViewState) => void;
+  navigateToPath: (path: string) => void;
   currentProjectId: string | null;
   setCurrentProjectId: (id: string | null) => void;
   runtimeState?: FrontendRuntimeState;
@@ -162,6 +163,45 @@ interface AppProviderProps {
   resettingData?: boolean;
   resetMessage?: string;
   onResetRuntimeData?: () => Promise<boolean> | boolean;
+}
+
+interface PersistedRuntimeState {
+  version: 1;
+  notifications: NotificationMessage[];
+  todos: TodoItem[];
+  suppliers: SupplierRecord[];
+  ratingTemplates: RatingTemplate[];
+}
+
+const runtimeStateStorageKey = 'eprocurement:gemini-runtime-state:v1';
+
+function readPersistedRuntimeState(): PersistedRuntimeState | null {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(runtimeStateStorageKey);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<PersistedRuntimeState>;
+    if (parsed.version !== 1) return null;
+    return {
+      version: 1,
+      notifications: Array.isArray(parsed.notifications) ? parsed.notifications : initialNotifications,
+      todos: Array.isArray(parsed.todos) ? parsed.todos : initialTodos,
+      suppliers: Array.isArray(parsed.suppliers) ? parsed.suppliers : initialSuppliers,
+      ratingTemplates: Array.isArray(parsed.ratingTemplates) ? parsed.ratingTemplates : initialRatingTemplates
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedRuntimeState(state: PersistedRuntimeState) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(runtimeStateStorageKey, JSON.stringify(state));
+}
+
+function clearPersistedRuntimeState() {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(runtimeStateStorageKey);
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -325,10 +365,20 @@ export function AppProvider({
   const [internalUser, setInternalUser] = useState<User | null>(null);
   const [internalView, setInternalView] = useState<ViewState>('LOGIN');
   const [internalProjectId, setInternalProjectId] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<NotificationMessage[]>(initialNotifications);
-  const [todos, setTodos] = useState<TodoItem[]>(initialTodos);
-  const [suppliers, setSuppliers] = useState<SupplierRecord[]>(initialSuppliers);
-  const [ratingTemplates, setRatingTemplates] = useState<RatingTemplate[]>(initialRatingTemplates);
+  const persistedRuntimeStateRef = useRef<PersistedRuntimeState | null | undefined>(undefined);
+  if (persistedRuntimeStateRef.current === undefined) {
+    persistedRuntimeStateRef.current = readPersistedRuntimeState();
+  }
+  const [notifications, setNotifications] = useState<NotificationMessage[]>(
+    () => persistedRuntimeStateRef.current?.notifications ?? initialNotifications
+  );
+  const [todos, setTodos] = useState<TodoItem[]>(() => persistedRuntimeStateRef.current?.todos ?? initialTodos);
+  const [suppliers, setSuppliers] = useState<SupplierRecord[]>(
+    () => persistedRuntimeStateRef.current?.suppliers ?? initialSuppliers
+  );
+  const [ratingTemplates, setRatingTemplates] = useState<RatingTemplate[]>(
+    () => persistedRuntimeStateRef.current?.ratingTemplates ?? initialRatingTemplates
+  );
   const pendingProjectIdRef = useRef<string | null>(projectId ?? null);
 
   const currentUser = user !== undefined ? user : internalUser;
@@ -338,6 +388,16 @@ export function AppProvider({
     pendingProjectIdRef.current = projectId;
   }
   const unreadNotifications = notifications.filter((item) => !item.read);
+
+  useEffect(() => {
+    writePersistedRuntimeState({
+      version: 1,
+      notifications,
+      todos,
+      suppliers,
+      ratingTemplates
+    });
+  }, [notifications, todos, suppliers, ratingTemplates]);
 
   const setCurrentUser = (nextUser: User | null) => {
     if (user !== undefined) return;
@@ -351,6 +411,27 @@ export function AppProvider({
       return;
     }
     setInternalView(nextView);
+  };
+
+  const navigateToPath = (path: string) => {
+    if (!path) return;
+    if (onNavigate) {
+      onNavigate(path);
+      return;
+    }
+    const [pathname, search = ''] = path.split('?');
+    const nextView = geminiViewForPath(pathname || '/', runtimeState?.roleId ?? '');
+    if (nextView) {
+      const params = new URLSearchParams(search);
+      const projectIdFromPath =
+        params.get('projectId') ??
+        (/^\/project-workbench\/([^/]+)/.exec(pathname || '')?.[1] ? decodeURIComponent(/^\/project-workbench\/([^/]+)/.exec(pathname || '')?.[1] ?? '') : null);
+      pendingProjectIdRef.current = projectIdFromPath;
+      if (projectId === undefined) {
+        setInternalProjectId(projectIdFromPath);
+      }
+      setInternalView(nextView);
+    }
   };
 
   const setCurrentProjectId = (nextProjectId: string | null) => {
@@ -379,6 +460,7 @@ export function AppProvider({
     try {
       const completed = await onResetRuntimeData();
       if (!completed) return;
+      clearPersistedRuntimeState();
       setNotifications(initialNotifications);
       setTodos(initialTodos);
       setSuppliers(initialSuppliers);
@@ -425,22 +507,7 @@ export function AppProvider({
 
   const loginAs = (role: keyof typeof DEMO_USERS) => {
     if (user === undefined) setInternalUser(DEMO_USERS[role]);
-    switch (role) {
-      case 'HOTEL_PROCUREMENT':
-        setCurrentView('PURCHASE_REQUEST');
-        break;
-      case 'SUPPLIER_BIDDER':
-        setCurrentView('QUOTE_RESPONSE');
-        break;
-      case 'EXPERT':
-        setCurrentView('EXPERT_RATING');
-        break;
-      case 'SYSTEM_ADMIN':
-        setCurrentView('SYSTEM_SETTINGS');
-        break;
-      default:
-        setCurrentView('DASHBOARD');
-    }
+    setCurrentView('DASHBOARD');
   };
 
   const logout = () => {
@@ -460,6 +527,7 @@ export function AppProvider({
         setCurrentUser,
         currentView,
         setCurrentView,
+        navigateToPath,
         currentProjectId,
         setCurrentProjectId,
         runtimeState,

@@ -25,6 +25,14 @@ function tinyPngBase64() {
   return "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 }
 
+function qualificationAttachment(fileName: string) {
+  return {
+    fileName,
+    contentType: "text/plain",
+    contentBase64: Buffer.from(fileName, "utf8").toString("base64")
+  };
+}
+
 async function createListedProduct(runtime: ReturnType<typeof boot>) {
   const image = await request(runtime.app)
     .post("/api/files/upload")
@@ -87,7 +95,13 @@ describe("Stage 11 supply chain mall expansion", () => {
     const admission = await request(runtime.app)
       .post("/api/suppliers/admissions")
       .set("x-mock-user-id", "u1")
-      .send({ name: "待准入商城供应商", category: "客房一次性用品", contactName: "待准入联系人", contactPhone: "13900009998" });
+      .send({
+        name: "待准入商城供应商",
+        category: "客房一次性用品",
+        contactName: "待准入联系人",
+        contactPhone: "13900009998",
+        qualificationAttachments: [qualificationAttachment("pending-mall-supplier-license.txt")]
+      });
     expect(admission.status).toBe(201);
     expect(admission.body.supplier.admissionStatus).toBe("pending");
     const supplierId = admission.body.supplier.id as string;

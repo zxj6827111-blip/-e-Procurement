@@ -3665,7 +3665,7 @@ body {
   gap: 18px;
 }
 
-.g-hotel-dashboard-head .runtime-reset-action {
+.g-hotel-dashboard-head .g-hotel-runtime-reset-action {
   order: 3;
   margin-left: auto;
 }

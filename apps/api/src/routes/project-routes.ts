@@ -295,7 +295,10 @@ function requestReadyForSubmit(procurementRequest: ProcurementRequest) {
 }
 
 function ensureRequest(ctx: AppContext, requestId: string, res: Response) {
-  const request = ctx.state.procurementRequests.find((item) => item.id === requestId);
+  const request = ctx.state.procurementRequests.find((item) => {
+    const normalized = normalizeRequest(item);
+    return item.id === requestId || item.code === requestId || normalized.code === requestId;
+  });
   if (!request) {
     res.status(404).json({ error: { code: "PROCUREMENT_REQUEST_NOT_FOUND", message: "Procurement request does not exist." } });
     return null;

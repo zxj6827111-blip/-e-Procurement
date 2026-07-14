@@ -261,25 +261,25 @@ const roleAuditSpec = {
     home: "/",
     template: "A",
     bell: true,
-    sidebar: ["我的待办", "审批规则", "需求审批", "采购项目", "报价进度", "评审定标", "评分模板", "定标审批", "供应商", "商品目录", "档案审计"]
+    sidebar: ["工作台", "我的待办", "审批规则", "需求审批", "采购项目", "报价进度", "评审定标", "评分模板", "定标审批", "供应商", "商品目录", "档案审计"]
   },
   buyer: {
     label: "采购经办人",
     home: "/",
     template: "A",
     bell: true,
-    sidebar: ["我的待办", "采购申请", "采购项目", "商品目录", "评审定标", "定标审批", "订单履约", "档案审计"]
+    sidebar: ["工作台", "我的待办", "采购申请", "采购项目", "商品目录", "评审定标", "定标审批", "订单履约", "档案审计"]
   },
   platform_operator: {
     label: "平台运营",
     home: "/",
     template: "A",
     bell: true,
-    sidebar: ["我的待办", "采购申请", "采购项目", "商品目录", "评审定标", "评分模板", "定标审批", "订单履约", "档案审计"]
+    sidebar: ["工作台", "我的待办", "采购申请", "采购项目", "商品目录", "评审定标", "评分模板", "定标审批", "订单履约", "档案审计"]
   },
   hotel_buyer: {
     label: "酒店采购",
-    home: "/procurement-requests",
+    home: "/",
     template: "B",
     bell: true,
     sidebar: ["工作台", "我的待办", "采购申请", "商品目录", "订单履约"]
@@ -303,25 +303,25 @@ const roleAuditSpec = {
     home: "/",
     template: "C",
     bell: true,
-    sidebar: ["我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
+    sidebar: ["工作台", "我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
   },
   supplier_admin: {
     label: "供应商管理员",
     home: "/",
     template: "C",
     bell: true,
-    sidebar: ["我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
+    sidebar: ["工作台", "我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
   },
   supplier_quotation: {
     label: "供应商报价人员",
-    home: "/bidding",
+    home: "/",
     template: "C",
     bell: true,
-    sidebar: ["我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
+    sidebar: ["工作台", "我的待办", "商品维护", "供应商档案", "报名资料", "报价响应", "中标结果", "订单履约", "结算材料"]
   },
   expert: {
     label: "专家",
-    home: "/expert-scoring",
+    home: "/",
     template: "C",
     bell: true,
     sidebar: ["工作台", "我的待办"]
@@ -335,10 +335,10 @@ const roleAuditSpec = {
   },
   admin: {
     label: "系统管理员",
-    home: "/permissions",
+    home: "/",
     template: "D",
     bell: false,
-    sidebar: ["审批规则", "系统管理", "系统设置"]
+    sidebar: ["工作台", "审批规则", "系统管理", "系统设置"]
   }
 };
 
