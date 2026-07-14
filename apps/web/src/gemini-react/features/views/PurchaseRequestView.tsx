@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowLeft, CheckCircle2, Clock, FileText, Filter, Plus, Search, Send } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle2, Clock, FileText, Filter, Plus, Search, Send, Trash2 } from 'lucide-react';
 import { useApp } from '../../core/AppContext';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../shared/ui/Card';
-import { apiGet, apiPost } from '../../../api/http';
+import { apiDelete, apiGet, apiPost } from '../../../api/http';
 import { formatDateTime, labelStatus } from '../../../utils/status-labels';
 
 interface ApiProcurementRequestLineItem {
@@ -38,6 +38,7 @@ interface ApiProcurementRequest {
   status?: string;
   approvalStatus?: string;
   approvalOpinion?: string;
+  createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
   lineItems?: ApiProcurementRequestLineItem[];
@@ -71,6 +72,10 @@ function canSubmit(request: ApiProcurementRequest) {
   return (request.status ?? 'draft') === 'draft' && (request.approvalStatus ?? 'draft') === 'draft';
 }
 
+function canDelete(request: ApiProcurementRequest, userId?: string) {
+  return Boolean(userId && request.createdBy === userId && canSubmit(request));
+}
+
 export function PurchaseRequestView() {
   const { currentUser, setCurrentView } = useApp();
   const [requests, setRequests] = useState<ApiProcurementRequest[]>([]);
@@ -78,6 +83,7 @@ export function PurchaseRequestView() {
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [loadState, setLoadState] = useState<LoadState>('idle');
+  const [deletingRequestId, setDeletingRequestId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const canCreate = currentUser?.role === 'HOTEL_PROCUREMENT';
@@ -114,6 +120,7 @@ export function PurchaseRequestView() {
   }, [requests, searchText, statusFilter]);
 
   async function submitRequest(request: ApiProcurementRequest) {
+    if (loadState === 'submitting' || deletingRequestId) return;
     setLoadState('submitting');
     setError('');
     try {
@@ -127,6 +134,22 @@ export function PurchaseRequestView() {
       setError(err instanceof Error ? err.message : '采购申请提交失败');
     } finally {
       setLoadState('idle');
+    }
+  }
+
+  async function deleteRequest(request: ApiProcurementRequest) {
+    if (!canDelete(request, currentUser?.id) || deletingRequestId || loadState === 'submitting') return;
+    if (!window.confirm(`确认删除采购申请草稿“${request.title}”吗？删除后无法恢复。`)) return;
+    setDeletingRequestId(request.id);
+    setError('');
+    try {
+      await apiDelete(`/api/procurement-requests/${encodeURIComponent(request.id)}`, currentUser?.id);
+      setRequests((items) => items.filter((item) => item.id !== request.id));
+      if (selectedRequest?.id === request.id) setSelectedRequest(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '采购申请草稿删除失败');
+    } finally {
+      setDeletingRequestId(null);
     }
   }
 
@@ -150,9 +173,22 @@ export function PurchaseRequestView() {
               状态：{labelStatus(status)}
             </Badge>
             {canCreate && canSubmit(selectedRequest) && (
-              <Button data-ui-check="procurement-request-submit-detail" variant="brand" size="sm" className="gap-2" disabled={loadState === 'submitting'} onClick={() => void submitRequest(selectedRequest)}>
+              <Button data-ui-check="procurement-request-submit-detail" variant="brand" size="sm" className="gap-2" disabled={loadState === 'submitting' || Boolean(deletingRequestId)} onClick={() => void submitRequest(selectedRequest)}>
                 <Send className="w-4 h-4" />
                 提交审批
+              </Button>
+            )}
+            {canCreate && canDelete(selectedRequest, currentUser?.id) && (
+              <Button
+                data-ui-check="procurement-request-delete-detail"
+                variant="ghost"
+                size="sm"
+                className="gap-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                disabled={Boolean(deletingRequestId) || loadState === 'submitting'}
+                onClick={() => void deleteRequest(selectedRequest)}
+              >
+                <Trash2 className="w-4 h-4" />
+                {deletingRequestId === selectedRequest.id ? '删除中...' : '删除草稿'}
               </Button>
             )}
           </div>
@@ -339,13 +375,29 @@ export function PurchaseRequestView() {
                         </Badge>
                       </td>
                       <td className="px-6 py-4 text-slate-500">{requestDate(request.createdAt)}</td>
-                      <td className="px-6 py-4 text-right space-x-2">
-                        <Button data-ui-check="procurement-request-detail-entry" variant="ghost" size="sm" className="text-[#006666]" onClick={() => setSelectedRequest(request)}>查看详情</Button>
-                        {canCreate && canSubmit(request) && (
-                          <Button data-ui-check="procurement-request-submit-row" variant="outline" size="sm" disabled={loadState === 'submitting'} onClick={() => void submitRequest(request)}>
-                            提交审批
-                          </Button>
-                        )}
+                      <td className="px-6 py-4 text-right">
+                        <div className="inline-flex items-center justify-end gap-1 whitespace-nowrap">
+                          <Button data-ui-check="procurement-request-detail-entry" variant="ghost" size="sm" className="text-[#006666]" onClick={() => setSelectedRequest(request)}>查看详情</Button>
+                          {canCreate && canSubmit(request) && (
+                            <Button data-ui-check="procurement-request-submit-row" variant="outline" size="sm" disabled={loadState === 'submitting' || Boolean(deletingRequestId)} onClick={() => void submitRequest(request)}>
+                              提交审批
+                            </Button>
+                          )}
+                          {canCreate && canDelete(request, currentUser?.id) && (
+                            <Button
+                              data-ui-check="procurement-request-delete-row"
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                              disabled={Boolean(deletingRequestId) || loadState === 'submitting'}
+                              onClick={() => void deleteRequest(request)}
+                              title="删除草稿"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              {deletingRequestId === request.id ? '删除中...' : '删除'}
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

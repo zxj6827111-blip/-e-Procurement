@@ -178,6 +178,12 @@ function expertCanBeDrawn(expert: Expert) {
   return expert.status.includes("可") || expert.status.toLowerCase().includes("available") || expert.status.includes("启用");
 }
 
+function expertHasActiveAccount(ctx: AppContext, expertId: string) {
+  return ctx.state.users.some(
+    (user) => user.roleId === "expert" && user.expertId === expertId && !["disabled", "suspended", "offboarded"].includes(String(user.status ?? "active"))
+  );
+}
+
 function canReadProject(req: Request, project: ProcurementProject) {
   if (req.auth.roleId === "buyer" || req.auth.roleId === "platform_operator") {
     return (req.auth.user.managedProjectIds?.includes(project.id) ?? false) || req.auth.orgScope.includes(project.orgId);
@@ -708,11 +714,28 @@ function publicExpertAssignment(ctx: AppContext, assignment: ExpertAssignment) {
   };
 }
 
+function activeReviewScoringSheets(ctx: AppContext, projectId: string) {
+  const activeExpertIds = new Set(
+    ctx.state.expertAssignments
+      .filter((assignment) => assignment.projectId === projectId && !["replaced", "archived"].includes(assignment.status))
+      .map((assignment) => assignment.expertId)
+  );
+  const lockedSupplierIds = new Set(
+    ctx.state.bids.filter((bid) => bid.projectId === projectId && bid.status === "locked").map((bid) => bid.supplierId)
+  );
+  return ctx.state.scoringSheets.filter(
+    (sheet) =>
+      sheet.projectId === projectId &&
+      activeExpertIds.has(sheet.expertId) &&
+      lockedSupplierIds.has(sheet.supplierId) &&
+      !["replaced", "archived"].includes(sheet.status)
+  );
+}
+
 function buildScoringSummary(ctx: AppContext, projectId: string) {
-  const project = ctx.state.projects.find((item) => item.id === projectId);
-  const sheets = ctx.state.scoringSheets.filter((item) => item.projectId === projectId);
+  const sheets = activeReviewScoringSheets(ctx, projectId);
   const submittedSheets = sheets.filter((item) => item.status === "submitted_locked" || item.status === "resubmitted_locked");
-  const suppliers = project?.participantSupplierIds ?? [];
+  const suppliers = Array.from(new Set(ctx.state.bids.filter((item) => item.projectId === projectId && item.status === "locked").map((item) => item.supplierId)));
   const supplierScores = suppliers.map((supplierId) => {
     const supplierSheets = submittedSheets.filter((item) => item.supplierId === supplierId);
     const supplier = ctx.state.suppliers.find((item) => item.id === supplierId);
@@ -729,7 +752,7 @@ function buildScoringSummary(ctx: AppContext, projectId: string) {
     };
   });
   const ranked = supplierScores.sort((a, b) => b.total - a.total).map((item, index) => ({ ...item, rank: index + 1 }));
-  const lowestBid = ctx.state.bids.filter((item) => item.projectId === projectId).sort((a, b) => a.amount - b.amount)[0];
+  const lowestBid = ctx.state.bids.filter((item) => item.projectId === projectId && item.status === "locked").sort((a, b) => a.amount - b.amount)[0];
   const recommendedSupplierId = ranked[0]?.supplierId ?? null;
   const allSubmitted = sheets.length > 0 && sheets.every((item) => item.status === "submitted_locked" || item.status === "resubmitted_locked");
   return {
@@ -755,7 +778,7 @@ function buildScoringSummary(ctx: AppContext, projectId: string) {
 }
 
 function buildReviewRecordDetail(ctx: AppContext, project: ProcurementProject) {
-  const sheets = ctx.state.scoringSheets.filter((item) => item.projectId === project.id);
+  const sheets = activeReviewScoringSheets(ctx, project.id);
   const submittedSheets = sheets.filter((item) => item.status === "submitted_locked" || item.status === "resubmitted_locked");
   const summary = buildScoringSummary(ctx, project.id);
   const template = ctx.state.scoringTemplates.find((item) => item.id === submittedSheets[0]?.templateId) ?? ctx.state.scoringTemplates.find((item) => item.status === "enabled") ?? null;
@@ -841,7 +864,10 @@ function createScoringSheetsForAssignment(ctx: AppContext, project: ProcurementP
   if (hasExistingSheetsForExpert) return;
   const templateId = enabledScoringTemplateId(ctx);
   const expertUser = ctx.state.users.find((user) => user.expertId === assignment.expertId);
-  for (const supplierId of project.participantSupplierIds) {
+  const lockedSupplierIds = Array.from(
+    new Set(ctx.state.bids.filter((bid) => bid.projectId === project.id && bid.status === "locked").map((bid) => bid.supplierId))
+  );
+  for (const supplierId of lockedSupplierIds) {
     const existing = ctx.state.scoringSheets.some(
       (sheet) =>
         sheet.projectId === project.id &&
@@ -1078,11 +1104,14 @@ export function expertReviewRoutes(ctx: AppContext) {
     const assignedIds = new Set(ctx.state.expertAssignments.filter((item) => item.projectId === project.id).map((item) => item.expertId));
     const candidates = ctx.state.experts
       .filter((item) => {
-        if (!expertCanBeDrawn(item) || assignedIds.has(item.id)) return false;
+        if (!expertCanBeDrawn(item) || !expertHasActiveAccount(ctx, item.id) || assignedIds.has(item.id)) return false;
         if (requestedScopes.length === 0) return true;
         return (item.reviewScopes ?? []).some((scope) => requestedScopes.includes(scope));
       })
       .slice(0, Number.isFinite(count) && count > 0 ? count : 1);
+    if (candidates.length === 0) {
+      return denyResponse(ctx, req, res, 400, "EXPERT_CANDIDATE_NOT_FOUND", "No eligible expert with an active account is available.", "expert_assignment.draw.candidate.denied", "project", project.id, project.id);
+    }
     const now = new Date().toISOString();
     const assignments = candidates.map((expert) => {
       const assignment: ExpertAssignment = {
@@ -1142,6 +1171,9 @@ export function expertReviewRoutes(ctx: AppContext) {
       return denyResponse(ctx, req, res, 400, "EXPERT_APPOINT_REASON_REQUIRED", "Expert appointment reason is required.", "expert_assignment.appoint.reason.denied", "expert", expertId, project.id);
     }
     if (!ctx.state.experts.some((item) => item.id === expertId)) return res.status(404).json({ error: { code: "EXPERT_NOT_FOUND", message: "Expert does not exist." } });
+    if (!expertHasActiveAccount(ctx, expertId)) {
+      return denyResponse(ctx, req, res, 400, "EXPERT_ACCOUNT_REQUIRED", "Expert must have an active expert account before appointment.", "expert_assignment.appoint.account.denied", "expert", expertId, project.id);
+    }
     if (!assertProjectExpertNotAssigned(ctx, req, res, project, expertId, "expert_assignment.appoint.duplicate.denied")) return;
     const now = new Date().toISOString();
     const assignment: ExpertAssignment = {
@@ -1199,6 +1231,9 @@ export function expertReviewRoutes(ctx: AppContext) {
       return denyResponse(ctx, req, res, 400, "EXPERT_REPLACE_REASON_REQUIRED", "Expert replacement reason is required.", "expert_assignment.replace.reason.denied", "expert_assignment", assignment.id, project.id);
     }
     if (!ctx.state.experts.some((item) => item.id === replacementExpertId)) return res.status(404).json({ error: { code: "EXPERT_NOT_FOUND", message: "Replacement expert does not exist." } });
+    if (!expertHasActiveAccount(ctx, replacementExpertId)) {
+      return denyResponse(ctx, req, res, 400, "EXPERT_ACCOUNT_REQUIRED", "Replacement expert must have an active expert account.", "expert_assignment.replace.account.denied", "expert", replacementExpertId, project.id);
+    }
     if (!assertProjectExpertNotAssigned(ctx, req, res, project, replacementExpertId, "expert_assignment.replace.duplicate.denied")) return;
     assignment.status = "replaced";
     assignment.replacedByExpertId = replacementExpertId;
@@ -1535,6 +1570,7 @@ export function expertReviewRoutes(ctx: AppContext) {
       createdBy: req.auth.user.id
     };
     ctx.state.reviewReports.push(report);
+    ctx.r5ReviewAwardRepository.upsertReviewReport(report);
     const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "review_report.generate", "review_report", report.id, project.id);
     ctx.eventBus.emit({
       eventCode: "ReviewReportGenerated",
@@ -1571,6 +1607,8 @@ export function expertReviewRoutes(ctx: AppContext) {
     report.frozenAt = new Date().toISOString();
     project.status = "review_report_frozen";
     project.displayStatus = "review report frozen";
+    ctx.r5ReviewAwardRepository.upsertReviewReport(report);
+    ctx.r4SourcingRepository.upsertProject(project);
     const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "review_report.freeze", "review_report", report.id, project.id);
     ctx.eventBus.emit({
       eventCode: "ReviewReportFrozen",

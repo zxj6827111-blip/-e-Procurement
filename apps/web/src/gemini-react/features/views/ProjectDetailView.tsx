@@ -3,7 +3,8 @@ import { useApp } from '../../core/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../../shared/ui/Card';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
-import { ArrowLeft, Archive, CheckCircle2, Clock, FileText, ShieldAlert, Trophy, Truck, Users } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Archive, ArrowRight, CheckCircle2, Clock, FileText, LockKeyhole, Scissors, ShieldAlert, Trophy, Truck, Users } from 'lucide-react';
+import { apiPost } from '../../../api/http';
 import { cn } from '../../shared/lib/utils';
 import {
   calculateArchiveCompleteness,
@@ -29,11 +30,32 @@ const tabs: Array<{ id: ProjectDetailTab; label: string }> = [
   { id: 'ARCHIVE', label: '档案与日志' }
 ];
 
-function stageNextView(status: string, hasOrder: boolean) {
+function projectNextAction(status: string, hasOrder: boolean) {
   if (hasOrder || ['contract_registered', 'performing', 'evaluated', 'archived'].includes(status)) {
-    return 'PROJECT_FULFILLMENT' as const;
+    return { view: 'PROJECT_FULFILLMENT' as const, label: '进入履约处理' };
   }
-  return 'PROJECT_SOURCING' as const;
+  if (['project_created', 'document_preparing'].includes(status)) {
+    return { view: 'PROCUREMENT_DOCUMENT' as const, label: '处理采购文件' };
+  }
+  if (status === 'document_published') {
+    return { view: 'ANNOUNCEMENT' as const, label: '发布公告/邀请供应商' };
+  }
+  if (status === 'registration_open') {
+    return { view: 'REGISTRATION' as const, label: '查看报名与资格审核' };
+  }
+  if (status === 'bidding_open') {
+    return { view: 'QUOTE_PROGRESS' as const, label: '查看报价进度' };
+  }
+  if (['bidding_locked', 'expert_reviewing'].includes(status)) {
+    return { view: 'REVIEW_AWARD' as const, label: '组织评审' };
+  }
+  if (['review_report_frozen', 'award_approving'].includes(status)) {
+    return { view: 'AWARD_APPROVE' as const, label: '创建/查看定标审批' };
+  }
+  if (['awarded_pending_order', 'result_notified'].includes(status)) {
+    return { view: 'AWARD_RESULT' as const, label: '查看定标结果' };
+  }
+  return { view: 'PROJECT_SOURCING' as const, label: '查看招采执行' };
 }
 
 interface ProjectDetailViewProps {
@@ -41,9 +63,13 @@ interface ProjectDetailViewProps {
 }
 
 export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailViewProps) {
-  const { currentProjectId, setCurrentProjectId, setCurrentView } = useApp();
-  const { workbench, resolvedProjectId, loading, error } = useProjectWorkbenchData(currentProjectId);
+  const { currentProjectId, currentUser, setCurrentProjectId, setCurrentView } = useApp();
+  const { workbench, resolvedProjectId, loading, error, reload } = useProjectWorkbenchData(currentProjectId);
   const [activeTab, setActiveTab] = useState<ProjectDetailTab>(initialTab);
+  const [bidAction, setBidAction] = useState<'cutoff' | 'lock' | null>(null);
+  const [bidActionMessage, setBidActionMessage] = useState('');
+  const [bidActionError, setBidActionError] = useState('');
+  const [cutoffReason, setCutoffReason] = useState('');
 
   useEffect(() => {
     if (!currentProjectId && resolvedProjectId) {
@@ -56,6 +82,10 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
   }, [initialTab]);
 
   const archivePercent = calculateArchiveCompleteness(workbench);
+  const activeProcurementDocuments = useMemo(
+    () => (workbench?.procurementDocuments ?? []).filter((document) => document.status !== 'voided'),
+    [workbench?.procurementDocuments]
+  );
 
   const latestAward = useMemo(
     () => (workbench ? sortByNewest(workbench.awardApprovals, (item) => item.approvedAt ?? item.submittedAt ?? item.createdAt)[0] ?? null : null),
@@ -113,7 +143,7 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
       `项目名称：${workbench.project.name}`,
       `业务阶段：${projectStageLabel(workbench.project)}`,
       `采购申请：${workbench.procurementRequest?.code ?? '-'}`,
-      `采购文件：${workbench.procurementDocuments.length} 份`,
+      `采购文件：${activeProcurementDocuments.length} 份`,
       `公告邀请：${workbench.announcements.length} 条 / ${workbench.invitations.length} 条`,
       `报名与报价：${workbench.registrations.length} 家报名 / ${workbench.bids.length} 家报价`,
       `专家评审：${workbench.scoringSheets.length} 份评分 / ${workbench.reviewReports?.length ?? 0} 份报告`,
@@ -122,6 +152,48 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
       `档案完整度：${archivePercent}%`
     ].join('\n');
     downloadTextFile(`${workbench.project.code}-archive-checklist.txt`, content);
+  };
+
+  const runBidControlAction = async (action: 'cutoff' | 'lock') => {
+    if (!currentUser || !workbench || !resolvedProjectId || bidAction) return;
+    const submittedCount = workbench.bids.filter((bid) => bid.status === 'submitted').length;
+    const draftCount = workbench.bids.filter((bid) => bid.status === 'draft').length;
+    if (action === 'cutoff' && !cutoffReason.trim()) {
+      setBidActionError('请先填写提前截标原因。');
+      return;
+    }
+    const confirmed = window.confirm(
+      action === 'cutoff'
+        ? `确认提前截标吗？当前 ${submittedCount} 家已提交、${draftCount} 家仍为草稿。截标原因：${cutoffReason.trim()}。截标后供应商将无法继续提交或修改报价。`
+        : `确认锁定 ${submittedCount} 家已提交报价吗？锁定后项目将进入专家评审阶段，报价不可再修改。`
+    );
+    if (!confirmed) return;
+
+    setBidAction(action);
+    setBidActionMessage('');
+    setBidActionError('');
+    try {
+      if (action === 'cutoff') {
+        await apiPost(
+          `/api/projects/${encodeURIComponent(resolvedProjectId)}/bids/cutoff`,
+          { action: 'early_cutoff', reason: cutoffReason.trim() },
+          currentUser.id
+        );
+        setBidActionMessage('提前截标已完成。请核对报价数量后执行“锁定报价”。');
+      } else {
+        const result = await apiPost<{ lockedCount: number }>(
+          `/api/projects/${encodeURIComponent(resolvedProjectId)}/bids/lock`,
+          {},
+          currentUser.id
+        );
+        setBidActionMessage(`已锁定 ${result.lockedCount} 家供应商报价，项目现可进入专家评审。`);
+      }
+      reload();
+    } catch (actionError) {
+      setBidActionError(actionError instanceof Error ? actionError.message : '截标操作失败，请稍后重试。');
+    } finally {
+      setBidAction(null);
+    }
   };
 
   if (loading && !workbench) {
@@ -139,9 +211,27 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
   const request = workbench.procurementRequest;
   const stageLabel = projectStageLabel(workbench.project);
   const hasOrder = workbench.purchaseOrders.length > 0;
-  const nextView = stageNextView(workbench.project.status, hasOrder);
+  const nextAction = projectNextAction(workbench.project.status, hasOrder);
   const recommendedSupplierId = workbench.comparisonReport?.recommendedSupplierId ?? latestAward?.selectedSupplierId;
   const recommendedSupplierName = resolveSupplierName(workbench, recommendedSupplierId);
+  const canMaintainBidControl = ['PROCUREMENT_AGENT', 'PLATFORM_OPERATIONS'].includes(String(currentUser?.role));
+  const submittedBidCount = workbench.bids.filter((bid) => bid.status === 'submitted').length;
+  const draftBidCount = workbench.bids.filter((bid) => bid.status === 'draft').length;
+  const lockedBidCount = workbench.bids.filter((bid) => bid.status === 'locked').length;
+  const beforeDeadline = Boolean(workbench.project.beforeDeadline);
+  const biddingOpen = workbench.project.status === 'bidding_open';
+  const biddingLocked = [
+    'bidding_locked',
+    'expert_reviewing',
+    'review_report_frozen',
+    'award_approving',
+    'awarded_pending_order',
+    'result_notified',
+    'contract_registered',
+    'performing',
+    'evaluated',
+    'archived'
+  ].includes(workbench.project.status);
 
   return (
     <div className="space-y-6">
@@ -177,10 +267,10 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
               variant="primary"
               onClick={() => {
                 setCurrentProjectId(resolvedProjectId);
-                setCurrentView(nextView);
+                setCurrentView(nextAction.view);
               }}
             >
-              进入下一阶段处理
+              {nextAction.label}
             </Button>
           </div>
         </div>
@@ -272,7 +362,7 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
                       <div className="mb-4 text-base font-medium text-slate-900">项目推进摘要</div>
                       <div className="grid gap-4 md:grid-cols-2">
                         {[
-                          { label: '采购文件', value: `${workbench.procurementDocuments.length} 份` },
+                          { label: '采购文件', value: `${activeProcurementDocuments.length} 份` },
                           { label: '公告邀请', value: `${workbench.announcements.length} 条 / ${workbench.invitations.length} 家` },
                           { label: '供应商报名', value: `${workbench.registrations.length} 家` },
                           { label: '有效报价', value: `${workbench.bids.length} 家` },
@@ -335,7 +425,7 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
                   </div>
 
                   <div className="space-y-4">
-                    {workbench.procurementDocuments.map((document) => (
+                    {activeProcurementDocuments.map((document) => (
                       <div key={document.id} className="rounded-lg border border-slate-200 p-4">
                         <div className="flex items-start justify-between gap-4">
                           <div>
@@ -372,7 +462,98 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
 
               {activeTab === 'BIDDING' && (
                 <div className="space-y-6">
-                  <div className="grid gap-4 md:grid-cols-3">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <LockKeyhole className="h-5 w-5 text-[#006666]" />
+                          <h3 className="font-medium text-slate-900">截标与报价锁定</h3>
+                          <Badge variant={biddingLocked ? 'success' : beforeDeadline ? 'warning' : 'info'}>
+                            {biddingLocked ? '已完成锁定' : beforeDeadline ? '报价期内' : '待锁定'}
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-600">
+                          {biddingLocked
+                            ? `当前已锁定 ${lockedBidCount} 家供应商报价，可以进入专家评审。`
+                            : beforeDeadline
+                              ? `报价截止时间为 ${formatDateTime(workbench.project.quoteDeadlineAt)}。截止前报价内容保持保密。`
+                              : submittedBidCount > 0
+                                ? `报价已截止，当前有 ${submittedBidCount} 家供应商报价待采购方统一锁定。`
+                                : '报价已截止，当前没有可锁定的已提交报价。'}
+                        </p>
+                        {canMaintainBidControl && biddingOpen && beforeDeadline ? (
+                          <label className="mt-4 block max-w-xl text-sm text-slate-700">
+                            提前截标原因
+                            <input
+                              value={cutoffReason}
+                              onChange={(event) => setCutoffReason(event.target.value)}
+                              placeholder={`请填写业务原因；当前另有 ${draftBidCount} 家草稿报价`}
+                              className="mt-1 h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-[#006666] focus:ring-2 focus:ring-[#006666]/20"
+                            />
+                          </label>
+                        ) : null}
+                      </div>
+
+                      {canMaintainBidControl && biddingOpen ? (
+                        <div className="flex shrink-0 flex-wrap gap-3">
+                          <Button
+                            variant="outline"
+                            disabled={!beforeDeadline || submittedBidCount === 0 || !cutoffReason.trim() || bidAction !== null}
+                            title={
+                              submittedBidCount === 0
+                                ? '至少需要一份已提交报价'
+                                : !cutoffReason.trim()
+                                  ? '请先填写提前截标原因'
+                                  : beforeDeadline
+                                    ? '将报价截止时间调整为当前时间'
+                                    : '报价已经截止'
+                            }
+                            onClick={() => void runBidControlAction('cutoff')}
+                          >
+                            <Scissors className="mr-2 h-4 w-4" />
+                            {bidAction === 'cutoff' ? '截标处理中...' : '提前截标'}
+                          </Button>
+                          <Button
+                            variant="brand"
+                            disabled={beforeDeadline || submittedBidCount === 0 || bidAction !== null}
+                            title={beforeDeadline ? '请等待报价截止，或先执行提前截标' : submittedBidCount === 0 ? '没有可锁定的已提交报价' : '锁定全部已提交报价'}
+                            onClick={() => void runBidControlAction('lock')}
+                          >
+                            <LockKeyhole className="mr-2 h-4 w-4" />
+                            {bidAction === 'lock' ? '锁定处理中...' : '锁定报价'}
+                          </Button>
+                        </div>
+                      ) : biddingLocked ? (
+                        <Button
+                          variant="brand"
+                          onClick={() => {
+                            setCurrentProjectId(resolvedProjectId);
+                            setCurrentView('REVIEW_AWARD');
+                          }}
+                        >
+                          进入专家评审
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <div className="text-sm text-slate-500">当前角色仅可查看报价进度。</div>
+                      )}
+                    </div>
+
+                    {bidActionMessage ? (
+                      <div className="mt-4 flex items-start gap-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{bidActionMessage}</span>
+                      </div>
+                    ) : null}
+                    {bidActionError ? (
+                      <div className="mt-4 flex items-start gap-2 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{bidActionError}</span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                       <div className="text-xs text-slate-500">已邀请供应商</div>
                       <div className="mt-2 text-xl font-semibold text-slate-900">{workbench.invitations.length} 家</div>
@@ -384,8 +565,12 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
                       </div>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-xs text-slate-500">已提交报价</div>
+                      <div className="mt-2 text-xl font-semibold text-slate-900">{submittedBidCount} 家</div>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                       <div className="text-xs text-slate-500">已锁定报价</div>
-                      <div className="mt-2 text-xl font-semibold text-slate-900">{workbench.bids.length} 家</div>
+                      <div className="mt-2 text-xl font-semibold text-slate-900">{lockedBidCount} 家</div>
                     </div>
                   </div>
 
@@ -612,7 +797,7 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
                 <div className="space-y-2 text-slate-700">
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-slate-400" />
-                    采购文件 {workbench.procurementDocuments.length} 份
+                    采购文件 {activeProcurementDocuments.length} 份
                   </div>
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-slate-400" />

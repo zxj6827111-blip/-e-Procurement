@@ -162,7 +162,9 @@ describe("R2 data model governance baseline", () => {
     );
     expect(requestRow).toEqual({ title: "R2 持久化采购申请", request_status: "draft", budget_amount: 12000 });
 
-    const lineRow = single<{ item_name: string; quantity: number }>(runtime1, "select item_name, quantity from r2_procurement_request_items where id = ?", "r2-line-001");
+    const requestItemId = created.body.procurementRequest.lineItems[0].id as string;
+    expect(requestItemId).toBe(`${created.body.procurementRequest.id}-line-1`);
+    const lineRow = single<{ item_name: string; quantity: number }>(runtime1, "select item_name, quantity from r2_procurement_request_items where id = ?", requestItemId);
     expect(lineRow).toEqual({ item_name: "R2 测试物资", quantity: 20 });
 
     const runtime2 = boot(dataRoot);

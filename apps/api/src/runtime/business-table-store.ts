@@ -2782,6 +2782,19 @@ export class BusinessTableStore {
         updated_at text not null
       );
 
+      create table if not exists r2_review_reports (
+        id text primary key,
+        project_id text not null,
+        report_no text not null,
+        report_status text not null,
+        summary_json text not null,
+        snapshot_json text not null,
+        generated_at text not null,
+        frozen_at text null,
+        created_by text not null,
+        updated_at text not null
+      );
+
       create table if not exists r2_award_decisions (
         id text primary key,
         project_id text not null,

@@ -2,12 +2,13 @@ import React, { useEffect, useMemo } from 'react';
 import { Card, CardContent } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Badge } from '../../shared/ui/Badge';
-import { CheckCircle, FileText, Handshake, ShieldAlert, Trophy, Users } from 'lucide-react';
+import { AlertCircle, CheckCircle, FileText, Handshake, ShieldAlert, Trophy, Users } from 'lucide-react';
 import { useApp } from '../../core/AppContext';
 import {
   downloadTextFile,
   formatCurrency,
   formatDateTime,
+  getAwardReadiness,
   humanizeStatus,
   resolveSupplierName,
   sortByNewest,
@@ -43,6 +44,7 @@ export function ProjectSourcingView() {
     () => (workbench ? sortByNewest(workbench.announcements, (item) => item.publishedAt ?? item.updatedAt)[0] ?? null : null),
     [workbench]
   );
+  const awardReadiness = useMemo(() => (workbench ? getAwardReadiness(workbench) : null), [workbench]);
 
   const generateReviewReport = () => {
     if (!workbench) return;
@@ -81,11 +83,22 @@ export function ProjectSourcingView() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={generateReviewReport}>
+          <Button
+            variant="outline"
+            onClick={generateReviewReport}
+            disabled={!awardReadiness?.hasFrozenSource}
+            title={awardReadiness?.hasFrozenSource ? '导出当前冻结评审摘要' : '请先形成并冻结比价报告或评审报告'}
+          >
             生成评审摘要
           </Button>
           <Button
             className="bg-[#006666] text-white hover:bg-[#004d4d]"
+            disabled={!workbench.awardApprovals.length && !awardReadiness?.ready}
+            title={
+              workbench.awardApprovals.length || awardReadiness?.ready
+                ? '进入定标审批'
+                : awardReadiness?.blockers.join('；')
+            }
             onClick={() => {
               setCurrentProjectId(resolvedProjectId);
               setCurrentView('AWARD_APPROVE');
@@ -156,7 +169,7 @@ export function ProjectSourcingView() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {supplierRows.map((row) => {
+                    {supplierRows.length ? supplierRows.map((row) => {
                       const registration = workbench.registrations.find((item) => item.supplierId === row.supplierId);
                       return (
                         <tr key={row.supplierId} className={row.rank === 1 ? 'bg-yellow-50/40' : ''}>
@@ -180,7 +193,13 @@ export function ProjectSourcingView() {
                           </td>
                         </tr>
                       );
-                    })}
+                    }) : (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                          尚未形成供应商评审排名。请先完成公告、报名、报价截止和评审。
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -220,6 +239,11 @@ export function ProjectSourcingView() {
                     <Badge variant={statusBadgeVariant(latestAnnouncement.status)}>{humanizeStatus(latestAnnouncement.status)}</Badge>
                   </div>
                 ) : null}
+                {!latestDocument && !latestAnnouncement ? (
+                  <div className="rounded border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500">
+                    当前项目还没有采购文件或公告记录。
+                  </div>
+                ) : null}
               </div>
             </CardContent>
           </Card>
@@ -235,10 +259,17 @@ export function ProjectSourcingView() {
               <div className="space-y-4">
                 <div className="rounded border bg-slate-50 p-3">
                   <p className="mb-1 text-sm font-medium">评分一致性</p>
-                  <p className="flex items-center gap-1 text-xs text-emerald-600">
-                    <CheckCircle className="h-3 w-3" />
-                    已形成冻结比价报告，推荐供应商为 {resolveSupplierName(workbench, workbench.comparisonReport?.recommendedSupplierId)}
-                  </p>
+                  {awardReadiness?.hasFrozenSource ? (
+                    <p className="flex items-center gap-1 text-xs text-emerald-600">
+                      <CheckCircle className="h-3 w-3" />
+                      已形成冻结评审来源，推荐供应商为 {resolveSupplierName(workbench, workbench.comparisonReport?.recommendedSupplierId)}
+                    </p>
+                  ) : (
+                    <p className="flex items-start gap-1 text-xs text-amber-700">
+                      <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+                      尚未形成冻结的比价报告或评审报告。
+                    </p>
+                  )}
                 </div>
                 <div className="rounded border bg-slate-50 p-3">
                   <p className="mb-1 text-sm font-medium">供应商参与度</p>
@@ -248,7 +279,15 @@ export function ProjectSourcingView() {
                 </div>
                 <div className="rounded border bg-slate-50 p-3">
                   <p className="mb-1 text-sm font-medium">定标准备</p>
-                  <p className="text-xs text-slate-600">当前项目已有 {workbench.awardApprovals.length} 条定标审批记录，可直接进入定标页面查看。</p>
+                  {workbench.awardApprovals.length ? (
+                    <p className="text-xs text-slate-600">当前项目已有 {workbench.awardApprovals.length} 条定标审批记录，可进入定标页面查看。</p>
+                  ) : awardReadiness?.ready ? (
+                    <p className="text-xs text-emerald-700">定标前置条件已满足，可以创建定标审批。</p>
+                  ) : (
+                    <ul className="space-y-1 text-xs text-amber-700">
+                      {awardReadiness?.blockers.map((blocker) => <li key={blocker}>• {blocker}</li>)}
+                    </ul>
+                  )}
                 </div>
               </div>
             </CardContent>

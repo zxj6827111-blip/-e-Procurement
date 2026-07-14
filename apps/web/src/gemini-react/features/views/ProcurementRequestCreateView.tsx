@@ -114,8 +114,7 @@ export function ProcurementRequestCreateView() {
       externalTradeFlag,
       lineItems: lineItems
         .filter((item) => item.itemName.trim())
-        .map((item, index) => ({
-          id: `line-${index + 1}`,
+        .map((item) => ({
           itemName: item.itemName.trim(),
           category: category.trim(),
           specification: item.specification.trim(),

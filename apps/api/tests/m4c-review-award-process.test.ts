@@ -52,6 +52,10 @@ async function confirmAssignment(runtime: ReturnType<typeof boot>, assignmentId 
 
 async function buildReviewAwardFlow(runtime: ReturnType<typeof boot>) {
   const projectId = "p-award";
+  for (const bid of runtime.ctx.state.bids.filter((item) => item.projectId === projectId)) {
+    bid.status = "submitted";
+    bid.lockedAt = null;
+  }
   const lock = await request(runtime.app).post(`/api/projects/${projectId}/bids/lock`).set("x-mock-user-id", "u2");
   expect(lock.status).toBe(200);
 
@@ -59,7 +63,16 @@ async function buildReviewAwardFlow(runtime: ReturnType<typeof boot>) {
     id: "exp-m4c-orphan",
     name: "M4-C process expert",
     category: "process-test",
-    status: "available"
+    status: "available",
+    accountUserIds: ["u-m4c-expert"]
+  });
+  runtime.ctx.state.users.push({
+    id: "u-m4c-expert",
+    name: "M4-C process expert",
+    roleId: "expert",
+    orgId: "org-group",
+    orgScope: ["org-group", "org-east", "org-hotel"],
+    expertId: "exp-m4c-orphan"
   });
   const appointed = await request(runtime.app)
     .post(`/api/projects/${projectId}/expert-assignments/appoint`)

@@ -219,6 +219,19 @@ function isQuoteDeadlineProject(project: ApiProject) {
   return ['document_published', 'registration_open', 'bidding_open'].includes(project.status);
 }
 
+function supplierProjectTarget(project: ApiProject): DashboardTarget {
+  if (['document_published', 'registration_open'].includes(project.status)) {
+    return { view: 'REGISTRATION', projectId: project.id };
+  }
+  if (['awarded_pending_order', 'result_notified'].includes(project.status)) {
+    return { view: 'AWARD_RESULT', projectId: project.id };
+  }
+  if (['contract_registered', 'performing', 'evaluated', 'archived'].includes(project.status)) {
+    return { view: 'ORDER_FULFILLMENT', projectId: project.id };
+  }
+  return { view: 'QUOTE_RESPONSE', projectId: project.id };
+}
+
 function isReviewProject(project: ApiProject) {
   return ['expert_reviewing', 'review_report_frozen', 'award_approving', 'awarded_pending_order'].includes(project.status);
 }
@@ -459,7 +472,16 @@ export function DashboardView() {
     if (isSupplierRole(currentUser.role)) {
       return [
         { id: 'supplier-todos', label: '待处理事项', value: pendingTasks.length, unit: '项', meta: '本企业账号', tone: 'primary', icon: 'todo', target: { view: 'TODO' } },
-        { id: 'bidding', label: '可报价项目', value: quoteProjects.length, unit: '个', meta: '报名/报价范围', tone: 'warning', icon: 'deadline', target: { view: 'QUOTE_RESPONSE' } },
+        {
+          id: 'bidding',
+          label: '可参与项目',
+          value: quoteProjects.length,
+          unit: '个',
+          meta: '报名/报价范围',
+          tone: 'warning',
+          icon: 'deadline',
+          target: quoteProjects[0] ? supplierProjectTarget(quoteProjects[0]) : { view: 'REGISTRATION' }
+        },
         { id: 'orders', label: '订单履约', value: dashboardData.orders.length, unit: '单', meta: '本企业订单', tone: 'blue', icon: 'catalog', target: { view: 'ORDER_FULFILLMENT' } },
         { id: 'settlement', label: '待结算/异常', value: dashboardData.orders.filter((order) => order.paymentStatus !== 'paid' || isAbnormalOrder(order)).length, unit: '单', meta: '发票与验收', tone: abnormalOrders.length ? 'danger' : 'success', icon: 'finance', target: { view: 'SETTLEMENT_MATS' } }
       ];
@@ -564,7 +586,7 @@ export function DashboardView() {
           title: projectTitle(project),
           code: projectCode(project),
           deadline: project.quoteDeadlineAt ? displayTime(project.quoteDeadlineAt) : '等待采购方推进',
-          target: { view: 'QUOTE_RESPONSE' as const, projectId: project.id }
+          target: supplierProjectTarget(project)
         })),
         ...dashboardData.orders.slice(0, 2).map((order) => ({
           id: `order-${order.id}`,
@@ -766,7 +788,7 @@ export function DashboardView() {
           phase: progress.phase,
           progress: progress.progress,
           tone: progress.tone,
-          target: { view: 'QUOTE_RESPONSE', projectId: project.id }
+          target: supplierProjectTarget(project)
         };
       });
       const orderRows = dashboardData.orders.slice(0, Math.max(0, 6 - projectRows.length)).map<TimelineRow>((order) => {
@@ -948,7 +970,9 @@ export function DashboardView() {
                       <td className="px-5 py-3 text-slate-500 font-mono text-xs">{task.code}</td>
                       <td className="px-5 py-3 text-slate-500">{task.deadline}</td>
                       <td className="px-5 py-3 text-right">
-                        <Button variant="outline" size="sm" className="text-xs" onClick={() => openTarget(task.target)}>去处理</Button>
+                        <Button variant="outline" size="sm" className="text-xs" onClick={() => openTarget(task.target)}>
+                          {task.target.view === 'REGISTRATION' ? '去报名' : '去处理'}
+                        </Button>
                       </td>
                     </tr>
                   ))}

@@ -175,6 +175,43 @@ describe("R5 review award pricing formal source", () => {
     expect(pricingRead.body.pricingReports.some((item: { id: string }) => item.id === pricingId)).toBe(true);
   });
 
+  it("persists frozen review reports and project stage across restart", async () => {
+    const dataRoot = makeDataRoot();
+    const runtime1 = boot(dataRoot);
+    const project = runtime1.ctx.state.projects.find((item) => item.id === "p-award")!;
+    project.status = "expert_reviewing";
+    project.displayStatus = "expert reviewing";
+    project.beforeDeadline = false;
+    project.quoteDeadlineAt = "2026-01-01T00:00:00.000Z";
+    for (const sheet of runtime1.ctx.state.scoringSheets.filter((item) => item.projectId === project.id)) {
+      sheet.status = "submitted_locked";
+      sheet.submittedAt ??= "2026-06-20T13:00:00.000Z";
+      sheet.lockedAt ??= "2026-06-20T13:01:00.000Z";
+      runtime1.ctx.r5ReviewAwardRepository.upsertScoringSheet(sheet);
+    }
+
+    const generated = await request(runtime1.app)
+      .post(`/api/projects/${project.id}/review-report`)
+      .set("x-mock-user-id", "u2")
+      .send({ note: "restart persistence regression" });
+    expect(generated.status).toBe(201);
+    const reportId = generated.body.report.id as string;
+    expect(single<{ report_status: string }>(runtime1, "select report_status from r2_review_reports where id = ?", reportId)?.report_status).toBe("generated");
+
+    const frozen = await request(runtime1.app).post(`/api/projects/${project.id}/review-report/freeze`).set("x-mock-user-id", "u2");
+    expect(frozen.status).toBe(200);
+    expect(single<{ report_status: string }>(runtime1, "select report_status from r2_review_reports where id = ?", reportId)?.report_status).toBe("frozen");
+    expect(single<{ project_status: string }>(runtime1, "select project_status from r2_sourcing_projects where id = ?", project.id)?.project_status).toBe("review_report_frozen");
+
+    const runtime2 = boot(dataRoot);
+    const reports = await request(runtime2.app).get(`/api/projects/${project.id}/review-report`).set("x-mock-user-id", "u2");
+    expect(reports.status).toBe(200);
+    expect(reports.body.reports).toEqual(expect.arrayContaining([expect.objectContaining({ id: reportId, status: "frozen", frozenAt: expect.any(String) })]));
+    const restoredProject = await request(runtime2.app).get(`/api/projects/${project.id}`).set("x-mock-user-id", "u2");
+    expect(restoredProject.status).toBe(200);
+    expect(restoredProject.body.project.status).toBe("review_report_frozen");
+  });
+
   it("keeps expert, supplier, auditor and admin boundaries for R5 objects", async () => {
     const runtime = boot();
 

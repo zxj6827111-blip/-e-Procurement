@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Badge } from '../../shared/ui/Badge';
-import { CheckCircle2, Clock, FileCheck, Search, ShieldCheck, TrendingDown, Users } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, FileCheck, Search, Send, ShieldCheck, TrendingDown, Users } from 'lucide-react';
+import { apiGet, apiPost } from '../../../api/http';
 import { useApp } from '../../core/AppContext';
 import {
   AwardApprovalRecord,
   formatCurrency,
   formatDateTime,
+  getAwardReadiness,
   humanizeStatus,
   resolveSupplierName,
   sortByNewest,
@@ -15,10 +17,25 @@ import {
   useProjectWorkbenchData
 } from './project-workbench-data';
 
+interface AwardRecommendation {
+  recommendedSupplierId?: string;
+  recommendedSupplierName?: string;
+  isLowestPrice?: boolean;
+  sourceReportId?: string | null;
+  candidateSupplierIds?: string[];
+  note?: string;
+}
+
 export function AwardApproveView() {
-  const { currentProjectId, setCurrentProjectId, setCurrentView } = useApp();
-  const { workbench, resolvedProjectId, loading, error } = useProjectWorkbenchData(currentProjectId);
+  const { currentProjectId, currentUser, setCurrentProjectId, setCurrentView } = useApp();
+  const { workbench, resolvedProjectId, loading, error, reload } = useProjectWorkbenchData(currentProjectId);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [recommendation, setRecommendation] = useState<AwardRecommendation | null>(null);
+  const [selectedSupplierId, setSelectedSupplierId] = useState('');
+  const [nonLowestPriceReason, setNonLowestPriceReason] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [busyAction, setBusyAction] = useState<'create' | 'submit' | null>(null);
 
   useEffect(() => {
     if (!currentProjectId && resolvedProjectId) {
@@ -31,12 +48,100 @@ export function AwardApproveView() {
     [workbench]
   );
   const selectedApproval = approvals.find((item) => item.id === selectedId) ?? approvals[0] ?? null;
+  const draftApproval = approvals.find((item) => item.approvalStatus === 'draft') ?? null;
+  const submittedApproval = approvals.find((item) => item.approvalStatus === 'submitted') ?? null;
+  const approvedApproval = approvals.find((item) => item.approvalStatus === 'approved') ?? null;
+  const canMaintainAward = ['PROCUREMENT_AGENT', 'PLATFORM_OPERATIONS'].includes(String(currentUser?.role));
+  const awardReadiness = useMemo(() => (workbench ? getAwardReadiness(workbench) : null), [workbench]);
+  const candidateSupplierIds = recommendation?.candidateSupplierIds ?? [];
+  const selectedCandidateRow = workbench?.comparisonReport?.comparisonRows?.find((item) => item.supplierId === selectedSupplierId);
+  const selectedIsLowestPrice =
+    selectedCandidateRow?.isLowestPrice ??
+    (selectedSupplierId === recommendation?.recommendedSupplierId ? Boolean(recommendation?.isLowestPrice) : false);
+  const createBlockedReasons = [
+    ...(awardReadiness?.blockers ?? []),
+    ...(!recommendation?.sourceReportId ? ['未找到冻结评审来源'] : []),
+    ...(candidateSupplierIds.length === 0 ? ['冻结报告中没有可定标候选供应商'] : [])
+  ].filter((item, index, array) => array.indexOf(item) === index);
 
   useEffect(() => {
     if (!selectedId && approvals[0]) {
       setSelectedId(approvals[0].id);
     }
   }, [approvals, selectedId]);
+
+  useEffect(() => {
+    if (!currentUser || !resolvedProjectId) return;
+    let active = true;
+    apiGet<{ recommendation?: AwardRecommendation }>(
+      `/api/projects/${encodeURIComponent(resolvedProjectId)}/award-recommendation`,
+      currentUser.id
+    )
+      .then((data) => {
+        if (active) setRecommendation(data.recommendation ?? null);
+      })
+      .catch(() => {
+        if (active) setRecommendation(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [currentUser?.id, resolvedProjectId, workbench?.comparisonReport?.reportNo]);
+
+  useEffect(() => {
+    setSelectedSupplierId((previous) => {
+      if (candidateSupplierIds.includes(previous)) return previous;
+      if (recommendation?.recommendedSupplierId && candidateSupplierIds.includes(recommendation.recommendedSupplierId)) {
+        return recommendation.recommendedSupplierId;
+      }
+      return candidateSupplierIds[0] ?? '';
+    });
+  }, [recommendation]);
+
+  async function createAwardApproval() {
+    if (!currentUser || !resolvedProjectId || !selectedSupplierId || busyAction) return;
+    if (!selectedIsLowestPrice && !nonLowestPriceReason.trim()) {
+      setActionError('选择非最低价供应商时必须填写定标理由。');
+      return;
+    }
+    setBusyAction('create');
+    setActionMessage('');
+    setActionError('');
+    try {
+      const result = await apiPost<{ approval: AwardApprovalRecord }>(
+        `/api/projects/${encodeURIComponent(resolvedProjectId)}/award-approvals`,
+        {
+          selectedSupplierId,
+          nonLowestPriceReason: selectedIsLowestPrice ? undefined : nonLowestPriceReason.trim()
+        },
+        currentUser.id
+      );
+      setSelectedId(result.approval.id);
+      setActionMessage(`定标审批 ${result.approval.id} 已创建，请检查后提交审批。`);
+      reload();
+    } catch (createError) {
+      setActionError(createError instanceof Error ? createError.message : '定标审批创建失败。');
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function submitAwardApproval(approval: AwardApprovalRecord) {
+    if (!currentUser || busyAction || approval.approvalStatus !== 'draft') return;
+    setBusyAction('submit');
+    setActionMessage('');
+    setActionError('');
+    try {
+      await apiPost(`/api/award-approvals/${encodeURIComponent(approval.id)}/submit`, {}, currentUser.id);
+      setSelectedId(approval.id);
+      setActionMessage(`定标审批 ${approval.id} 已提交，请等待集团审批。`);
+      reload();
+    } catch (submitError) {
+      setActionError(submitError instanceof Error ? submitError.message : '定标审批提交失败。');
+    } finally {
+      setBusyAction(null);
+    }
+  }
 
   function awardSummary(approval: AwardApprovalRecord | null) {
     if (!approval || !workbench) return null;
@@ -83,6 +188,99 @@ export function AwardApproveView() {
           </Button>
         </div>
       </div>
+
+      {(actionMessage || actionError) ? (
+        <div
+          className={`rounded-md border px-4 py-3 text-sm ${
+            actionError ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+          }`}
+          role="status"
+        >
+          {actionError || actionMessage}
+        </div>
+      ) : null}
+
+      <Card>
+        <CardHeader className="border-b border-slate-100 py-4">
+          <CardTitle className="text-base font-medium">发起定标审批</CardTitle>
+        </CardHeader>
+        <CardContent className="p-5">
+          {!canMaintainAward ? (
+            <p className="text-sm text-slate-600">采购经办创建并提交定标审批后，当前角色可在本页查看审批记录和结果。</p>
+          ) : approvedApproval ? (
+            <div className="flex items-center gap-2 text-sm text-emerald-700">
+              <CheckCircle2 className="h-4 w-4" />
+              定标审批 {approvedApproval.id} 已通过，无需重复创建。
+            </div>
+          ) : submittedApproval ? (
+            <div className="flex items-center gap-2 text-sm text-amber-700">
+              <Clock className="h-4 w-4" />
+              定标审批 {submittedApproval.id} 已提交，正在等待集团审批。
+            </div>
+          ) : draftApproval ? (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <div className="text-sm font-medium text-slate-900">草稿 {draftApproval.id}</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  拟定标供应商：{resolveSupplierName(workbench, draftApproval.selectedSupplierId)}
+                </div>
+              </div>
+              <Button variant="brand" onClick={() => void submitAwardApproval(draftApproval)} disabled={Boolean(busyAction)}>
+                <Send className="mr-2 h-4 w-4" />
+                {busyAction === 'submit' ? '提交中...' : '提交定标审批'}
+              </Button>
+            </div>
+          ) : createBlockedReasons.length ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
+                <AlertCircle className="h-4 w-4" />
+                当前还不能创建定标审批
+              </div>
+              <ul className="mt-2 space-y-1 text-sm text-amber-700">
+                {createBlockedReasons.map((reason) => <li key={reason}>• {reason}</li>)}
+              </ul>
+            </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+              <label className="text-sm text-slate-600">
+                拟定标供应商
+                <select
+                  value={selectedSupplierId}
+                  onChange={(event) => {
+                    setSelectedSupplierId(event.target.value);
+                    setNonLowestPriceReason('');
+                  }}
+                  className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                >
+                  {candidateSupplierIds.map((supplierId) => (
+                    <option key={supplierId} value={supplierId}>
+                      {resolveSupplierName(workbench, supplierId)}
+                      {supplierId === recommendation?.recommendedSupplierId ? '（报告推荐）' : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm text-slate-600">
+                非最低价定标理由
+                <input
+                  value={nonLowestPriceReason}
+                  onChange={(event) => setNonLowestPriceReason(event.target.value)}
+                  disabled={selectedIsLowestPrice}
+                  placeholder={selectedIsLowestPrice ? '当前选择为最低价，无需填写' : '说明服务、质量或综合评分依据'}
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 disabled:bg-slate-100"
+                />
+              </label>
+              <Button
+                variant="brand"
+                onClick={() => void createAwardApproval()}
+                disabled={Boolean(busyAction) || !selectedSupplierId || (!selectedIsLowestPrice && !nonLowestPriceReason.trim())}
+              >
+                {busyAction === 'create' ? '创建中...' : '创建定标审批'}
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">

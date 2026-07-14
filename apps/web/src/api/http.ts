@@ -44,6 +44,10 @@ function normalizeErrorMessage(message: string, status: number, path: string) {
   if (/Procurement document under review cannot be revised before approval or rejection/i.test(value)) return "采购文件处于旧审核状态，请由采购经办发布锁定或作废后重新创建。";
   if (/Published procurement documents are locked/i.test(value)) return "已发布并锁定的采购文件不能再次提交审核。";
   if (/Procurement document has already been published and locked/i.test(value)) return "采购文件已经发布并锁定，无需重复发布。";
+  if (/Bid locking is only allowed after the quote deadline/i.test(value)) return "报价截止后才能锁定报价；如需提前结束，请先执行“提前截标”。";
+  if (/At least one submitted bid is required before locking bids/i.test(value)) return "至少需要一份已提交报价，才能执行报价锁定。";
+  if (/Early bid cutoff reason is required/i.test(value)) return "提前截标必须填写业务原因。";
+  if (/Only authorized procurement roles can progress bid cutoff|Only procurement business roles can lock bids/i.test(value)) return "当前角色不能执行截标或锁定报价。";
   if (value.startsWith("API ")) return `请求失败（${status}）。`;
   return value || `请求失败（${status}）：${path}`;
 }

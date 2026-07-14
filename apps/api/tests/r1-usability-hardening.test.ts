@@ -91,6 +91,58 @@ describe("R1 usability hardening", () => {
     expect(publishAgain.body.error.code).toBe("PROCUREMENT_DOCUMENT_VOIDED");
   });
 
+  it("uploads a local procurement file, creates its draft and soft-deletes it from active lists", async () => {
+    const runtime = boot();
+
+    const uploaded = await request(runtime.app)
+      .post("/api/files/upload-multipart")
+      .set("x-mock-user-id", "u2")
+      .field("attachmentKind", "procurement_document_attachment")
+      .field("objectType", "procurement_document")
+      .field("objectId", "pending-document-r1")
+      .field("projectId", "p-pre")
+      .attach("file", Buffer.from("R1 local procurement document", "utf8"), {
+        filename: "r1-local-procurement-document.txt",
+        contentType: "text/plain"
+      });
+    expect(uploaded.status).toBe(201);
+    expect(uploaded.body.file).toMatchObject({
+      fileName: "r1-local-procurement-document.txt",
+      contentType: "text/plain"
+    });
+
+    const created = await request(runtime.app)
+      .post("/api/projects/p-pre/procurement-documents")
+      .set("x-mock-user-id", "u2")
+      .send({
+        title: "R1 本地上传采购文件",
+        contentSummary: "验证 React 采购文件上传闭环",
+        attachmentMetadata: [uploaded.body.file]
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.procurementDocument.status).toBe("draft");
+    expect(created.body.procurementDocument.attachmentMetadata).toEqual([
+      expect.objectContaining({ id: uploaded.body.file.id, fileName: "r1-local-procurement-document.txt" })
+    ]);
+
+    const downloaded = await request(runtime.app)
+      .get(`/api/files/${uploaded.body.file.id}/download`)
+      .set("x-mock-user-id", "u2");
+    expect(downloaded.status).toBe(200);
+    expect(downloaded.text).toBe("R1 local procurement document");
+
+    const voided = await request(runtime.app)
+      .post(`/api/procurement-documents/${created.body.procurementDocument.id}/void`)
+      .set("x-mock-user-id", "u2")
+      .send({ reason: "R1 删除采购文件草稿" });
+    expect(voided.status).toBe(200);
+    expect(voided.body.procurementDocument.status).toBe("voided");
+
+    const activeDocuments = await request(runtime.app).get("/api/procurement-documents").set("x-mock-user-id", "u2");
+    expect(activeDocuments.status).toBe(200);
+    expect(activeDocuments.body.procurementDocuments.map((item: { id: string }) => item.id)).not.toContain(created.body.procurementDocument.id);
+  });
+
   it("persists procurement document locked status across runtime reloads", async () => {
     const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "eproc-r1-doc-persist-"));
     const options = {

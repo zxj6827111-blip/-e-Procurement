@@ -76,10 +76,17 @@ interface BidRecord {
   lineItems?: BidLineItem[];
 }
 
+function projectDisplayName(project?: ProjectRecord | null) {
+  if (!project) return '当前项目';
+  const value = project.displayName ?? project.name ?? project.id;
+  const codePrefix = project.code ? `${project.code} / ` : '';
+  return codePrefix && value.startsWith(codePrefix) ? value.slice(codePrefix.length) : value;
+}
+
 function buildRequirementText(project: ProjectRecord) {
   const header = [
     `项目编号：${project.code ?? project.id}`,
-    `项目名称：${project.displayName ?? project.name ?? project.id}`,
+    `项目名称：${projectDisplayName(project)}`,
     `采购组织：${project.orgName ?? '-'}`,
     `采购方式：${project.type ?? '-'}`,
     ''
@@ -143,6 +150,7 @@ export function QuoteResponseView() {
   const canSaveDraft = Boolean(
     selectedProject &&
       selectedProject.beforeDeadline &&
+      selectedRegistration?.status === 'qualified' &&
       (!selectedBid || ['draft', 'saved', 'withdrawn', 'rejected'].includes(selectedBid.status))
   );
   const canSubmit = Boolean(
@@ -298,7 +306,7 @@ export function QuoteResponseView() {
             报价响应
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            {selectedProject?.code ?? '-'} / {selectedProject?.displayName ?? selectedProject?.name ?? '当前项目'} | 报价截止：{formatDateTime(selectedProject?.quoteDeadlineAt)}
+            {selectedProject?.code ?? '-'} / {projectDisplayName(selectedProject)} | 报价截止：{formatDateTime(selectedProject?.quoteDeadlineAt)}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -328,7 +336,7 @@ export function QuoteResponseView() {
               <option value="">暂无可报价项目</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
-                  {project.code ?? project.id} / {project.displayName ?? project.name ?? project.id}
+                  {project.code ?? project.id} / {projectDisplayName(project)}
                 </option>
               ))}
             </select>
@@ -340,6 +348,16 @@ export function QuoteResponseView() {
           </div>
         </CardContent>
       </Card>
+
+      {projects.length === 0 ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          当前没有可报价项目。请先到“报名资料”查看采购方已发布的公告并提交报名；采购经办审核资格通过后，项目才会出现在报价响应中。
+        </div>
+      ) : selectedRegistration && selectedRegistration.status !== 'qualified' ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          当前项目的报名资格状态为“{humanizeStatus(selectedRegistration.status)}”。资格审核通过前可以查看项目，但不能正式提交报价。
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
         <Card>

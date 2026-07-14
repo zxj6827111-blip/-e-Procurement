@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
   ListTodo,
   LogOut,
+  Menu,
   Megaphone,
   PackageSearch,
   PenTool,
@@ -26,7 +27,8 @@ import {
   ShieldAlert,
   Store,
   TrendingUp,
-  Users
+  Users,
+  X
 } from "lucide-react";
 import { Badge } from "./components/ui/Badge";
 import { Button } from "./components/ui/Button";
@@ -154,6 +156,7 @@ function SmartRiskPanel() {
 export function GeminiDashboardApp(props: GeminiDashboardProps) {
   const activePath = "/";
   const quickActions = props.quickActions.slice(0, 4);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
 
   return (
     <div className="h-screen overflow-hidden bg-[#F5F7FA] text-slate-900 font-sans">
@@ -168,7 +171,21 @@ export function GeminiDashboardApp(props: GeminiDashboardProps) {
       </div>
 
       <div data-ui-check="shell" className="flex h-screen bg-[#F5F7FA] overflow-hidden text-slate-900 font-sans">
-        <aside data-ui-check="sidebar" className="w-[220px] bg-[#006666] text-slate-300 flex flex-col shrink-0">
+        <aside
+          data-ui-check="sidebar"
+          className={cn(
+            "fixed inset-y-0 left-0 z-50 w-[220px] bg-[#006666] text-slate-300 flex flex-col shrink-0 transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0",
+            mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
+          <button
+            type="button"
+            aria-label="关闭导航菜单"
+            className="absolute right-3 top-3 p-1 text-[#b3d1d1] hover:text-white lg:hidden"
+            onClick={() => setMobileSidebarOpen(false)}
+          >
+            <X className="w-5 h-5" />
+          </button>
           <div className="h-14 flex items-center px-5 border-b border-[#005252]">
             <Shield className="w-5 h-5 text-amber-500 mr-2" />
             <span className="font-semibold text-white tracking-wide text-sm">集团内部采购规范化平台</span>
@@ -186,7 +203,10 @@ export function GeminiDashboardApp(props: GeminiDashboardProps) {
                 return (
                   <li key={`${item.id}-${item.to}`}>
                     <button
-                      onClick={() => props.onNavigate(item.to)}
+                      onClick={() => {
+                        props.onNavigate(item.to);
+                        setMobileSidebarOpen(false);
+                      }}
                       className={cn(
                         "w-full flex items-center px-5 py-3 text-sm font-medium transition-colors relative",
                         isActive ? "bg-[#005252] text-white" : "text-[#b3d1d1] hover:bg-[#005252]/50 hover:text-white"
@@ -210,27 +230,44 @@ export function GeminiDashboardApp(props: GeminiDashboardProps) {
           </div>
         </aside>
 
+        {mobileSidebarOpen ? (
+          <button
+            type="button"
+            aria-label="关闭导航菜单"
+            className="fixed inset-0 z-40 bg-slate-950/40 lg:hidden"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+        ) : null}
+
         <main data-ui-check="main" className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <header data-ui-check="topbar" className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-40 shadow-sm relative">
-            <div className="flex items-center text-sm text-slate-500">
-              <span className="font-medium text-slate-700">{props.roleLabel}</span>
-              <span className="mx-2">/</span>
+          <header data-ui-check="topbar" className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-3 sm:px-4 lg:px-6 shrink-0 z-30 shadow-sm relative">
+            <div className="flex min-w-0 items-center text-sm text-slate-500">
+              <button
+                type="button"
+                aria-label="打开导航菜单"
+                className="mr-2 shrink-0 rounded p-2 text-slate-500 hover:bg-slate-100 hover:text-[#006666] lg:hidden"
+                onClick={() => setMobileSidebarOpen(true)}
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <span className="hidden font-medium text-slate-700 sm:inline">{props.roleLabel}</span>
+              <span className="mx-2 hidden sm:inline">/</span>
               <span className="text-[#006666] font-medium">工作台</span>
             </div>
-            <div className="flex items-center gap-5">
+            <div className="flex shrink-0 items-center gap-3 sm:gap-5">
               <button data-ui-check="bell-button" className="relative text-slate-400 hover:text-slate-600 transition-colors" onClick={() => props.onNavigate("/messages")}>
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
               </button>
-              <div className="h-6 w-px bg-slate-200" />
-              <div data-ui-check="role-switch" className="text-xs bg-slate-50 text-slate-600 px-2 py-1 rounded border border-slate-200">{props.organization}</div>
+              <div className="hidden h-6 w-px bg-slate-200 sm:block" />
+              <div data-ui-check="role-switch" className="hidden text-xs bg-slate-50 text-slate-600 px-2 py-1 rounded border border-slate-200 sm:block">{props.organization}</div>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-[#006666] text-white flex items-center justify-center font-medium text-sm">{props.userName.charAt(0)}</div>
               </div>
             </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
             <div className="mx-auto" style={{ maxWidth: "1440px" }}>
               <div data-ui-check="dashboard" className="space-y-6">
                 <div className="flex items-center justify-between gap-3 mb-2">

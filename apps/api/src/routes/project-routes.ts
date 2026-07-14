@@ -214,12 +214,13 @@ function normalizeRequest(request: ProcurementRequest): ProcurementRequest {
   };
 }
 
-function parseLineItems(raw: unknown, fallbackPrefix?: string): ProcurementRequestLineItem[] {
+function parseLineItems(raw: unknown, requestId?: string): ProcurementRequestLineItem[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((item, index) => {
     const input = (item ?? {}) as Record<string, unknown>;
     return {
-      id: String(input.id ?? `${fallbackPrefix ? `${fallbackPrefix}-` : ""}line-${index + 1}`),
+      // 明细主键由服务端按申请范围生成，避免不同申请复用客户端临时 ID 时发生全局主键冲突。
+      id: requestId ? `${requestId}-line-${index + 1}` : String(input.id ?? `line-${index + 1}`),
       itemName: String(input.itemName ?? input.name ?? "").trim(),
       category: input.category === undefined ? undefined : String(input.category),
       specification: String(input.specification ?? ""),
@@ -351,10 +352,16 @@ function projectDisplayName(ctx: AppContext, project: ProcurementProject) {
   return [project.code, meaningfulName || projectName || project.id].filter(Boolean).join(" / ");
 }
 
+function isBeforeQuoteDeadline(project: ProcurementProject) {
+  if (!project.quoteDeadlineAt) return false;
+  return new Date(project.quoteDeadlineAt).getTime() > Date.now();
+}
+
 function projectListRow(ctx: AppContext, project: ProcurementProject) {
   const sourceRequestTitle = sourceRequestProjectTitle(sourceRequestForProject(ctx, project));
   return {
     ...project,
+    beforeDeadline: isBeforeQuoteDeadline(project),
     sourceRequestTitle,
     displayName: projectDisplayName(ctx, project)
   };
@@ -598,7 +605,7 @@ export function projectRoutes(ctx: AppContext) {
     if (req.auth.roleId === "supplier" && !isSupplierProject(ctx, req.auth.user.supplierId ?? "", project)) {
       ctx.policies.supplierDataIsolation.assertSupplierAccess(req.auth, "not-participant", "project", project.id);
     }
-    return res.json({ project });
+    return res.json({ project: { ...project, beforeDeadline: isBeforeQuoteDeadline(project) } });
   });
 
   router.post("/projects/:projectId/transitions", (req, res) => {
@@ -695,8 +702,8 @@ export function projectRoutes(ctx: AppContext) {
       createdAt: now,
       updatedAt: now
     };
-    ctx.state.procurementRequests.push(procurementRequest);
     ctx.r4SourcingRepository.upsertProcurementRequest(procurementRequest);
+    ctx.state.procurementRequests.push(procurementRequest);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "procurement-request.create", "procurement_request", procurementRequest.id);
     ctx.processService.recordProcurementRequestCreated({ request: normalizeRequest(procurementRequest), actor: req.auth.user });
     ctx.eventBus.emit({
@@ -746,7 +753,7 @@ export function projectRoutes(ctx: AppContext) {
     procurementRequest.purpose = req.body?.purpose === undefined ? procurementRequest.purpose : String(req.body.purpose);
     procurementRequest.expectedArrivalAt = req.body?.expectedArrivalAt === undefined ? procurementRequest.expectedArrivalAt : String(req.body.expectedArrivalAt);
     procurementRequest.receivingLocation = req.body?.receivingLocation === undefined ? procurementRequest.receivingLocation : String(req.body.receivingLocation);
-    procurementRequest.lineItems = req.body?.lineItems === undefined ? procurementRequest.lineItems : parseLineItems(req.body.lineItems);
+    procurementRequest.lineItems = req.body?.lineItems === undefined ? procurementRequest.lineItems : parseLineItems(req.body.lineItems, procurementRequest.id);
     if (req.body?.attachments !== undefined) {
       const resolvedAttachments = resolveRequestAttachments(ctx, req, procurementRequest.id, req.body.attachments, procurementRequest.projectId ?? undefined);
       if ("error" in resolvedAttachments) return res.status(400).json({ error: resolvedAttachments.error });

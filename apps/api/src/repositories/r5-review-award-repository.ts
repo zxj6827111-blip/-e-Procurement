@@ -7,6 +7,7 @@ import type {
   ExpertAssignment,
   PricingReport,
   PricingReportItem,
+  ReviewReport,
   ScoringDetailValue,
   ScoringSheet,
   ScoringTemplate,
@@ -61,6 +62,7 @@ export class R5ReviewAwardRepository {
     scoringTemplates: ScoringTemplate[];
     scoringSheets: ScoringSheet[];
     comparisonReports: ComparisonReport[];
+    reviewReports: ReviewReport[];
     awardApprovals: AwardApproval[];
     pricingReports: PricingReport[];
   }) {
@@ -69,12 +71,14 @@ export class R5ReviewAwardRepository {
     mergeById(state.scoringTemplates, this.listScoringTemplates());
     mergeById(state.scoringSheets, this.listScoringSheets());
     mergeById(state.comparisonReports, this.listComparisonReports());
+    mergeById(state.reviewReports, this.listReviewReports());
     mergeById(state.awardApprovals, this.listAwardApprovals());
     mergeById(state.pricingReports, this.listPricingReports());
     for (const expert of state.experts) {
       const accountUserIds = state.users.filter((user) => user.expertId === expert.id).map((user) => user.id);
       expert.accountUserIds = Array.from(new Set([...(expert.accountUserIds ?? []), ...accountUserIds]));
     }
+    for (const report of state.reviewReports) this.upsertReviewReport(report);
   }
 
   listExperts(): Expert[] {
@@ -356,6 +360,55 @@ export class R5ReviewAwardRepository {
         report.generatedAt,
         report.frozenAt,
         JSON.stringify(report.comparisonRows),
+        now
+      ]
+    );
+  }
+
+  listReviewReports(): ReviewReport[] {
+    const rows = this.runtimeDb.db.prepare("select * from r2_review_reports order by id").all() as Row[];
+    return rows.map((row) => ({
+      id: String(row.id),
+      projectId: String(row.project_id),
+      reportNo: String(row.report_no),
+      status: String(row.report_status) as ReviewReport["status"],
+      summaryJson: json<Record<string, unknown>>(row.summary_json, {}),
+      snapshotJson: json<Record<string, unknown>>(row.snapshot_json, {}),
+      generatedAt: String(row.generated_at),
+      frozenAt: nullableString(row.frozen_at),
+      createdBy: String(row.created_by)
+    }));
+  }
+
+  upsertReviewReport(report: ReviewReport) {
+    const now = new Date().toISOString();
+    run(
+      this.runtimeDb.db.prepare(
+        `insert into r2_review_reports (
+          id, project_id, report_no, report_status, summary_json, snapshot_json,
+          generated_at, frozen_at, created_by, updated_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        on conflict(id) do update set
+          project_id = excluded.project_id,
+          report_no = excluded.report_no,
+          report_status = excluded.report_status,
+          summary_json = excluded.summary_json,
+          snapshot_json = excluded.snapshot_json,
+          generated_at = excluded.generated_at,
+          frozen_at = excluded.frozen_at,
+          created_by = excluded.created_by,
+          updated_at = excluded.updated_at`
+      ),
+      [
+        report.id,
+        report.projectId,
+        report.reportNo,
+        report.status,
+        JSON.stringify(report.summaryJson),
+        JSON.stringify(report.snapshotJson),
+        report.generatedAt,
+        report.frozenAt,
+        report.createdBy,
         now
       ]
     );

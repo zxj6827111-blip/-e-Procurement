@@ -828,8 +828,23 @@ export function bidRoutes(ctx: AppContext) {
     ctx.policies.externalTradeBlocking.assertInternalActionAllowed(req.auth, project, "internal_bid");
     if (!assertProjectReadable(ctx, req, res, project)) return;
     if (!ensureProjectDeadlineReached(ctx, req, res, project)) return;
-    const now = new Date().toISOString();
     const bids = ctx.state.bids.filter((item) => item.projectId === project.id && item.status === "submitted");
+    if (bids.length === 0) {
+      return denyResponse(
+        ctx,
+        req,
+        res,
+        400,
+        "BID_SUBMITTED_REQUIRED",
+        "At least one submitted bid is required before locking bids.",
+        "bid.lock.submitted_bid.denied",
+        "project",
+        project.id,
+        project.id,
+        "no submitted bids"
+      );
+    }
+    const now = new Date().toISOString();
     for (const bid of bids) {
       bid.status = "locked";
       bid.lockedAt = now;
@@ -860,6 +875,22 @@ export function bidRoutes(ctx: AppContext) {
     if (!["early_cutoff", "deadline_reached", "manual_cutoff"].includes(action)) {
       return res.status(400).json({ error: { code: "BID_CUTOFF_ACTION_INVALID", message: "Cutoff action must be early_cutoff, deadline_reached or manual_cutoff." } });
     }
+    const reason = String(req.body?.reason ?? "").trim();
+    if (action === "early_cutoff" && !reason) {
+      return denyResponse(
+        ctx,
+        req,
+        res,
+        400,
+        "BID_CUTOFF_REASON_REQUIRED",
+        "Early bid cutoff reason is required.",
+        "bid.cutoff.reason.denied",
+        "project",
+        project.id,
+        project.id,
+        "early cutoff reason missing"
+      );
+    }
     const now = new Date();
     const cutoffAt = req.body?.cutoffAt === undefined ? now : new Date(String(req.body.cutoffAt));
     if (Number.isNaN(cutoffAt.getTime())) {
@@ -884,7 +915,7 @@ export function bidRoutes(ctx: AppContext) {
       "project",
       project.id,
       project.id,
-      `previousDeadline=${previousDeadline ?? ""};cutoffAt=${project.quoteDeadlineAt};reason=${String(req.body?.reason ?? "")}`
+      `previousDeadline=${previousDeadline ?? ""};cutoffAt=${project.quoteDeadlineAt};reason=${reason}`
     );
     emitBidSourcingEvent(ctx, req, project, "BidCutoffCompleted", {
       businessId: project.id,

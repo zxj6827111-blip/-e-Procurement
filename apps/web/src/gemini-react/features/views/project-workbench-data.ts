@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiGet } from '../../../api/http';
+import { statusLabelMap } from '../../../utils/status-labels';
 
 export interface WorkbenchProject {
   id: string;
@@ -50,6 +51,14 @@ export interface ProcurementDocumentRecord {
   status: string;
   reviewStatus?: string;
   contentSummary?: string;
+  attachmentMetadata?: Array<{
+    id: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    uploadedAt: string;
+  }>;
+  previousDocumentId?: string;
   createdAt: string;
   updatedAt: string;
   publishedAt?: string | null;
@@ -537,9 +546,18 @@ export function humanizeStatus(status?: string | null) {
     submitted_locked: '已锁定',
     resubmitted_locked: '已重锁',
     admitted: '已准入',
-    restricted: '受限'
+    restricted: '受限',
+    assigned: '待专家确认',
+    confirmed: '已确认',
+    scoring: '评分中',
+    completed: '已完成',
+    replaced: '已替换',
+    archived: '已归档',
+    withdrawn: '已撤回',
+    resubmitted: '已重新提交',
+    pending: '待处理'
   };
-  return mapping[normalized] ?? normalized.replaceAll('_', ' ');
+  return mapping[normalized] ?? statusLabelMap[normalized] ?? normalized.replaceAll('_', ' ');
 }
 
 export function statusBadgeVariant(status?: string | null): 'default' | 'success' | 'warning' | 'danger' | 'info' | 'outline' {
@@ -563,7 +581,6 @@ export function statusBadgeVariant(status?: string | null): 'default' | 'success
 }
 
 export function projectStageLabel(project: WorkbenchProject) {
-  if (project.displayStatus) return project.displayStatus;
   const mapping: Record<string, string> = {
     project_created: '项目已立项',
     document_preparing: '采购文件编制中',
@@ -581,7 +598,10 @@ export function projectStageLabel(project: WorkbenchProject) {
     evaluated: '供应商已评价',
     archived: '已归档'
   };
-  return mapping[project.status] ?? humanizeStatus(project.status);
+  const mappedStatus = mapping[project.status] ?? statusLabelMap[project.status];
+  if (mappedStatus) return mappedStatus;
+  if (project.displayStatus && /[\u3400-\u9fff]/.test(project.displayStatus)) return project.displayStatus;
+  return humanizeStatus(project.status);
 }
 
 export function calculateArchiveCompleteness(workbench: WorkbenchData | null) {
@@ -589,6 +609,32 @@ export function calculateArchiveCompleteness(workbench: WorkbenchData | null) {
   if (total === 0) return 0;
   const collected = workbench?.archiveItems.filter((item) => item.collectedFlag).length ?? 0;
   return Math.round((collected / total) * 100);
+}
+
+export interface AwardReadiness {
+  ready: boolean;
+  blockers: string[];
+  hasFrozenSource: boolean;
+  validBidCount: number;
+}
+
+export function getAwardReadiness(workbench: WorkbenchData): AwardReadiness {
+  const blockers: string[] = [];
+  const validBidCount = workbench.bids.filter((bid) => ['submitted', 'locked'].includes(bid.status)).length;
+  const hasFrozenSource =
+    workbench.comparisonReport?.status === 'frozen' ||
+    (workbench.reviewReports ?? []).some((report) => report.status === 'frozen');
+
+  if (workbench.project.beforeDeadline) blockers.push('报价尚未截止');
+  if (validBidCount === 0) blockers.push('尚无已提交或已锁定的有效报价');
+  if (!hasFrozenSource) blockers.push('尚未形成冻结的比价报告或评审报告');
+
+  return {
+    ready: blockers.length === 0,
+    blockers,
+    hasFrozenSource,
+    validBidCount
+  };
 }
 
 export function resolveSupplierName(workbench: WorkbenchData, supplierId?: string | null) {

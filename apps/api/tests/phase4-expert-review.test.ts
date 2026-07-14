@@ -15,6 +15,19 @@ function expectDenied(response: request.Response, code: string, sensitiveTokens:
   }
 }
 
+function bindExpertAccount(runtime: ReturnType<typeof boot>, expertId: string, userId: string) {
+  runtime.ctx.state.users.push({
+    id: userId,
+    name: `Expert account ${expertId}`,
+    roleId: "expert",
+    orgId: "org-group",
+    orgScope: ["org-group", "org-east", "org-hotel"],
+    expertId
+  });
+  const expert = runtime.ctx.state.experts.find((item) => item.id === expertId);
+  if (expert) expert.accountUserIds = Array.from(new Set([...(expert.accountUserIds ?? []), userId]));
+}
+
 describe("Phase 4 expert review and scoring report", () => {
   let runtime: ReturnType<typeof boot>;
 
@@ -89,9 +102,7 @@ describe("Phase 4 expert review and scoring report", () => {
       .post("/api/projects/p-food/expert-assignments/draw")
       .set("x-mock-user-id", "u2")
       .send({ count: 2, reason: "按范围抽取", reviewScopes: ["技术评审"] });
-    expect(draw.status).toBe(201);
-    expect(draw.body.assignments.some((item: { expertId: string }) => item.expertId === "exp-1")).toBe(false);
-    expect(draw.body.assignments.every((item: { expertId: string }) => item.expertId !== "exp-4")).toBe(true);
+    expectDenied(draw, "EXPERT_CANDIDATE_NOT_FOUND", ["按范围抽取"]);
   });
 
   it("enforces expert directory and draw permissions across business roles", async () => {
@@ -162,6 +173,7 @@ describe("Phase 4 expert review and scoring report", () => {
     expect(appointed.body.assignment.expertId).toBe("exp-1");
     expect(runtime.ctx.state.projects.find((item) => item.id === "p-food")?.assignedExpertIds).toContain("exp-1");
 
+    bindExpertAccount(runtime, "exp-3", "u-phase4-exp3-replace");
     const replaced = await request(runtime.app)
       .post(`/api/expert-assignments/${appointed.body.assignment.id}/replace`)
       .set("x-mock-user-id", "u2")
@@ -197,6 +209,7 @@ describe("Phase 4 expert review and scoring report", () => {
     expectDenied(duplicateAppoint, "EXPERT_ASSIGNMENT_DUPLICATE", ["duplicate appoint"]);
     expect(runtime.ctx.state.expertAssignments.filter((assignment) => assignment.projectId === "p-food" && assignment.expertId === "exp-1")).toHaveLength(1);
 
+    bindExpertAccount(runtime, "exp-3", "u-phase4-exp3-duplicate");
     const second = await request(runtime.app)
       .post("/api/projects/p-food/expert-assignments/appoint")
       .set("x-mock-user-id", "u2")
@@ -214,11 +227,48 @@ describe("Phase 4 expert review and scoring report", () => {
       .post("/api/projects/p-food/expert-assignments/draw")
       .set("x-mock-user-id", "u2")
       .send({ count: 10, reason: "draw after manual appoint" });
-    expect(draw.status).toBe(201);
-    const drawnExpertIds = draw.body.assignments.map((assignment: { expertId: string }) => assignment.expertId);
-    expect(drawnExpertIds).not.toContain("exp-1");
-    expect(drawnExpertIds).not.toContain("exp-3");
-    expect(new Set(drawnExpertIds).size).toBe(drawnExpertIds.length);
+    expectDenied(draw, "EXPERT_CANDIDATE_NOT_FOUND", ["draw after manual appoint"]);
+  });
+
+  it("rejects experts without an active expert account", async () => {
+    const project = runtime.ctx.state.projects.find((item) => item.id === "p-food")!;
+    project.status = "bidding_locked";
+    project.displayStatus = "bidding locked";
+    project.beforeDeadline = false;
+    project.assignedExpertIds = [];
+    runtime.ctx.state.expertAssignments = runtime.ctx.state.expertAssignments.filter((assignment) => assignment.projectId !== project.id);
+    runtime.ctx.state.experts.push({
+      id: "exp-phase4-unbound",
+      name: "Unbound expert",
+      category: "technical",
+      status: "available",
+      active: true,
+      reviewScopes: ["unbound-only"]
+    });
+
+    const appointed = await request(runtime.app)
+      .post(`/api/projects/${project.id}/expert-assignments/appoint`)
+      .set("x-mock-user-id", "u2")
+      .send({ expertId: "exp-phase4-unbound", reason: "must have account" });
+    expectDenied(appointed, "EXPERT_ACCOUNT_REQUIRED", ["must have account"]);
+
+    const drawn = await request(runtime.app)
+      .post(`/api/projects/${project.id}/expert-assignments/draw`)
+      .set("x-mock-user-id", "u2")
+      .send({ count: 3, reason: "exclude unbound", reviewScopes: ["unbound-only"] });
+    expectDenied(drawn, "EXPERT_CANDIDATE_NOT_FOUND", ["exclude unbound"]);
+
+    const source = await request(runtime.app)
+      .post(`/api/projects/${project.id}/expert-assignments/appoint`)
+      .set("x-mock-user-id", "u2")
+      .send({ expertId: "exp-1", reason: "valid source expert" });
+    expect(source.status).toBe(201);
+    const replaced = await request(runtime.app)
+      .post(`/api/expert-assignments/${source.body.assignment.id}/replace`)
+      .set("x-mock-user-id", "u2")
+      .send({ replacementExpertId: "exp-phase4-unbound", reason: "invalid replacement" });
+    expectDenied(replaced, "EXPERT_ACCOUNT_REQUIRED", ["invalid replacement"]);
+    expect(runtime.ctx.state.expertAssignments.find((assignment) => assignment.id === source.body.assignment.id)?.status).toBe("assigned");
   });
 
   it("creates expert confirmation tasks and notifications before scoring sheets exist", async () => {
@@ -226,6 +276,7 @@ describe("Phase 4 expert review and scoring report", () => {
     assignableProject.status = "bidding_locked";
     assignableProject.displayStatus = "bidding locked";
     assignableProject.beforeDeadline = false;
+    assignableProject.participantSupplierIds = ["sup-3", "sup-1", "sup-2"];
 
     const appointed = await request(runtime.app)
       .post("/api/projects/p-food/expert-assignments/appoint")
@@ -281,7 +332,8 @@ describe("Phase 4 expert review and scoring report", () => {
     expect(completedTasks.body.tasks.find((item: { id: string }) => item.id === `task:expert_confirmation:${assignmentId}`)?.status).toBe("completed");
 
     const generatedSheets = await request(runtime.app).get("/api/expert-review/my-scoring-sheets").set("x-mock-user-id", "u4");
-    expect(generatedSheets.body.scoringSheets.some((item: { projectId: string }) => item.projectId === "p-food")).toBe(true);
+    const foodSheets = generatedSheets.body.scoringSheets.filter((item: { projectId: string }) => item.projectId === "p-food");
+    expect(foodSheets.map((item: { supplierId: string }) => item.supplierId)).toEqual(["sup-3"]);
   });
 
   it("maintains scoring templates and applies the enabled template to newly generated sheets", async () => {
@@ -500,8 +552,9 @@ describe("Phase 4 expert review and scoring report", () => {
         supplierAssessmentScopes: ["technical"],
         active: true,
         status: "available"
-      });
+    });
     expect(replacementExpert.status).toBe(201);
+    bindExpertAccount(runtime, replacementExpert.body.expert.id, "u-phase4-replacement");
 
     const replaced = await request(runtime.app)
       .post("/api/expert-assignments/ea-3/replace")
@@ -521,6 +574,19 @@ describe("Phase 4 expert review and scoring report", () => {
     const mySheets = await request(runtime.app).get("/api/expert-review/my-scoring-sheets").set("x-mock-user-id", "u7");
     expect(mySheets.status).toBe(200);
     expect(mySheets.body.scoringSheets.some((item: { id: string }) => item.id === "score-open")).toBe(false);
+  });
+
+  it("excludes replaced expert sheets from scoring summary", async () => {
+    runtime.ctx.state.expertAssignments = runtime.ctx.state.expertAssignments.filter((item) => item.projectId !== "p-award" || ["ea-1", "ea-2"].includes(item.id));
+    runtime.ctx.state.expertAssignments.find((item) => item.id === "ea-1")!.status = "submitted_locked";
+    runtime.ctx.state.expertAssignments.find((item) => item.id === "ea-2")!.status = "replaced";
+    runtime.ctx.state.scoringSheets = runtime.ctx.state.scoringSheets.filter((item) => item.projectId !== "p-award" || ["score-1", "score-3"].includes(item.id));
+
+    const summary = await request(runtime.app).get("/api/projects/p-award/scoring-summary").set("x-mock-user-id", "u2");
+    expect(summary.status).toBe(200);
+    expect(summary.body.summary.totalExpertCount).toBe(1);
+    expect(summary.body.summary.submittedExpertCount).toBe(1);
+    expect(summary.body.summary.supplierScores.find((item: { supplierId: string }) => item.supplierId === "sup-1")?.total).toBe(89);
   });
 
   it("blocks expert-review actions for external-trade projects even if dirty data exists", async () => {

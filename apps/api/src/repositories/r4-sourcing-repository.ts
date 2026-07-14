@@ -89,8 +89,11 @@ export class R4SourcingRepository {
 
   upsertProcurementRequest(request: ProcurementRequest) {
     const now = new Date().toISOString();
-    run(
-      this.runtimeDb.db.prepare(
+    const db = this.runtimeDb.db;
+    db.exec("begin immediate transaction;");
+    try {
+      run(
+        db.prepare(
         `insert into r2_procurement_requests (
           id, request_code, project_id, title, org_id, request_department, requester_name, category,
           description, request_status, approval_status, approval_opinion, approval_by, approved_at,
@@ -123,37 +126,42 @@ export class R4SourcingRepository {
           updated_at = excluded.updated_at,
           synced_at = excluded.synced_at`
       ),
-      [
-        request.id,
-        request.code ?? null,
-        request.projectId ?? null,
-        request.title,
-        request.orgId,
-        request.requestDepartment ?? null,
-        request.requesterName ?? null,
-        request.category ?? null,
-        request.description ?? null,
-        request.status ?? (request.projectId ? "project_created" : "draft"),
-        request.approvalStatus,
-        request.approvalOpinion ?? null,
-        request.approvalBy ?? null,
-        request.approvedAt ?? null,
-        request.budgetLabel ?? null,
-        request.budgetAmount ?? null,
-        request.purpose ?? null,
-        request.expectedArrivalAt ?? null,
-        request.receivingLocation ?? null,
-        request.methodSuggestion,
-        request.methodRuleId ?? null,
-        request.externalTradeFlag ? 1 : 0,
-        JSON.stringify(request.attachments ?? []),
-        request.createdBy ?? null,
-        request.createdAt ?? now,
-        request.updatedAt ?? now,
-        now
-      ]
-    );
-    this.replaceRequestItems(request.id, request.lineItems ?? []);
+        [
+          request.id,
+          request.code ?? null,
+          request.projectId ?? null,
+          request.title,
+          request.orgId,
+          request.requestDepartment ?? null,
+          request.requesterName ?? null,
+          request.category ?? null,
+          request.description ?? null,
+          request.status ?? (request.projectId ? "project_created" : "draft"),
+          request.approvalStatus,
+          request.approvalOpinion ?? null,
+          request.approvalBy ?? null,
+          request.approvedAt ?? null,
+          request.budgetLabel ?? null,
+          request.budgetAmount ?? null,
+          request.purpose ?? null,
+          request.expectedArrivalAt ?? null,
+          request.receivingLocation ?? null,
+          request.methodSuggestion,
+          request.methodRuleId ?? null,
+          request.externalTradeFlag ? 1 : 0,
+          JSON.stringify(request.attachments ?? []),
+          request.createdBy ?? null,
+          request.createdAt ?? now,
+          request.updatedAt ?? now,
+          now
+        ]
+      );
+      this.replaceRequestItems(request.id, request.lineItems ?? []);
+      db.exec("commit;");
+    } catch (error) {
+      db.exec("rollback;");
+      throw error;
+    }
   }
 
   deleteProcurementRequest(requestId: string) {

@@ -295,6 +295,49 @@ describe("Phase 3 bidding, locking and abnormal view approvals", () => {
     expectDenied(update, "BID_LOCKED", ["100"]);
   });
 
+  it("reports the effective quote deadline in the project workbench instead of a stale stored flag", async () => {
+    const project = runtime.ctx.state.projects.find((item) => item.id === "p-pre")!;
+    project.quoteDeadlineAt = "2020-01-01T00:00:00.000Z";
+    project.beforeDeadline = true;
+
+    const workbench = await request(runtime.app).get("/api/project-workbench/projects/p-pre").set("x-mock-user-id", "u2");
+
+    expect(workbench.status).toBe(200);
+    expect(workbench.body.project.quoteDeadlineAt).toBe("2020-01-01T00:00:00.000Z");
+    expect(workbench.body.project.beforeDeadline).toBe(false);
+
+    const projectList = await request(runtime.app).get("/api/projects").set("x-mock-user-id", "u2");
+    expect(projectList.body.projects.find((item: { id: string }) => item.id === "p-pre").beforeDeadline).toBe(false);
+
+    project.quoteDeadlineAt = "2099-01-01T00:00:00.000Z";
+    project.beforeDeadline = false;
+    const futureProjectList = await request(runtime.app).get("/api/projects").set("x-mock-user-id", "u2");
+    expect(futureProjectList.body.projects.find((item: { id: string }) => item.id === "p-pre").beforeDeadline).toBe(true);
+  });
+
+  it("requires a business reason before an early cutoff changes the supplier deadline", async () => {
+    const project = runtime.ctx.state.projects.find((item) => item.id === "p-pre")!;
+    const previousDeadline = project.quoteDeadlineAt;
+
+    const cutoff = await request(runtime.app).post("/api/projects/p-pre/bids/cutoff").set("x-mock-user-id", "u2").send({ action: "early_cutoff" });
+
+    expectDenied(cutoff, "BID_CUTOFF_REASON_REQUIRED");
+    expect(project.quoteDeadlineAt).toBe(previousDeadline);
+    expect(project.beforeDeadline).toBe(true);
+  });
+
+  it("does not advance an empty project into expert review when no submitted bid can be locked", async () => {
+    const project = runtime.ctx.state.projects.find((item) => item.id === "p-pre")!;
+    project.quoteDeadlineAt = "2020-01-01T00:00:00.000Z";
+    project.beforeDeadline = false;
+    runtime.ctx.state.bids = runtime.ctx.state.bids.filter((item) => item.projectId !== project.id);
+
+    const locked = await request(runtime.app).post("/api/projects/p-pre/bids/lock").set("x-mock-user-id", "u2");
+
+    expectDenied(locked, "BID_SUBMITTED_REQUIRED");
+    expect(project.status).toBe("bidding_open");
+  });
+
   it("keeps bid control access aligned with project execution visibility and reports safe progress counts", async () => {
     runtime.ctx.state.projects.push({
       id: "p-buyer-owned",

@@ -517,7 +517,10 @@ export function projectWorkbenchRoutes(ctx: AppContext) {
     const auditLogs = isSupplier || req.auth.roleId === "expert" ? [] : ctx.state.auditLogs.filter((log) => log.projectId === project.id && canReadAuditLog(req, ctx, log));
 
     return res.json({
-      project,
+      project: {
+        ...project,
+        beforeDeadline: isBeforeDeadline(project)
+      },
       procurementRequest: request,
       procurementDocuments: ctx.state.procurementDocuments.filter((item) => item.projectId === project.id),
       announcements: ctx.state.procurementAnnouncements.filter((item) => item.projectId === project.id),

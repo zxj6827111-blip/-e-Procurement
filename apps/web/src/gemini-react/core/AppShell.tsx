@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from './AppContext';
 import { RoleNames, type ViewState } from '../shared/types';
 import { loadNotifications, markNotificationsRead, markNotificationRead as markRuntimeNotificationRead } from '../features/views/workflow-runtime';
-import { Shield, LogOut, FileText, Bell } from 'lucide-react';
+import { Shield, LogOut, FileText, Bell, Menu, X } from 'lucide-react';
 import { cn } from '../shared/lib/utils';
 import { getGovernedMenuItems } from './governed-menu';
 import { LoginView } from '../features/views/LoginView';
@@ -61,6 +61,7 @@ export function AppShell() {
     logout,
     menuConfig
   } = useApp();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<Awaited<ReturnType<typeof loadNotifications>>>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
@@ -223,7 +224,21 @@ export function AppShell() {
   return (
     <div data-ui-check="shell" className="flex h-screen bg-[#F5F7FA] overflow-hidden text-slate-900 font-sans">
       {/* Sidebar */}
-      <aside data-ui-check="sidebar" className="w-[220px] bg-[#006666] text-slate-300 flex flex-col shrink-0">
+      <aside
+        data-ui-check="sidebar"
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-[220px] bg-[#006666] text-slate-300 flex flex-col shrink-0 transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0",
+          mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <button
+          type="button"
+          aria-label="关闭导航菜单"
+          className="absolute right-3 top-3 p-1 text-[#b3d1d1] hover:text-white lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        >
+          <X className="w-5 h-5" />
+        </button>
         <div className="h-14 flex items-center px-5 border-b border-[#005252]">
           <Shield className="w-5 h-5 text-amber-500 mr-2" />
           <span className="font-semibold text-white tracking-wide text-sm">集团内部采购规范化平台</span>
@@ -242,7 +257,10 @@ export function AppShell() {
                 <li key={item.id}>
                   <button
                     data-ui-check="nav-item"
-                    onClick={() => setCurrentView(item.id as ViewState)}
+                    onClick={() => {
+                      setCurrentView(item.id as ViewState);
+                      setMobileSidebarOpen(false);
+                    }}
                     className={cn(
                       "w-full flex items-center px-5 py-3 text-sm font-medium transition-colors relative",
                       isActive
@@ -272,15 +290,32 @@ export function AppShell() {
         </div>
       </aside>
 
+      {mobileSidebarOpen ? (
+        <button
+          type="button"
+          aria-label="关闭导航菜单"
+          className="fixed inset-0 z-40 bg-slate-950/40 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      ) : null}
+
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header data-ui-check="topbar" className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-40 shadow-sm relative">
-          <div className="flex items-center text-sm text-slate-500">
-            <span className="font-medium text-slate-700">{RoleNames[currentUser.role]}</span>
-            <span className="mx-2">/</span>
-            <span className="text-[#006666] font-medium">{getBreadcrumb()}</span>
+        <header data-ui-check="topbar" className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-3 sm:px-4 lg:px-6 shrink-0 z-30 shadow-sm relative">
+          <div className="flex min-w-0 items-center text-sm text-slate-500">
+            <button
+              type="button"
+              aria-label="打开导航菜单"
+              className="mr-2 shrink-0 rounded p-2 text-slate-500 hover:bg-slate-100 hover:text-[#006666] lg:hidden"
+              onClick={() => setMobileSidebarOpen(true)}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <span className="hidden font-medium text-slate-700 sm:inline">{RoleNames[currentUser.role]}</span>
+            <span className="mx-2 hidden sm:inline">/</span>
+            <span className="truncate text-[#006666] font-medium">{getBreadcrumb()}</span>
           </div>
-          <div className="flex items-center gap-5">
+          <div className="flex shrink-0 items-center gap-3 sm:gap-5">
             {currentUser.role !== 'SYSTEM_ADMIN' && (
               <div className="relative" ref={notificationRef}>
                 <button
@@ -340,8 +375,8 @@ export function AppShell() {
                 )}
               </div>
             )}
-            <div className="h-6 w-px bg-slate-200" />
-            <div data-ui-check="role-switch" className="text-xs bg-slate-50 text-slate-600 px-2 py-1 rounded border border-slate-200">
+            <div className="hidden h-6 w-px bg-slate-200 sm:block" />
+            <div data-ui-check="role-switch" className="hidden text-xs bg-slate-50 text-slate-600 px-2 py-1 rounded border border-slate-200 sm:block">
               {currentUser.organization}
             </div>
             <div className="flex items-center gap-2">
@@ -352,7 +387,7 @@ export function AppShell() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6">
           <div className="mx-auto" style={{ maxWidth: '1440px' }}>
             {renderView()}
           </div>

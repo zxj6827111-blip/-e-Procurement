@@ -155,6 +155,50 @@ async function submitAndQualifyRegistration(runtime: ReturnType<typeof boot>, an
 }
 
 describe("R4 sourcing procurement master-source migration", () => {
+  it("scopes repeated client line item ids to their procurement request", async () => {
+    const runtime = boot();
+    const createRequest = (title: string) =>
+      request(runtime.app)
+        .post("/api/procurement-requests")
+        .set("x-mock-user-id", "u8")
+        .send({
+          title,
+          orgId: "org-hotel",
+          requestDepartment: "Housekeeping",
+          requesterName: "Hotel procurement",
+          lineItems: [{ id: "line-1", itemName: "Linen", specification: "standard", quantity: 1, unit: "set" }]
+        });
+
+    const first = await createRequest("Repeated line id request 1");
+    const second = await createRequest("Repeated line id request 2");
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    const firstRequestId = first.body.procurementRequest.id as string;
+    const secondRequestId = second.body.procurementRequest.id as string;
+    expect(first.body.procurementRequest.lineItems[0].id).toBe(`${firstRequestId}-line-1`);
+    expect(second.body.procurementRequest.lineItems[0].id).toBe(`${secondRequestId}-line-1`);
+
+    const rows = all<{ id: string; request_id: string }>(
+      runtime,
+      "select id, request_id from r2_procurement_request_items where request_id in (?, ?) order by request_id",
+      firstRequestId,
+      secondRequestId
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { id: `${firstRequestId}-line-1`, request_id: firstRequestId },
+        { id: `${secondRequestId}-line-1`, request_id: secondRequestId }
+      ])
+    );
+
+    const firstSubmitted = await request(runtime.app).post(`/api/procurement-requests/${firstRequestId}/submit`).set("x-mock-user-id", "u8");
+    const secondSubmitted = await request(runtime.app).post(`/api/procurement-requests/${secondRequestId}/submit`).set("x-mock-user-id", "u8");
+    expect(firstSubmitted.status).toBe(200);
+    expect(secondSubmitted.status).toBe(200);
+  });
+
   it("writes procurement requests, sourcing projects, invitations and participations into R2/R4 formal tables", async () => {
     const runtime = boot();
     const { requestId, projectId } = await createRequestProject(runtime);
