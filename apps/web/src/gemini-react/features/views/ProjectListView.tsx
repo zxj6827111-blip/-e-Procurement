@@ -30,12 +30,20 @@ interface ApiProject {
 interface ApiProcurementRequest {
   id: string;
   code: string;
+  title?: string;
   projectId?: string;
+  status?: string;
+  approvalStatus?: string;
+  category?: string;
+  methodSuggestion?: string;
+  budgetAmount?: number;
+  requestDepartment?: string;
+  requesterName?: string;
 }
 
 const copy = {
   title: '\u91c7\u8d2d\u9879\u76ee\u53f0\u8d26',
-  description: '\u67e5\u770b\u548c\u7ba1\u7406\u6388\u6743\u8303\u56f4\u5185\u7684\u91c7\u8d2d\u9879\u76ee',
+  description: '\u67e5\u770b\u548c\u7ba1\u7406\u6388\u6743\u8303\u56f4\u5185\u7684\u91c7\u8d2d\u9879\u76ee\u53ca\u5f85\u627f\u63a5\u7533\u8bf7',
   createProject: '\u65b0\u5efa\u9879\u76ee',
   searchPlaceholder: '\u641c\u7d22\u9879\u76ee\u7f16\u53f7\u3001\u91c7\u8d2d\u7533\u8bf7\u53f7\u3001\u540d\u79f0\u6216\u7ecf\u529e\u4eba',
   ruleFilter: '\u89c4\u5219\u7b5b\u9009',
@@ -52,13 +60,19 @@ const copy = {
   next: '\u4e0b\u4e00\u9875',
   loading: '\u6b63\u5728\u52a0\u8f7d\u771f\u5b9e\u9879\u76ee...',
   loadFailed: '\u9879\u76ee\u63a5\u53e3\u6682\u65f6\u4e0d\u53ef\u7528\uff0c\u5df2\u663e\u793a\u672c\u5730\u515c\u5e95\u6570\u636e\u3002',
-  empty: '\u6682\u65e0\u91c7\u8d2d\u9879\u76ee\u8bb0\u5f55',
+  empty: '\u6682\u65e0\u91c7\u8d2d\u9879\u76ee\u6216\u5f85\u627f\u63a5\u7533\u8bf7',
   countPrefix: '\u5171 ',
-  countSuffix: ' \u4e2a\u9879\u76ee\u8bb0\u5f55',
+  countSuffix: ' \u6761\u53f0\u8d26\u8bb0\u5f55',
   defaultType: '\u96c6\u4e2d\u91c7\u8d2d',
   defaultMethod: '\u5185\u90e8\u91c7\u8d2d',
   defaultOrg: '\u96c6\u56e2\u91c7\u8d2d\u4e2d\u5fc3',
-  defaultAgent: '\u91c7\u8d2d\u7ecf\u529e'
+  defaultAgent: '\u91c7\u8d2d\u7ecf\u529e',
+  pendingMethod: '\u5f85\u5224\u5b9a\u91c7\u8d2d\u65b9\u5f0f',
+  pendingProject: '\u5f85\u627f\u63a5\u91c7\u8d2d\u7533\u8bf7',
+  pendingCreation: '\u5f85\u751f\u6210\u91c7\u8d2d\u9879\u76ee',
+  pendingAgent: '\u5f85\u91c7\u8d2d\u7ecf\u529e\u627f\u63a5',
+  acceptRequest: '\u627f\u63a5\u7533\u8bf7',
+  createFromRequest: '\u751f\u6210\u9879\u76ee'
 };
 
 type ProjectRow = Project & {
@@ -66,6 +80,8 @@ type ProjectRow = Project & {
   sourceRequestCode?: string;
   sourceRequestTitle?: string;
   displayName?: string;
+  pendingRequest?: boolean;
+  pendingRequestStatus?: string;
 };
 
 function mapProjectStage(status?: string): ProjectStage {
@@ -112,7 +128,30 @@ function toGeminiProject(project: ApiProject, sourceRequestCode?: string): Proje
   };
 }
 
-async function loadProjects(userId?: string): Promise<ProjectRow[]> {
+function toPendingRequestRow(request: ApiProcurementRequest): ProjectRow {
+  return {
+    id: `pending-request:${request.id}`,
+    code: request.code,
+    name: request.title || request.code,
+    type: request.category || copy.defaultType,
+    method: request.status === 'method_decided' ? request.methodSuggestion || copy.defaultMethod : copy.pendingMethod,
+    stage: 'INITIATION',
+    organization: request.requestDepartment || copy.defaultOrg,
+    agent: copy.pendingAgent,
+    budget: request.budgetAmount ?? 0,
+    riskLevel: 'LOW',
+    archiveCompleteness: 0,
+    isExternal: false,
+    sourceRequestId: request.id,
+    sourceRequestCode: request.code,
+    sourceRequestTitle: request.title,
+    displayName: request.title,
+    pendingRequest: true,
+    pendingRequestStatus: request.status
+  };
+}
+
+async function loadProjects(userId?: string, includePendingRequests = false): Promise<ProjectRow[]> {
   const [projectData, requestData] = await Promise.all([
     apiGet<{ projects: ApiProject[] }>('/api/projects', userId),
     apiGet<{ procurementRequests: ApiProcurementRequest[] }>('/api/procurement-requests', userId).catch(() => ({ procurementRequests: [] }))
@@ -123,13 +162,23 @@ async function loadProjects(userId?: string): Promise<ProjectRow[]> {
       .filter((request) => request.projectId)
       .map((request) => [request.projectId as string, request.code])
   );
-  return projectData.projects.map((project) =>
+  const projects = projectData.projects.map((project) =>
     toGeminiProject(project, requestCodeById.get(project.sourceRequestId ?? '') ?? requestCodeByProjectId.get(project.id))
   );
+  if (!includePendingRequests) return projects;
+  const pendingRequests = requestData.procurementRequests
+    .filter(
+      (request) =>
+        !request.projectId &&
+        request.approvalStatus === 'approved' &&
+        ['submitted', 'method_decided'].includes(String(request.status))
+    )
+    .map(toPendingRequestRow);
+  return [...pendingRequests, ...projects];
 }
 
 export function ProjectListView() {
-  const { currentUser, setCurrentView, setCurrentProjectId } = useApp();
+  const { currentUser, navigateToPath, setCurrentView, setCurrentProjectId } = useApp();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -139,7 +188,8 @@ export function ProjectListView() {
     let mounted = true;
     setLoading(true);
     setLoadError('');
-    loadProjects(currentUser?.id)
+    const includePendingRequests = ['PROCUREMENT_AGENT', 'PLATFORM_OPERATIONS'].includes(String(currentUser?.role));
+    loadProjects(currentUser?.id, includePendingRequests)
       .then((items) => {
         if (!mounted) return;
         setProjects(items);
@@ -155,7 +205,7 @@ export function ProjectListView() {
     return () => {
       mounted = false;
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUser?.role]);
 
   const filteredProjects = useMemo(() => {
     const keyword = query.trim().toLowerCase();
@@ -170,6 +220,10 @@ export function ProjectListView() {
   const handleViewProject = (id: string) => {
     setCurrentProjectId(id);
     setCurrentView('PROJECT_DETAIL');
+  };
+
+  const handleAcceptRequest = (requestId: string) => {
+    navigateToPath(`/procurement-requests/${encodeURIComponent(requestId)}`);
   };
 
   const handleCreateProject = () => {
@@ -239,7 +293,9 @@ export function ProjectListView() {
                   <td className="px-6 py-4">
                     <div className="font-medium text-slate-900">{contract.name}</div>
                     <div className="text-slate-500 text-xs mt-1 font-mono">
-                      {contract.code}{project.sourceRequestCode ? ` / ${project.sourceRequestCode}` : project.sourceRequestId ? ` / ${project.sourceRequestId}` : ''}
+                      {project.pendingRequest
+                        ? project.sourceRequestCode || project.sourceRequestId
+                        : `${contract.code}${project.sourceRequestCode ? ` / ${project.sourceRequestCode}` : project.sourceRequestId ? ` / ${project.sourceRequestId}` : ''}`}
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -247,14 +303,16 @@ export function ProjectListView() {
                     <div className="text-slate-500 text-xs mt-1">{contract.agent}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <Badge variant={project.isExternal ? 'outline' : 'default'}>
-                      {contract.procurementMethod}
+                    <Badge variant={project.pendingRequest ? 'warning' : project.isExternal ? 'outline' : 'default'}>
+                      {project.pendingRequest ? project.method : contract.procurementMethod}
                     </Badge>
                   </td>
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                      {contract.currentStage.label}
+                      {project.pendingRequest
+                        ? project.pendingRequestStatus === 'method_decided' ? copy.pendingCreation : copy.pendingProject
+                        : contract.currentStage.label}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -263,9 +321,15 @@ export function ProjectListView() {
                     {project.riskLevel === 'LOW' && <span className="text-slate-400">-</span>}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Button variant="ghost" size="sm" onClick={() => handleViewProject(project.id)}>
-                      {copy.detail}
-                    </Button>
+                    {project.pendingRequest && project.sourceRequestId ? (
+                      <Button variant="ghost" size="sm" onClick={() => handleAcceptRequest(project.sourceRequestId!)}>
+                        {project.pendingRequestStatus === 'method_decided' ? copy.createFromRequest : copy.acceptRequest}
+                      </Button>
+                    ) : (
+                      <Button variant="ghost" size="sm" onClick={() => handleViewProject(project.id)}>
+                        {copy.detail}
+                      </Button>
+                    )}
                   </td>
                 </tr>
               )) : (

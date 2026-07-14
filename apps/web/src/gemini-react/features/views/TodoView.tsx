@@ -16,8 +16,8 @@ function statusVariant(status: string): 'default' | 'success' | 'warning' | 'out
 }
 
 function actionLabel(task: UnifiedTaskView) {
-  if (task.approvalInstanceId) return '审批处理';
-  if (task.actionTaskId) return '完成任务';
+  if (task.status === 'pending' && task.canComplete && task.approvalInstanceId) return '审批处理';
+  if (task.status === 'pending' && task.canComplete && task.actionTaskId) return '完成任务';
   return '查看业务';
 }
 
@@ -74,6 +74,10 @@ export function TodoView() {
 
   const handleTaskAction = async (task: UnifiedTaskView, action: 'approve' | 'reject' | 'complete') => {
     if (!currentUser?.id) return;
+    if (task.status !== 'pending' || !task.canComplete) {
+      setError('该任务已完成或当前账号无权处理，请刷新待办列表。');
+      return;
+    }
     setActionBusy(`${action}:${task.id}`);
     setError('');
     try {
@@ -89,6 +93,7 @@ export function TodoView() {
 
   if (selectedTask) {
     const actionKey = (action: 'approve' | 'reject' | 'complete') => `${action}:${selectedTask.id}`;
+    const canProcessTask = selectedTask.status === 'pending' && selectedTask.canComplete;
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -151,16 +156,18 @@ export function TodoView() {
                 </p>
               </div>
             ) : null}
-            <div className="md:col-span-2">
-              <label className="mb-2 block text-sm font-medium text-slate-700">处理意见</label>
-              <textarea
-                rows={4}
-                value={opinion}
-                onChange={(event) => setOpinion(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
-                placeholder="请输入审批或处理意见"
-              />
-            </div>
+            {canProcessTask ? (
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-sm font-medium text-slate-700">处理意见</label>
+                <textarea
+                  rows={4}
+                  value={opinion}
+                  onChange={(event) => setOpinion(event.target.value)}
+                  className="w-full rounded-lg border border-slate-300 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300"
+                  placeholder="请输入审批或处理意见"
+                />
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -168,7 +175,7 @@ export function TodoView() {
           <Button variant="outline" onClick={() => navigateToPath(selectedTask.targetPath)}>
             查看业务页面
           </Button>
-          {selectedTask.approvalInstanceId ? (
+          {canProcessTask && selectedTask.approvalInstanceId ? (
             <>
               <Button
                 variant="outline"
@@ -184,7 +191,7 @@ export function TodoView() {
                 {actionBusy === actionKey('approve') ? '处理中...' : '同意'}
               </Button>
             </>
-          ) : selectedTask.actionTaskId ? (
+          ) : canProcessTask && selectedTask.actionTaskId ? (
             <Button disabled={actionBusy.length > 0} onClick={() => void handleTaskAction(selectedTask, 'complete')}>
               <CheckCircle2 className="mr-2 h-4 w-4" />
               {actionBusy === actionKey('complete') ? '处理中...' : '标记完成'}

@@ -17,6 +17,7 @@ tmp/
 .tmp/
 .codex/
 .codex-run/
+.codegraph/
 .playwright-mcp/
 .playwright-cli/
 *.sqlite

@@ -158,8 +158,16 @@ function SupplierDetailDrawer({
   const status = currentStatus(supplier);
   const statusText = labelStatus(status);
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={`${supplier.name}供应商详情`}>
       <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-[760px] bg-white h-full shadow-2xl flex flex-col">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
@@ -170,7 +178,7 @@ function SupplierDetailDrawer({
             </h3>
             <p className="text-xs text-slate-500 mt-1">{supplier.id} / {supplier.socialCreditCode || supplier.businessLicenseNo || '-'}</p>
           </div>
-          <button className="text-slate-400 hover:text-slate-600" onClick={onClose}>
+          <button type="button" className="text-slate-400 hover:text-slate-600" aria-label="关闭供应商详情" onClick={onClose}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -370,11 +378,8 @@ export function SupplierManagementView() {
   }, [loadSuppliers]);
 
   useEffect(() => {
-    if (!selectedId && suppliers[0]) {
-      setSelectedId(suppliers[0].id);
-    }
     if (selectedId && !suppliers.some((item) => item.id === selectedId)) {
-      setSelectedId(suppliers[0]?.id ?? null);
+      setSelectedId(null);
     }
   }, [selectedId, suppliers]);
 
