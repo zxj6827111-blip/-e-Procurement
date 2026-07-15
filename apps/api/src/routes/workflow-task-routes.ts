@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import type { AppContext } from "../app-context.js";
 import { WorkflowRuleError } from "../repositories/r8-workflow-task-repository.js";
+import { settlementWorkflowBusinessTypes } from "../services/settlement-workflow-service.js";
 import type { ApprovalBusinessType, ApprovalRule, RoleId, User } from "../types.js";
 import { isOrgReaderRole } from "../role-groups.js";
 import { denyResponse } from "./permission-helpers.js";
@@ -324,14 +325,17 @@ export function workflowTaskRoutes(ctx: AppContext) {
       return res.status(400).json({ error: { code: "WORKFLOW_ACTION_INVALID", message: "Unsupported workflow action." } });
     }
     try {
-      const result = ctx.r8WorkflowTaskRepository.recordApprovalAction({
+      const actionArgs = {
         instanceId: req.params.instanceId,
         actor: req.auth.user,
         action: action as "approve" | "reject" | "return" | "cancel" | "revoke",
         opinion: req.body?.opinion === undefined ? undefined : String(req.body.opinion),
         sourceJson: { route: "workflow" }
-      });
-      syncBusinessAfterWorkflowAction(ctx, result.approvalInstance.id, req.auth.user);
+      };
+      const instance = ctx.r8WorkflowTaskRepository.getApprovalInstance(req.params.instanceId);
+      const isSettlementWorkflow = Boolean(instance && settlementWorkflowBusinessTypes.has(instance.businessType));
+      const result = isSettlementWorkflow ? ctx.settlementWorkflowService.recordApprovalAction(actionArgs) : ctx.r8WorkflowTaskRepository.recordApprovalAction(actionArgs);
+      if (!isSettlementWorkflow) syncBusinessAfterWorkflowAction(ctx, result.approvalInstance.id, req.auth.user);
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, `workflow_instance.${action}`, "approval_instance", result.approvalInstance.id, result.approvalInstance.projectId);
       return res.json({ ...result, auditLogId: auditLog.id });
     } catch (error) {

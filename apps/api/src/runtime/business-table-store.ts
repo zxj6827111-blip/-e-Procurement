@@ -3087,6 +3087,10 @@ export class BusinessTableStore {
         created_at text not null,
         operated_by text null,
         operated_at text null,
+        payment_voucher_file_id text null,
+        payment_voucher_file_name text null,
+        payment_voucher_uploaded_by text null,
+        payment_voucher_uploaded_at text null,
         note text null,
         updated_at text not null
       );
@@ -3411,6 +3415,10 @@ export class BusinessTableStore {
     this.addColumnIfMissing("r2_invoices", "tax_rate", "real null");
     this.addColumnIfMissing("r2_invoices", "tax_amount", "real null");
     this.addColumnIfMissing("r2_invoices", "verification_opinion", "text null");
+    this.addColumnIfMissing("r2_fund_ledger_entries", "payment_voucher_file_id", "text null");
+    this.addColumnIfMissing("r2_fund_ledger_entries", "payment_voucher_file_name", "text null");
+    this.addColumnIfMissing("r2_fund_ledger_entries", "payment_voucher_uploaded_by", "text null");
+    this.addColumnIfMissing("r2_fund_ledger_entries", "payment_voucher_uploaded_at", "text null");
     this.addColumnIfMissing("r2_amount_reconciliation_lines", "order_amount", "real not null default 0");
     this.addColumnIfMissing("r2_amount_reconciliation_lines", "received_amount", "real not null default 0");
     this.addColumnIfMissing("r2_amount_reconciliation_lines", "return_amount", "real not null default 0");

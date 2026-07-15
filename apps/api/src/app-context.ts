@@ -23,6 +23,7 @@ import { BpmnPilotService } from "./services/bpmn-pilot-service.js";
 import { InternalEventBus } from "./services/internal-event-bus.js";
 import { ProcessService } from "./services/process-service.js";
 import { R8ToProcessAdapter } from "./services/r8-to-process-adapter.js";
+import { SettlementWorkflowService } from "./services/settlement-workflow-service.js";
 import { AuthStore, BusinessTableStore, FileStore, getRuntimeConfig, RuntimeDb, RuntimeStateStore, type RuntimeConfig } from "./runtime/index.js";
 import { seedRuntimeFiles } from "./runtime/seed-files.js";
 
@@ -48,6 +49,7 @@ export interface AppContext {
   eventBus: InternalEventBus;
   processRepository: ProcessRepository;
   processService: ProcessService;
+  settlementWorkflowService: SettlementWorkflowService;
   stateStore: RuntimeStateStore;
   authStore: AuthStore;
   fileStore: FileStore;
@@ -109,6 +111,7 @@ export function createAppContext(options: AppContextOptions = {}): AppContext {
   const authStore = new AuthStore(runtimeDb);
   authStore.seedAccounts(state.users, config.allowLocalPasswordLogin);
   const fileStore = new FileStore(runtimeDb, config.filesRoot, config);
+  const settlementWorkflowService = new SettlementWorkflowService(runtimeDb, state, r7SettlementFinanceRepository, r8WorkflowTaskRepository);
   const auditService = new AuditService(state, runtimeDb);
   const ctx: AppContext = {
     state,
@@ -132,6 +135,7 @@ export function createAppContext(options: AppContextOptions = {}): AppContext {
     eventBus,
     processRepository,
     processService,
+    settlementWorkflowService,
     stateStore,
     authStore,
     fileStore,

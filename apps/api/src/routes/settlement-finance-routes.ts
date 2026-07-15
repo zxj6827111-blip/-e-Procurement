@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import type { AppContext } from "../app-context.js";
+import { WorkflowRuleError } from "../repositories/r8-workflow-task-repository.js";
 import { isSettlementMaterialType } from "../repositories/r7-settlement-finance-repository.js";
 import { isFinanceReviewRole, isFinanceRole, isProcurementBuyerRole, isSupplierRole, supplierIdMatches } from "../role-groups.js";
 import { denyResponse } from "./permission-helpers.js";
@@ -41,6 +42,13 @@ function assertSupplierBill(ctx: AppContext, req: Request, res: Response, settle
 
 function syncR7(ctx: AppContext) {
   ctx.r7SettlementFinanceRepository.syncSettlementFinanceState(ctx.state);
+}
+
+function workflowError(res: Response, error: unknown, fallbackCode: string) {
+  if (error instanceof WorkflowRuleError) {
+    return res.status(error.status).json({ error: { code: error.code, message: error.message } });
+  }
+  return res.status(400).json({ error: { code: fallbackCode, message: error instanceof Error ? error.message : "Workflow operation blocked." } });
 }
 
 export function settlementFinanceRoutes(ctx: AppContext) {
@@ -138,19 +146,17 @@ export function settlementFinanceRoutes(ctx: AppContext) {
     if (!existing) return;
     if (!assertFinanceWriter(ctx, req, res, "settlement_bill.review.denied", existing.id)) return;
     try {
-      const bill = ctx.r7SettlementFinanceRepository.reviewSettlementBill(existing.id, req.auth.user, req.body?.approved !== false, req.body?.opinion === undefined ? undefined : String(req.body.opinion));
-      try {
-        ctx.r8WorkflowTaskRepository.recordApprovalAction({
-          businessType: "settlement_bill",
-          businessId: bill.id,
-          actor: req.auth.user,
-          action: req.body?.approved === false ? "reject" : "approve",
-          opinion: bill.approvalOpinion,
-          sourceJson: { route: "settlement_bill.review" }
-        });
-      } catch {
-        // Keep existing R7 review endpoint compatible if the settlement bill pre-dates R8 workflow.
-      }
+      const approved = req.body?.approved !== false;
+      const opinion = req.body?.opinion === undefined ? undefined : String(req.body.opinion);
+      ctx.settlementWorkflowService.recordApprovalAction({
+        businessType: "settlement_bill",
+        businessId: existing.id,
+        actor: req.auth.user,
+        action: approved ? "approve" : "reject",
+        opinion,
+        sourceJson: { route: "settlement_bill.review" }
+      });
+      const bill = ctx.r7SettlementFinanceRepository.getSettlementBill(existing.id)!;
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, req.body?.approved === false ? "settlement_bill.reject" : "settlement_bill.approve", "settlement_bill", bill.id, bill.projectId, bill.approvalOpinion);
       ctx.eventBus.emit({
         eventCode: req.body?.approved === false ? "SettlementBillRejected" : "SettlementBillApproved",
@@ -171,7 +177,7 @@ export function settlementFinanceRoutes(ctx: AppContext) {
       });
       return res.json({ settlementBill: bill, auditLogId: auditLog.id });
     } catch (error) {
-      return res.status(400).json({ error: { code: "SETTLEMENT_BILL_REVIEW_BLOCKED", message: error instanceof Error ? error.message : "Settlement review blocked." } });
+      return workflowError(res, error, "SETTLEMENT_BILL_REVIEW_BLOCKED");
     }
   });
 
@@ -319,20 +325,17 @@ export function settlementFinanceRoutes(ctx: AppContext) {
     if (!bill) return;
     if (!assertFinanceWriter(ctx, req, res, "invoice.review.denied", invoice.id)) return;
     try {
-      const reviewed = ctx.r7SettlementFinanceRepository.reviewInvoice(invoice.id, req.auth.user, req.body?.approved !== false, req.body?.opinion === undefined ? undefined : String(req.body.opinion));
-      syncR7(ctx);
-      try {
-        ctx.r8WorkflowTaskRepository.recordApprovalAction({
-          businessType: "invoice",
-          businessId: reviewed.id,
-          actor: req.auth.user,
-          action: req.body?.approved === false ? "reject" : "approve",
-          opinion: reviewed.verificationOpinion,
-          sourceJson: { route: "invoice.review", settlementBillId: bill.id }
-        });
-      } catch {
-        // Keep existing R7 invoice review compatible for pre-R8 invoices.
-      }
+      const approved = req.body?.approved !== false;
+      const opinion = req.body?.opinion === undefined ? undefined : String(req.body.opinion);
+      ctx.settlementWorkflowService.recordApprovalAction({
+        businessType: "invoice",
+        businessId: invoice.id,
+        actor: req.auth.user,
+        action: approved ? "approve" : "reject",
+        opinion,
+        sourceJson: { route: "invoice.review", settlementBillId: bill.id }
+      });
+      const reviewed = ctx.r7SettlementFinanceRepository.getInvoice(invoice.id)!;
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, req.body?.approved === false ? "invoice.reject" : "invoice.verify", "invoice", reviewed.id, bill.projectId, reviewed.verificationOpinion);
       ctx.eventBus.emit({
         eventCode: req.body?.approved === false ? "InvoiceRejected" : "InvoiceApproved",
@@ -353,7 +356,7 @@ export function settlementFinanceRoutes(ctx: AppContext) {
       });
       return res.json({ invoice: reviewed, auditLogId: auditLog.id });
     } catch (error) {
-      return res.status(400).json({ error: { code: "INVOICE_REVIEW_BLOCKED", message: error instanceof Error ? error.message : "Invoice review blocked." } });
+      return workflowError(res, error, "INVOICE_REVIEW_BLOCKED");
     }
   });
 
