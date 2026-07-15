@@ -410,8 +410,18 @@ describe("R8 workflow, task center and notification formal source", () => {
     expect(invoiceReview.status).toBe(200);
     expect(single(runtime, "select task_status from r2_task_items where approval_instance_id = ?", invoice.body.workflow.approvalInstance.id)).toEqual({ task_status: "completed" });
 
+    const directPaid = await request(runtime.app).post(`/api/settlement-finance/settlement-bills/${bill.body.settlementBill.id}/fund-ledger`).set("x-mock-user-id", "u2").send({ status: "paid" });
+    expect(directPaid.status).toBe(400);
+
     const payment = await request(runtime.app).post(`/api/settlement-finance/settlement-bills/${bill.body.settlementBill.id}/fund-ledger`).set("x-mock-user-id", "u2").send({ status: "payment_requested" });
     expect(payment.status).toBe(201);
+    const paymentTaskView = toR8WorkflowTaskView(payment.body.workflow.task, {
+      userId: "u1",
+      roleId: "group_manager",
+      orgScope: ["org-group", "org-east", "org-hotel"]
+    });
+    expect(paymentTaskView.title).toBe("待处理付款");
+    expect(paymentTaskView.targetPath).toContain("/payment-status");
 
     const supplierReturnTask = runtime.ctx.r8WorkflowTaskRepository.upsertTask({
       id: "task:return_request:r8-direct",
@@ -439,6 +449,21 @@ describe("R8 workflow, task center and notification formal source", () => {
     expect(disallowedReturn.status).toBe(400);
     expect(disallowedReturn.body.error.code).toBe("WORKFLOW_ACTION_NOT_ALLOWED");
 
+    const paymentApproval = await request(runtime.app).post(`/api/workflow/approval-instances/${payment.body.workflow.approvalInstance.id}/actions`).set("x-mock-user-id", "u1").send({ action: "approve", opinion: "付款申请审批通过" });
+    expect(paymentApproval.status).toBe(200);
+    expect(single(runtime, "select ledger_status from r2_fund_ledger_entries where id = ?", payment.body.fundLedgerEntry.id)).toEqual({ ledger_status: "pending_payment" });
+    expect(single(runtime, "select bill_status from r2_settlement_bills where id = ?", bill.body.settlementBill.id)).toEqual({ bill_status: "payable" });
+
+    const buyerConfirm = await request(runtime.app).post(`/api/settlement-finance/fund-ledger/${payment.body.fundLedgerEntry.id}/confirm-payment`).set("x-mock-user-id", "u2");
+    expect(buyerConfirm.status).toBe(403);
+
+    const financeConfirm = await request(runtime.app).post(`/api/settlement-finance/fund-ledger/${payment.body.fundLedgerEntry.id}/confirm-payment`).set("x-mock-user-id", "u13").send({ note: "财务付款流水已核对" });
+    expect(financeConfirm.status).toBe(200);
+    expect(financeConfirm.body.fundLedgerEntry.status).toBe("paid");
+    expect(single(runtime, "select bill_status from r2_settlement_bills where id = ?", bill.body.settlementBill.id)).toEqual({ bill_status: "paid" });
+    const repeatedConfirm = await request(runtime.app).post(`/api/settlement-finance/fund-ledger/${payment.body.fundLedgerEntry.id}/confirm-payment`).set("x-mock-user-id", "u13");
+    expect(repeatedConfirm.status).toBe(200);
+
     expect(all<{ business_type: string }>(runtime, "select distinct business_type from r2_task_items where business_type in ('settlement_bill','invoice','payment_request')").map((row) => row.business_type).sort()).toEqual([
       "invoice",
       "payment_request",
@@ -448,6 +473,8 @@ describe("R8 workflow, task center and notification formal source", () => {
     const rebooted = boot(dataRoot);
     expect(single(rebooted, "select id from r2_approval_instances where id = ?", settlement.body.workflow.approvalInstance.id)).toBeTruthy();
     expect(single(rebooted, "select id from r2_task_items where id = ?", supplierReturnTask.id)).toBeTruthy();
+    expect(single(rebooted, "select ledger_status from r2_fund_ledger_entries where id = ?", payment.body.fundLedgerEntry.id)).toEqual({ ledger_status: "paid" });
+    expect(single(rebooted, "select bill_status from r2_settlement_bills where id = ?", bill.body.settlementBill.id)).toEqual({ bill_status: "paid" });
     expect(
       all(
         rebooted,
@@ -474,6 +501,7 @@ describe("R8 workflow, task center and notification formal source", () => {
     });
     expect(taskView.businessTypeLabel).toBe("采购申请");
     expect(taskView.taskTypeLabel).toBe("待审批采购申请");
+    expect(taskView.title).toBe("待审批采购申请");
     expect(taskView.statusLabel).toBe("待处理");
     expect(taskView.targetPath).toContain(`/procurement-requests/${submitted.procurementRequest.id}`);
     expect(taskView.canComplete).toBe(true);

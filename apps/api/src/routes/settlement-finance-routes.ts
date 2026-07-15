@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import type { AppContext } from "../app-context.js";
-import { isFundLedgerStatus, isSettlementMaterialType } from "../repositories/r7-settlement-finance-repository.js";
+import { isSettlementMaterialType } from "../repositories/r7-settlement-finance-repository.js";
 import { isFinanceReviewRole, isFinanceRole, isProcurementBuyerRole, isSupplierRole, supplierIdMatches } from "../role-groups.js";
 import { denyResponse } from "./permission-helpers.js";
 
@@ -13,6 +13,12 @@ function assertFinanceReader(ctx: AppContext, req: Request, res: Response) {
 function assertFinanceWriter(ctx: AppContext, req: Request, res: Response, action: string, objectId = "operation") {
   if (isFinanceReviewRole(req.auth.roleId) || isProcurementBuyerRole(req.auth.roleId)) return true;
   denyResponse(ctx, req, res, 403, "SETTLEMENT_FINANCE_WRITE_DENIED", "Only finance/procurement business roles can perform this settlement finance action.", action, "settlement_finance", objectId);
+  return false;
+}
+
+function assertPaymentConfirmer(ctx: AppContext, req: Request, res: Response, objectId: string) {
+  if (req.auth.roleId === "hotel_finance" || req.auth.roleId === "finance_reviewer") return true;
+  denyResponse(ctx, req, res, 403, "PAYMENT_CONFIRM_DENIED", "Only hotel finance or finance reviewer can confirm payment.", "fund_ledger.confirm_payment.denied", "fund_ledger", objectId);
   return false;
 }
 
@@ -94,7 +100,7 @@ export function settlementFinanceRoutes(ctx: AppContext) {
       const workflow = ctx.r8WorkflowTaskRepository.startApproval({
         businessType: "settlement_bill",
         businessId: bill.id,
-        title: `Settlement bill ${bill.billNo}`,
+        title: "结算单审批",
         amount: bill.settlementAmount,
         methodType: "settlement_bill",
         projectId: bill.projectId,
@@ -273,7 +279,7 @@ export function settlementFinanceRoutes(ctx: AppContext) {
       const workflow = ctx.r8WorkflowTaskRepository.startApproval({
         businessType: "invoice",
         businessId: invoice.id,
-        title: `Invoice ${invoice.invoiceNo}`,
+        title: "发票审核",
         amount: invoice.amount,
         methodType: "invoice",
         projectId: bill.projectId,
@@ -356,8 +362,8 @@ export function settlementFinanceRoutes(ctx: AppContext) {
     if (!bill) return;
     if (!assertFinanceWriter(ctx, req, res, "fund_ledger.create.denied", bill.id)) return;
     const status = req.body?.status === undefined ? "payment_requested" : String(req.body.status);
-    if (!isFundLedgerStatus(status)) {
-      return denyResponse(ctx, req, res, 400, "FUND_LEDGER_STATUS_INVALID", "Fund ledger status is invalid.", "fund_ledger.create.denied", "settlement_bill", bill.id, bill.projectId);
+    if (status !== "payment_requested") {
+      return denyResponse(ctx, req, res, 400, "FUND_LEDGER_STATUS_INVALID", "New fund ledger entries must start as payment_requested.", "fund_ledger.create.denied", "settlement_bill", bill.id, bill.projectId);
     }
     try {
       const entry = ctx.r7SettlementFinanceRepository.createFundLedgerEntry(
@@ -369,7 +375,7 @@ export function settlementFinanceRoutes(ctx: AppContext) {
       const workflow = ctx.r8WorkflowTaskRepository.startApproval({
         businessType: "payment_request",
         businessId: entry.id,
-        title: `Payment request ${entry.ledgerNo}`,
+        title: "付款申请审批",
         amount: entry.amount,
         methodType: entry.entryType,
         projectId: bill.projectId,
@@ -401,6 +407,48 @@ export function settlementFinanceRoutes(ctx: AppContext) {
       return res.status(201).json({ fundLedgerEntry: entry, workflow, auditLogId: auditLog.id });
     } catch (error) {
       return res.status(400).json({ error: { code: "FUND_LEDGER_CREATE_BLOCKED", message: error instanceof Error ? error.message : "Fund ledger creation blocked." } });
+    }
+  });
+
+  router.post("/settlement-finance/fund-ledger/:entryId/confirm-payment", (req, res) => {
+    const existing = ctx.r7SettlementFinanceRepository.getFundLedgerEntry(req.params.entryId);
+    if (!existing) {
+      return res.status(404).json({ error: { code: "FUND_LEDGER_NOT_FOUND", message: "Fund ledger entry does not exist." } });
+    }
+    if (!assertPaymentConfirmer(ctx, req, res, existing.id)) return;
+    const bill = assertSupplierBill(ctx, req, res, existing.settlementBillId);
+    if (!bill) return;
+    try {
+      const entry = ctx.r7SettlementFinanceRepository.transitionFundLedgerEntry(
+        existing.id,
+        req.auth.user,
+        "paid",
+        req.body?.note === undefined ? "酒店财务已确认付款完成。" : String(req.body.note)
+      );
+      syncR7(ctx);
+      const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "fund_ledger.confirm_payment", "fund_ledger", entry.id, bill.projectId, `amount=${entry.amount}`);
+      ctx.eventBus.emit({
+        eventCode: "PaymentCaptured",
+        businessType: "payment",
+        businessId: entry.id,
+        businessTitle: entry.ledgerNo,
+        actor: req.auth.user,
+        orgId: bill.orgId,
+        supplierId: bill.supplierId,
+        projectId: bill.projectId,
+        idempotencyKey: `payment:${entry.id}:captured`,
+        payloadJson: {
+          processBusinessId: entry.id,
+          projectId: bill.projectId,
+          settlementBillId: bill.id,
+          ledgerNo: entry.ledgerNo,
+          amount: entry.amount,
+          status: entry.status
+        }
+      });
+      return res.json({ fundLedgerEntry: entry, auditLogId: auditLog.id });
+    } catch (error) {
+      return res.status(400).json({ error: { code: "PAYMENT_CONFIRM_BLOCKED", message: error instanceof Error ? error.message : "Payment confirmation blocked." } });
     }
   });
 

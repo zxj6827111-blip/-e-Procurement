@@ -358,10 +358,12 @@ function isBeforeQuoteDeadline(project: ProcurementProject) {
 }
 
 function projectListRow(ctx: AppContext, project: ProcurementProject) {
-  const sourceRequestTitle = sourceRequestProjectTitle(sourceRequestForProject(ctx, project));
+  const sourceRequest = sourceRequestForProject(ctx, project);
+  const sourceRequestTitle = sourceRequestProjectTitle(sourceRequest);
   return {
     ...project,
     beforeDeadline: isBeforeQuoteDeadline(project),
+    sourceLineItems: project.sourceLineItems?.length ? project.sourceLineItems : sourceRequest?.lineItems ?? [],
     sourceRequestTitle,
     displayName: projectDisplayName(ctx, project)
   };

@@ -20,8 +20,47 @@ import type {
 } from "../types.js";
 import { canReadAuditLog, canReadProject, denyResponse } from "./permission-helpers.js";
 import { isFinanceReviewRole, isProcurementBuyerRole, isSupplierAdminRole, isSupplierRole, supplierIdMatches } from "../role-groups.js";
+import type { R7Overview } from "../repositories/r7-settlement-finance-repository.js";
 
 const procurementExecutionRoles = new Set(["buyer", "platform_operator"]);
+
+type FulfillmentOverviewStatus =
+  | "pending_contract_confirmation"
+  | "pending_order_generation"
+  | "pending_supplier_confirmation"
+  | "pending_receipt"
+  | "partially_received"
+  | "exception"
+  | "pending_evaluation"
+  | "completed";
+
+const fulfillmentStatusPriority: Record<FulfillmentOverviewStatus, number> = {
+  exception: 0,
+  pending_receipt: 1,
+  partially_received: 2,
+  pending_evaluation: 3,
+  pending_supplier_confirmation: 4,
+  pending_order_generation: 5,
+  pending_contract_confirmation: 6,
+  completed: 7
+};
+
+type SettlementOverviewStatus =
+  | "pending_bill_creation"
+  | "pending_materials"
+  | "pending_submission"
+  | "pending_review"
+  | "pending_payment"
+  | "completed";
+
+const settlementStatusPriority: Record<SettlementOverviewStatus, number> = {
+  pending_bill_creation: 0,
+  pending_materials: 1,
+  pending_submission: 2,
+  pending_review: 3,
+  pending_payment: 4,
+  completed: 5
+};
 
 function isWorkbenchBusinessReader(roleId: string) {
   return isProcurementBuyerRole(roleId) || roleId === "group_manager" || roleId === "auditor" || isFinanceReviewRole(roleId);
@@ -33,6 +72,93 @@ function isWorkbenchBusinessMaintainer(roleId: string) {
 
 function isSettlementVerifier(roleId: string) {
   return procurementExecutionRoles.has(roleId) || isFinanceReviewRole(roleId);
+}
+
+function canReadFulfillmentProject(req: Request, project: ProcurementProject) {
+  if (isSupplierRole(req.auth.roleId)) {
+    return project.participantSupplierIds.some((supplierId) => supplierIdMatches(req.auth.user, supplierId));
+  }
+  return canReadProject(req, project);
+}
+
+function fulfillmentStatusForOrder(
+  order: PurchaseOrder,
+  receipts: ReceiptRecord[],
+  evaluations: SupplierEvaluation[]
+): FulfillmentOverviewStatus {
+  const hasOpenException =
+    order.status === "exception" ||
+    receipts.some((receipt) => receipt.receiptType === "exception" && receipt.handlingStatus !== "closed");
+  if (hasOpenException) return "exception";
+  if (order.status === "pending_confirmation") return "pending_supplier_confirmation";
+  if (order.status === "supplier_confirmed" || order.status === "performing") return "pending_receipt";
+  if (order.status === "partially_received") return "partially_received";
+  if (order.status === "received" || order.status === "closed") {
+    return evaluations.some((evaluation) => evaluation.status === "submitted_locked") ? "completed" : "pending_evaluation";
+  }
+  return "pending_receipt";
+}
+
+function fulfillmentNextAction(status: FulfillmentOverviewStatus, supplierSide: boolean) {
+  switch (status) {
+    case "pending_contract_confirmation":
+      return supplierSide ? "确认合同" : "等待供应商确认合同";
+    case "pending_order_generation":
+      return supplierSide ? "等待采购生成订单" : "生成采购订单";
+    case "pending_supplier_confirmation":
+      return supplierSide ? "确认采购订单" : "等待供应商确认订单";
+    case "pending_receipt":
+    case "partially_received":
+      return supplierSide ? "查看履约进度" : "登记收货";
+    case "exception":
+      return supplierSide ? "查看异常" : "处理收货异常";
+    case "pending_evaluation":
+      return supplierSide ? "查看履约结果" : "提交履约评价";
+    default:
+      return "查看履约详情";
+  }
+}
+
+function settlementStatusForOrder(
+  bill: R7Overview["settlementBills"][number] | undefined,
+  overview: R7Overview
+): SettlementOverviewStatus {
+  if (!bill) return "pending_bill_creation";
+  const materials = overview.settlementMaterials.filter((item) => item.purchaseOrderId === bill.purchaseOrderId);
+  const invoices = overview.invoices.filter((item) => item.settlementBillId === bill.id);
+  const ledgerEntries = overview.fundLedgerEntries.filter((item) => item.settlementBillId === bill.id);
+
+  if (bill.status === "paid" || ledgerEntries.some((item) => item.status === "paid")) return "completed";
+  if (["approved", "payable"].includes(bill.status)) return "pending_payment";
+  if (bill.status === "submitted" || materials.some((item) => item.status === "pending_verification") || invoices.some((item) => item.status === "pending_verification")) {
+    return "pending_review";
+  }
+  if (
+    materials.length === 0 ||
+    invoices.length === 0 ||
+    materials.some((item) => item.status === "rejected") ||
+    invoices.some((item) => item.status === "rejected")
+  ) {
+    return "pending_materials";
+  }
+  return "pending_submission";
+}
+
+function settlementNextAction(status: SettlementOverviewStatus, supplierSide: boolean, financeSide: boolean) {
+  switch (status) {
+    case "pending_bill_creation":
+      return supplierSide ? "等待生成结算单" : "生成结算单";
+    case "pending_materials":
+      return "补充结算资料";
+    case "pending_submission":
+      return "提交结算审核";
+    case "pending_review":
+      return financeSide ? "审核结算资料" : "查看审核进度";
+    case "pending_payment":
+      return financeSide ? "登记付款" : "查看付款进度";
+    default:
+      return "查看结算记录";
+  }
 }
 
 const archiveItemCatalog = [
@@ -482,6 +608,391 @@ function handleStoredFile(ctx: AppContext, storedFileId: string) {
 export function projectWorkbenchRoutes(ctx: AppContext) {
   const router = Router();
 
+  router.get("/project-workbench/fulfillment-overview", (req, res) => {
+    const supplierSide = isSupplierRole(req.auth.roleId);
+    if (
+      req.auth.roleId === "admin" ||
+      req.auth.roleId === "system" ||
+      req.auth.roleId === "expert" ||
+      (!supplierSide && !isWorkbenchBusinessReader(req.auth.roleId))
+    ) {
+      return denyResponse(
+        ctx,
+        req,
+        res,
+        403,
+        "FULFILLMENT_OVERVIEW_READ_DENIED",
+        "Current role cannot read fulfillment overview.",
+        "fulfillment_overview.read.denied",
+        "fulfillment_overview",
+        "list"
+      );
+    }
+
+    const keyword = String(req.query.keyword ?? "").trim().toLocaleLowerCase("zh-CN");
+    const requestedStatus = String(req.query.status ?? "all");
+    const allowedStatuses = new Set<FulfillmentOverviewStatus>(Object.keys(fulfillmentStatusPriority) as FulfillmentOverviewStatus[]);
+    const status = allowedStatuses.has(requestedStatus as FulfillmentOverviewStatus)
+      ? (requestedStatus as FulfillmentOverviewStatus)
+      : null;
+    const onlyPending = String(req.query.onlyPending ?? "false") === "true";
+    const parsedPage = Number.parseInt(String(req.query.page ?? "1"), 10);
+    const parsedPageSize = Number.parseInt(String(req.query.pageSize ?? "20"), 10);
+    const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
+    const pageSize = Number.isFinite(parsedPageSize) ? Math.min(100, Math.max(1, parsedPageSize)) : 20;
+
+    const accessibleProjects = ctx.state.projects.filter((project) => canReadFulfillmentProject(req, project));
+    const rows = accessibleProjects.flatMap((project) => {
+      const projectOrders = ctx.state.purchaseOrders.filter(
+        (order) => order.projectId === project.id && (!supplierSide || supplierIdMatches(req.auth.user, order.supplierId))
+      );
+      const projectContracts = ctx.state.contractLedgers.filter(
+        (contract) => contract.projectId === project.id && (!supplierSide || supplierIdMatches(req.auth.user, contract.supplierId))
+      );
+      const orderRows = projectOrders.map((order) => {
+        const contract = projectContracts.find((item) => item.id === order.contractId) ?? null;
+        const receipts = ctx.state.receiptRecords.filter((receipt) => receipt.purchaseOrderId === order.id);
+        const evaluations = ctx.state.supplierEvaluations.filter((evaluation) => evaluation.purchaseOrderId === order.id);
+        const fulfillmentStatus = fulfillmentStatusForOrder(order, receipts, evaluations);
+        const supplier = ctx.state.suppliers.find((item) => item.id === order.supplierId);
+        const hasOpenException =
+          order.status === "exception" ||
+          receipts.some((receipt) => receipt.receiptType === "exception" && receipt.handlingStatus !== "closed");
+        return {
+          id: `order:${order.id}`,
+          projectId: project.id,
+          projectCode: project.code,
+          projectName: project.name,
+          projectStatus: project.status,
+          externalTradeFlag: project.externalTradeFlag,
+          contractId: contract?.id ?? order.contractId ?? null,
+          contractNo: contract?.contractNo ?? null,
+          contractStatus: contract?.status ?? null,
+          orderId: order.id,
+          orderNo: order.orderNo,
+          orderStatus: order.status,
+          supplierId: order.supplierId,
+          supplierName: supplier?.name ?? order.supplierId,
+          amount: order.totalAmount,
+          expectedDeliveryAt: order.expectedDeliveryAt,
+          receiptCount: receipts.length,
+          hasOpenException,
+          fulfillmentStatus,
+          nextActionLabel: fulfillmentNextAction(fulfillmentStatus, supplierSide),
+          lastUpdatedAt: order.updatedAt ?? order.createdAt
+        };
+      });
+
+      const orderContractIds = new Set(projectOrders.map((order) => order.contractId).filter(Boolean));
+      const contractRows = projectContracts
+        .filter((contract) => !orderContractIds.has(contract.id))
+        .map((contract) => {
+          const fulfillmentStatus: FulfillmentOverviewStatus =
+            contract.status === "pending_supplier_confirmation"
+              ? "pending_contract_confirmation"
+              : contract.status === "registered" || contract.status === "performing"
+                ? "pending_order_generation"
+                : "completed";
+          const supplier = ctx.state.suppliers.find((item) => item.id === contract.supplierId);
+          return {
+            id: `contract:${contract.id}`,
+            projectId: project.id,
+            projectCode: project.code,
+            projectName: project.name,
+            projectStatus: project.status,
+            externalTradeFlag: project.externalTradeFlag,
+            contractId: contract.id,
+            contractNo: contract.contractNo,
+            contractStatus: contract.status,
+            orderId: null,
+            orderNo: null,
+            orderStatus: null,
+            supplierId: contract.supplierId,
+            supplierName: supplier?.name ?? contract.supplierId,
+            amount: contract.amount,
+            expectedDeliveryAt: project.expectedArrivalAt ?? null,
+            receiptCount: 0,
+            hasOpenException: false,
+            fulfillmentStatus,
+            nextActionLabel: fulfillmentNextAction(fulfillmentStatus, supplierSide),
+            lastUpdatedAt: contract.updatedAt ?? contract.createdAt
+          };
+        });
+
+      return [...orderRows, ...contractRows];
+    });
+
+    const keywordFilteredRows = keyword
+      ? rows.filter((row) =>
+          [row.projectCode, row.projectName, row.contractNo, row.orderNo, row.supplierName]
+            .filter(Boolean)
+            .some((value) => String(value).toLocaleLowerCase("zh-CN").includes(keyword))
+        )
+      : rows;
+    const statusCounts = Object.fromEntries(
+      (Object.keys(fulfillmentStatusPriority) as FulfillmentOverviewStatus[]).map((entry) => [
+        entry,
+        keywordFilteredRows.filter((row) => row.fulfillmentStatus === entry).length
+      ])
+    );
+    const filteredRows = keywordFilteredRows
+      .filter((row) => (!status ? true : row.fulfillmentStatus === status))
+      .filter((row) => (!onlyPending ? true : row.fulfillmentStatus !== "completed"))
+      .sort((left, right) => {
+        const priority = fulfillmentStatusPriority[left.fulfillmentStatus] - fulfillmentStatusPriority[right.fulfillmentStatus];
+        if (priority !== 0) return priority;
+        return String(right.lastUpdatedAt ?? "").localeCompare(String(left.lastUpdatedAt ?? ""));
+      });
+    const total = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const effectivePage = Math.min(page, totalPages);
+    const offset = (effectivePage - 1) * pageSize;
+    const pagedRows = filteredRows.slice(offset, offset + pageSize);
+    const projectOptions = Array.from(
+      keywordFilteredRows.reduce((options, row) => {
+        const current = options.get(row.projectId);
+        if (!current || String(row.lastUpdatedAt ?? "") > String(current.lastUpdatedAt ?? "")) {
+          options.set(row.projectId, {
+            id: row.projectId,
+            code: row.projectCode,
+            name: row.projectName,
+            status: row.projectStatus,
+            fulfillmentStatus: row.fulfillmentStatus,
+            externalTradeFlag: row.externalTradeFlag,
+            supplierName: row.supplierName,
+            lastUpdatedAt: row.lastUpdatedAt
+          });
+        }
+        return options;
+      }, new Map<string, {
+        id: string;
+        code: string;
+        name: string;
+        status: ProcurementProject["status"];
+        fulfillmentStatus: FulfillmentOverviewStatus;
+        externalTradeFlag: boolean;
+        supplierName: string;
+        lastUpdatedAt?: string;
+      }>()).values()
+    )
+      .sort((left, right) => String(right.lastUpdatedAt ?? "").localeCompare(String(left.lastUpdatedAt ?? "")))
+      .slice(0, 20);
+
+    return res.json({
+      rows: pagedRows,
+      projectOptions,
+      summary: {
+        total: keywordFilteredRows.length,
+        pending: keywordFilteredRows.filter((row) => row.fulfillmentStatus !== "completed").length,
+        exception: statusCounts.exception ?? 0,
+        pendingReceipt: (statusCounts.pending_receipt ?? 0) + (statusCounts.partially_received ?? 0),
+        pendingEvaluation: statusCounts.pending_evaluation ?? 0,
+        statusCounts
+      },
+      pagination: {
+        page: effectivePage,
+        pageSize,
+        total,
+        totalPages
+      }
+    });
+  });
+
+  router.get("/project-workbench/settlement-overview", (req, res) => {
+    const supplierSide = isSupplierRole(req.auth.roleId);
+    if (
+      req.auth.roleId === "admin" ||
+      req.auth.roleId === "system" ||
+      req.auth.roleId === "expert" ||
+      (!supplierSide && !isWorkbenchBusinessReader(req.auth.roleId))
+    ) {
+      return denyResponse(
+        ctx,
+        req,
+        res,
+        403,
+        "SETTLEMENT_OVERVIEW_READ_DENIED",
+        "Current role cannot read settlement overview.",
+        "settlement_overview.read.denied",
+        "settlement_overview",
+        "list"
+      );
+    }
+
+    const keyword = String(req.query.keyword ?? "").trim().toLocaleLowerCase("zh-CN");
+    const requestedStatus = String(req.query.status ?? "all");
+    const allowedStatuses = new Set<SettlementOverviewStatus>(Object.keys(settlementStatusPriority) as SettlementOverviewStatus[]);
+    const status = allowedStatuses.has(requestedStatus as SettlementOverviewStatus)
+      ? (requestedStatus as SettlementOverviewStatus)
+      : null;
+    const onlyPending = String(req.query.onlyPending ?? "false") === "true";
+    const parsedPage = Number.parseInt(String(req.query.page ?? "1"), 10);
+    const parsedPageSize = Number.parseInt(String(req.query.pageSize ?? "20"), 10);
+    const page = Number.isFinite(parsedPage) ? Math.max(1, parsedPage) : 1;
+    const pageSize = Number.isFinite(parsedPageSize) ? Math.min(100, Math.max(1, parsedPageSize)) : 20;
+    const overview = ctx.r7SettlementFinanceRepository.listOverview(req.auth.user, req.auth.roleId);
+    const billsByOrder = new Map(overview.settlementBills.map((bill) => [bill.purchaseOrderId, bill]));
+    const financeSide = isFinanceReviewRole(req.auth.roleId);
+
+    const rows = ctx.state.projects
+      .filter((project) => canReadFulfillmentProject(req, project))
+      .flatMap((project) =>
+        ctx.state.purchaseOrders
+          .filter(
+            (order) =>
+              order.projectId === project.id &&
+              (!supplierSide || supplierIdMatches(req.auth.user, order.supplierId)) &&
+              (["received", "closed"].includes(order.status) || billsByOrder.has(order.id))
+          )
+          .map((order) => {
+            const bill = billsByOrder.get(order.id);
+            const materials = overview.settlementMaterials.filter((item) => item.purchaseOrderId === order.id);
+            const invoices = bill ? overview.invoices.filter((item) => item.settlementBillId === bill.id) : [];
+            const ledgerEntries = bill ? overview.fundLedgerEntries.filter((item) => item.settlementBillId === bill.id) : [];
+            const settlementStatus = settlementStatusForOrder(bill, overview);
+            const supplier = ctx.state.suppliers.find((item) => item.id === order.supplierId);
+            const timestamps = [
+              order.updatedAt,
+              order.createdAt,
+              bill?.approvedAt,
+              bill?.submittedAt,
+              bill?.createdAt,
+              ...materials.map((item) => item.verifiedAt ?? item.uploadedAt),
+              ...invoices.map((item) => item.verifiedAt ?? item.uploadedAt),
+              ...ledgerEntries.map((item) => item.operatedAt ?? item.createdAt)
+            ].filter((value): value is string => Boolean(value));
+            return {
+              id: `order:${order.id}`,
+              projectId: project.id,
+              projectCode: project.code,
+              projectName: project.name,
+              projectStatus: project.status,
+              externalTradeFlag: project.externalTradeFlag,
+              orderId: order.id,
+              orderNo: order.orderNo,
+              orderStatus: order.status,
+              supplierId: order.supplierId,
+              supplierName: supplier?.name ?? order.supplierId,
+              amount: bill?.settlementAmount ?? order.totalAmount,
+              settlementBillId: bill?.id ?? null,
+              settlementBillNo: bill?.billNo ?? null,
+              settlementBillStatus: bill?.status ?? null,
+              materialCount: materials.length,
+              invoiceCount: invoices.length,
+              settlementStatus,
+              nextActionLabel: settlementNextAction(settlementStatus, supplierSide, financeSide),
+              lastUpdatedAt: timestamps.sort((left, right) => right.localeCompare(left))[0] ?? null
+            };
+          })
+      );
+
+    const keywordFilteredRows = keyword
+      ? rows.filter((row) =>
+          [row.projectCode, row.projectName, row.orderNo, row.settlementBillNo, row.supplierName]
+            .filter(Boolean)
+            .some((value) => String(value).toLocaleLowerCase("zh-CN").includes(keyword))
+        )
+      : rows;
+    const statusCounts = Object.fromEntries(
+      (Object.keys(settlementStatusPriority) as SettlementOverviewStatus[]).map((entry) => [
+        entry,
+        keywordFilteredRows.filter((row) => row.settlementStatus === entry).length
+      ])
+    ) as Record<SettlementOverviewStatus, number>;
+    const filteredRows = keywordFilteredRows
+      .filter((row) => (!status ? true : row.settlementStatus === status))
+      .filter((row) => (!onlyPending ? true : row.settlementStatus !== "completed"))
+      .sort((left, right) => {
+        const priority = settlementStatusPriority[left.settlementStatus] - settlementStatusPriority[right.settlementStatus];
+        if (priority !== 0) return priority;
+        return String(right.lastUpdatedAt ?? "").localeCompare(String(left.lastUpdatedAt ?? ""));
+      });
+    const total = filteredRows.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const effectivePage = Math.min(page, totalPages);
+    const offset = (effectivePage - 1) * pageSize;
+    const pagedRows = filteredRows.slice(offset, offset + pageSize);
+    const projectOptions = Array.from(
+      keywordFilteredRows.reduce((options, row) => {
+        const current = options.get(row.projectId);
+        if (!current || settlementStatusPriority[row.settlementStatus] < settlementStatusPriority[current.settlementStatus] || String(row.lastUpdatedAt ?? "") > String(current.lastUpdatedAt ?? "")) {
+          options.set(row.projectId, {
+            id: row.projectId,
+            code: row.projectCode,
+            name: row.projectName,
+            status: row.projectStatus,
+            settlementStatus: row.settlementStatus,
+            externalTradeFlag: row.externalTradeFlag,
+            supplierName: row.supplierName,
+            settlementBillNo: row.settlementBillNo,
+            lastUpdatedAt: row.lastUpdatedAt
+          });
+        }
+        return options;
+      }, new Map<string, {
+        id: string;
+        code: string;
+        name: string;
+        status: ProcurementProject["status"];
+        settlementStatus: SettlementOverviewStatus;
+        externalTradeFlag: boolean;
+        supplierName: string;
+        settlementBillNo: string | null;
+        lastUpdatedAt: string | null;
+      }>()).values()
+    )
+      .sort((left, right) => {
+        const priority = settlementStatusPriority[left.settlementStatus] - settlementStatusPriority[right.settlementStatus];
+        if (priority !== 0) return priority;
+        return String(right.lastUpdatedAt ?? "").localeCompare(String(left.lastUpdatedAt ?? ""));
+      })
+      .slice(0, 20);
+
+    return res.json({
+      rows: pagedRows,
+      projectOptions,
+      summary: {
+        total: keywordFilteredRows.length,
+        pendingBillCreation: statusCounts.pending_bill_creation,
+        pendingMaterials: statusCounts.pending_materials,
+        pendingReview: statusCounts.pending_review,
+        pendingPayment: statusCounts.pending_payment,
+        completed: statusCounts.completed,
+        statusCounts
+      },
+      pagination: {
+        page: effectivePage,
+        pageSize,
+        total,
+        totalPages
+      }
+    });
+  });
+
+  router.get("/project-workbench/purchase-orders", (req, res) => {
+    const supplierSide = isSupplierRole(req.auth.roleId);
+    if (!supplierSide && !isWorkbenchBusinessReader(req.auth.roleId)) {
+      return denyResponse(
+        ctx,
+        req,
+        res,
+        403,
+        "PURCHASE_ORDER_LIST_READ_DENIED",
+        "Current role cannot read purchase orders.",
+        "purchase_order.list.denied",
+        "purchase_order",
+        "list"
+      );
+    }
+
+    const purchaseOrders = ctx.state.purchaseOrders.filter((order) => {
+      if (supplierSide) return supplierIdMatches(req.auth.user, order.supplierId);
+      const project = ctx.state.projects.find((item) => item.id === order.projectId);
+      return Boolean(project && canReadProject(req, project));
+    });
+    return res.json({ purchaseOrders });
+  });
+
   router.get("/project-workbench/projects/:projectId", (req, res) => {
     const project = ensureProject(ctx, req.params.projectId, res);
     if (!project) return;
@@ -542,6 +1053,7 @@ export function projectWorkbenchRoutes(ctx: AppContext) {
       awardApprovals: isSupplier ? [] : ctx.state.awardApprovals.filter((item) => item.projectId === project.id),
       pricingReports: isSupplier ? [] : ctx.state.pricingReports.filter((item) => item.projectId === project.id),
       resultNotifications: ctx.state.resultNotifications.filter((item) => item.projectId === project.id && (!isSupplier || item.supplierId === req.auth.user.supplierId)),
+      contracts: ctx.state.contractLedgers.filter((item) => item.projectId === project.id && (!isSupplier || item.supplierId === req.auth.user.supplierId)),
       purchaseOrders: visibleOrders(ctx, req, project),
       receiptRecords: visibleReceipts(ctx, req, project),
       supplierEvaluations: visibleSupplierEvaluations(ctx, req, project),
@@ -557,8 +1069,8 @@ export function projectWorkbenchRoutes(ctx: AppContext) {
     if (!project) return;
     if (!assertOrderMaintainer(ctx, req, res, project, "purchase_order.generate.denied")) return;
     if (!ensureArchiveMutable(ctx, req, res, project.id, "project", project.id, "purchase_order.generate.denied")) return;
-    if (project.status !== "awarded_pending_order") {
-      return denyResponse(ctx, req, res, 400, "PROJECT_STATUS_NOT_READY", "Purchase order can be generated only when project status is awarded_pending_order.", "purchase_order.generate.denied", "project", project.id, project.id);
+    if (!["awarded_pending_order", "result_notified", "contract_registered"].includes(project.status)) {
+      return denyResponse(ctx, req, res, 400, "PROJECT_STATUS_NOT_READY", "Purchase order can be generated only after contract confirmation and before fulfillment starts.", "purchase_order.generate.denied", "project", project.id, project.id);
     }
     if (isBeforeDeadline(project)) {
       return denyResponse(ctx, req, res, 400, "BID_DEADLINE_NOT_REACHED", "Purchase order can be generated only after quote deadline.", "purchase_order.generate.denied", "project", project.id, project.id);
@@ -566,6 +1078,31 @@ export function projectWorkbenchRoutes(ctx: AppContext) {
     const approved = latestAwardApproval(ctx, project.id);
     if (!approved) {
       return denyResponse(ctx, req, res, 400, "AWARD_APPROVAL_NOT_APPROVED", "Approved award decision is required before generating purchase order.", "purchase_order.generate.denied", "project", project.id, project.id);
+    }
+    const contract = [...ctx.state.contractLedgers]
+      .reverse()
+      .find(
+        (item) =>
+          item.projectId === project.id &&
+          item.supplierId === approved.selectedSupplierId &&
+          ["registered", "performing", "completed"].includes(item.status)
+      );
+    if (!contract) {
+      return denyResponse(
+        ctx,
+        req,
+        res,
+        400,
+        "CONTRACT_CONFIRMATION_REQUIRED",
+        "Supplier-confirmed contract is required before generating purchase order.",
+        "purchase_order.generate.denied",
+        "project",
+        project.id,
+        project.id
+      );
+    }
+    if (req.body?.contractId !== undefined && String(req.body.contractId) !== contract.id) {
+      return denyResponse(ctx, req, res, 400, "CONTRACT_ID_MISMATCH", "Purchase order contract must match the confirmed awarded-supplier contract.", "purchase_order.generate.denied", "contract_ledger", String(req.body.contractId), project.id);
     }
     const duplicate = ctx.state.purchaseOrders.find((item) => item.projectId === project.id && item.awardApprovalId === approved.id);
     if (duplicate) {
@@ -581,7 +1118,7 @@ export function projectWorkbenchRoutes(ctx: AppContext) {
       id: `po-${ctx.state.purchaseOrders.length + 1}`,
       projectId: project.id,
       supplierId: approved.selectedSupplierId,
-      contractId: req.body?.contractId === undefined ? undefined : String(req.body.contractId),
+      contractId: contract.id,
       sourceRequestId: request?.id,
       awardApprovalId: approved.id,
       selectedBidId: bid.id,

@@ -201,6 +201,7 @@ export interface PurchaseOrderRecord {
   id: string;
   orderNo: string;
   supplierId: string;
+  contractId?: string;
   status: string;
   paymentStatus?: string;
   totalAmount: number;
@@ -219,12 +220,52 @@ export interface PurchaseOrderRecord {
   }>;
 }
 
+export interface ContractLedgerRecord {
+  id: string;
+  projectId: string;
+  supplierId: string;
+  contractNo: string;
+  amount: number;
+  status: 'pending_supplier_confirmation' | 'registered' | 'performing' | 'completed' | 'cancelled';
+  contractSystemLink?: string;
+  attachmentMetadata: Array<{
+    id: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    uploadedAt: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ReceiptRecord {
   id: string;
+  purchaseOrderId: string;
+  projectId?: string;
+  supplierId?: string;
   receiptType: string;
   exceptionType?: string;
+  acceptanceResult?: string;
+  status?: string;
   summary: string;
   handlingStatus?: string;
+  handlingNote?: string;
+  receiptAt?: string;
+  handledAt?: string;
+  receivedItems?: Array<{
+    itemName: string;
+    receivedQuantity: number;
+    unit: string;
+    accepted: boolean;
+  }>;
+  attachmentMetadata?: Array<{
+    id: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    uploadedAt: string;
+  }>;
   createdAt: string;
 }
 
@@ -240,11 +281,13 @@ export interface SupplierEvaluationRecord {
 
 export interface SettlementMaterialRecord {
   id: string;
+  settlementBillId?: string;
   projectId?: string;
   supplierId?: string;
   purchaseOrderId?: string;
   materialType: string;
   status: string;
+  fileId?: string;
   fileName?: string;
   uploadedAt?: string;
   verifiedAt?: string;
@@ -306,6 +349,7 @@ export interface WorkbenchData {
   awardApprovals: AwardApprovalRecord[];
   pricingReports?: PricingReportRecord[];
   resultNotifications?: ResultNotificationRecord[];
+  contracts: ContractLedgerRecord[];
   purchaseOrders: PurchaseOrderRecord[];
   receiptRecords: ReceiptRecord[];
   supplierEvaluations: SupplierEvaluationRecord[];
@@ -345,6 +389,7 @@ export interface InvoiceRecord {
   amount: number;
   taxRate?: number;
   taxAmount?: number;
+  fileId?: string;
   fileName?: string;
   status: string;
   uploadedAt?: string;
@@ -528,6 +573,7 @@ export function humanizeStatus(status?: string | null) {
     frozen: '已冻结',
     approved: '已批准',
     pending_confirmation: '待供应商确认',
+    pending_supplier_confirmation: '待供应商确认合同',
     supplier_confirmed: '供应商已确认',
     performing: '履约中',
     partially_received: '部分收货',
@@ -536,6 +582,7 @@ export function humanizeStatus(status?: string | null) {
     pending_verification: '待核验',
     verified: '已核验',
     payable: '待付款',
+    pending_payment: '待财务付款',
     paid: '已付款',
     payment_reserved: '付款已预留',
     payment_requested: '付款申请中',
@@ -571,7 +618,7 @@ export function statusBadgeVariant(status?: string | null): 'default' | 'success
   if (['rejected', 'voided', 'exception', 'restricted'].includes(normalized)) {
     return 'danger';
   }
-  if (['performing', 'supplier_confirmed', 'partially_received', 'viewed', 'payable'].includes(normalized)) {
+  if (['performing', 'supplier_confirmed', 'partially_received', 'viewed', 'payable', 'pending_payment'].includes(normalized)) {
     return 'info';
   }
   if (normalized === 'draft' || normalized === 'closed') {

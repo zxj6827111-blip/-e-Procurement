@@ -9,12 +9,19 @@ export interface SystemRoleRow {
 
 export interface SystemUserRow {
   id: string;
+  username?: string;
   name: string;
   roleId: string;
   orgId: string;
   status?: string;
+  accountStatus?: string;
+  statusSource?: string | null;
+  passwordChangeRequired?: boolean;
+  lastLoginAt?: string | null;
   departmentId?: string;
   position?: string;
+  orgScope?: string[];
+  supplierId?: string;
 }
 
 export interface SystemOrganizationRow {

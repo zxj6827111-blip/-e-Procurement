@@ -1,15 +1,17 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { approveWorkflowInstance, completeWorkflowTask, loadWorkflowTasks, rejectWorkflowInstance, type R8ApprovalBusinessType, type R8WorkflowTaskView } from "../../api/workflow";
+import { apiGet } from "../../api/http";
 import { loadProcessTasks, type ProcessTaskView } from "../../api/process";
 import type { SummaryCardItem } from "../../components/base";
 import { useSessionStore } from "../../stores/session";
 import { r8BusinessTypeLabels } from "../../../../api/src/workflow-ui-contract";
-import type { BusinessTypeOption, DateFilter, TaskAction, TaskStatusFilter, UnifiedTaskView } from "./types";
+import type { BusinessTypeOption, DateFilter, TaskAction, TaskProjectView, TaskStatusFilter, UnifiedTaskView } from "./types";
 
 export function useMyTasksPage() {
   const session = useSessionStore();
   const processTasks = ref<ProcessTaskView[]>([]);
   const r8Tasks = ref<R8WorkflowTaskView[]>([]);
+  const projects = ref<TaskProjectView[]>([]);
   const loading = ref(false);
   const error = ref("");
   const auditLogId = ref("");
@@ -22,11 +24,24 @@ export function useMyTasksPage() {
   function findCompatibleR8Task(processTask: ProcessTaskView) {
     return r8Tasks.value.find(
       (task) =>
-        task.businessType === processTask.businessType &&
         task.businessId === processTask.businessId &&
-        task.taskType === processTask.taskType &&
         task.status === processTask.status
     );
+  }
+
+  function resolveProjectName(task: Pick<UnifiedTaskView, "businessType" | "projectId">) {
+    if (!task.projectId) {
+      return task.businessType === "procurement_request" ? "尚未生成采购项目" : "未关联采购项目";
+    }
+    const project = projects.value.find((item) => item.id === task.projectId);
+    if (!project) return "项目名称暂不可用";
+    const explicitName = project.name?.trim() || project.sourceRequestTitle?.trim();
+    if (explicitName) return explicitName;
+    const displayName = project.displayName?.trim();
+    const codePrefix = project.code ? `${project.code} / ` : "";
+    if (displayName && codePrefix && displayName.startsWith(codePrefix)) return displayName.slice(codePrefix.length).trim();
+    if (displayName && displayName !== project.id && displayName !== project.code) return displayName;
+    return "项目名称暂不可用";
   }
 
   const tasks = computed<UnifiedTaskView[]>(() => {
@@ -43,8 +58,9 @@ export function useMyTasksPage() {
         businessType: task.businessType,
         businessId: task.businessId,
         projectId: task.projectId,
+        projectName: resolveProjectName(task),
         taskTypeLabel: task.taskTypeLabel,
-        title: task.businessTitle || task.title,
+        title: r8Task?.taskTypeLabel ?? task.taskTypeLabel,
         businessTypeLabel: task.businessTypeLabel,
         status: task.status,
         statusLabel: task.statusLabel,
@@ -70,8 +86,9 @@ export function useMyTasksPage() {
         businessType: task.businessType,
         businessId: task.businessId,
         projectId: task.projectId,
+        projectName: resolveProjectName(task),
         taskTypeLabel: task.taskTypeLabel,
-        title: task.title,
+        title: task.taskTypeLabel,
         businessTypeLabel: task.businessTypeLabel,
         status: task.status,
         statusLabel: task.statusLabel,
@@ -129,15 +146,21 @@ export function useMyTasksPage() {
     loading.value = true;
     error.value = "";
     try {
-      const [processResult, r8Result] = await Promise.allSettled([loadProcessTasks(), loadWorkflowTasks(session)]);
+      const [processResult, r8Result, projectResult] = await Promise.allSettled([
+        loadProcessTasks(),
+        loadWorkflowTasks(session),
+        apiGet<{ projects: TaskProjectView[] }>("/api/projects")
+      ]);
       processTasks.value = processResult.status === "fulfilled" ? processResult.value : [];
       r8Tasks.value = r8Result.status === "fulfilled" ? r8Result.value : [];
+      projects.value = projectResult.status === "fulfilled" ? projectResult.value.projects : [];
       if (processResult.status === "rejected" && r8Result.status === "rejected") throw r8Result.reason;
       if (processResult.status === "rejected") error.value = "业务待办暂不可用，已显示审批任务。";
     } catch (err) {
       error.value = err instanceof Error ? err.message : "任务加载失败";
       processTasks.value = [];
       r8Tasks.value = [];
+      projects.value = [];
     } finally {
       loading.value = false;
     }

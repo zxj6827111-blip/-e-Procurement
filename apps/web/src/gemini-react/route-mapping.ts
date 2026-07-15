@@ -57,6 +57,7 @@ export function geminiViewForPath(path: string, roleId: string): ViewState | nul
   if (path === "/supplier-registration") return "REGISTRATION";
   if (path === "/bidding") return "QUOTE_RESPONSE";
   if (path === "/bid-control") return "QUOTE_PROGRESS";
+  if (path === "/expert-directory") return "EXPERT_DIRECTORY";
   if (path === "/expert-review") return "REVIEW_AWARD";
   if (path === "/scoring-templates") return "RATING_TEMPLATE";
   if (path === "/expert-scoring") return "EXPERT_RATING";
@@ -81,7 +82,7 @@ export function geminiViewForPath(path: string, roleId: string): ViewState | nul
   if (/^\/supply-mall\/[^/]+$/.test(path)) return "SUPPLY_MALL";
   if (path === "/order-fulfillment") return "ORDER_FULFILLMENT";
   if (path === "/settlement-materials") {
-    if (["supplier", "supplier_admin", "supplier_quotation"].includes(roleId)) return "SETTLEMENT_MATS";
+    if (["buyer", "hotel_buyer", "platform_operator", "supplier", "supplier_admin", "supplier_quotation"].includes(roleId)) return "SETTLEMENT_MATS";
     return "SETTLEMENT";
   }
   if (path === "/payment-status") return "PAYMENT_PROGRESS";
@@ -137,6 +138,8 @@ export function routeForGeminiView(view: ViewState, roleId: string, projectId?: 
       return projectId ? `/bidding?projectId=${encodeURIComponent(projectId)}` : "/bidding";
     case "QUOTE_PROGRESS":
       return projectId ? `/bid-control?projectId=${encodeURIComponent(projectId)}` : "/bid-control";
+    case "EXPERT_DIRECTORY":
+      return "/expert-directory";
     case "REVIEW_AWARD":
       return projectId ? `/expert-review?projectId=${encodeURIComponent(projectId)}` : "/expert-review";
     case "RATING_TEMPLATE":

@@ -1,6 +1,8 @@
 import { apiGet, apiPatch, apiPost } from "./http";
 import {
   filterR8BusinessType,
+  r8BusinessTypeLabels,
+  r8TaskTypeLabels,
   toR8ApprovalRuleView,
   toR8WorkflowNotificationView,
   toR8WorkflowTaskView,
@@ -15,6 +17,8 @@ import {
   type R8WorkflowTaskView,
   type R8WorkflowUserContext
 } from "../../../api/src/workflow-ui-contract";
+
+export { r8BusinessTypeLabels, r8TaskTypeLabels };
 
 export type {
   R8ApprovalBusinessType,

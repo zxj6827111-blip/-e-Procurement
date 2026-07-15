@@ -1,6 +1,8 @@
+import crypto from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import type { AppContext } from "../app-context.js";
-import type { Expert, ExpertAssignment, InternalProjectStatus, ProcurementDocumentAttachment, ProcurementProject, ScoringCategory, ScoringDetailValue, ScoringSheet, ScoringTemplate } from "../types.js";
+import { generateTemporaryPassword } from "../runtime/auth-store.js";
+import type { Expert, ExpertAssignment, InternalProjectStatus, ProcurementDocumentAttachment, ProcurementProject, ScoringCategory, ScoringDetailValue, ScoringSheet, ScoringTemplate, User } from "../types.js";
 
 const reviewManagerRoles = new Set(["buyer", "platform_operator"]);
 const reviewApprovalRoles = new Set(["buyer", "platform_operator", "group_manager"]);
@@ -111,9 +113,48 @@ function assertExpertDirectoryMaintainer(ctx: AppContext, req: Request, res: Res
 function validateExpertAccountIds(ctx: AppContext, accountUserIds: string[]) {
   const invalidIds = accountUserIds.filter((userId) => {
     const user = ctx.state.users.find((item) => item.id === userId);
-    return !user || user.roleId !== "expert" || user.status === "disabled" || user.status === "offboarded";
+    const account = ctx.authStore.getAccountsByUserIds([userId])[0];
+    return !user || user.roleId !== "expert" || user.status === "disabled" || user.status === "suspended" || user.status === "offboarded" || account?.status !== "active";
   });
   return invalidIds;
+}
+
+function createExpertAccount(ctx: AppContext, body: Record<string, unknown>, expert: Expert) {
+  const provisioning = (body.accountProvisioning ?? {}) as Record<string, unknown>;
+  const username = String(provisioning.username ?? "").trim();
+  const name = String(provisioning.name ?? expert.name).trim() || expert.name;
+  const orgId = String(provisioning.orgId ?? expert.ownerOrgId ?? "").trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9._@-]{1,63}$/.test(username)) {
+    return { error: { status: 400, code: "USERNAME_INVALID", message: "Username must be 2-64 characters and may contain letters, numbers, dot, underscore, at sign or hyphen." } } as const;
+  }
+  if (ctx.authStore.getAccountByUsername(username) || ctx.authStore.getAccountsByUserIds(ctx.state.users.map((item) => item.id)).some((item) => item.username.toLowerCase() === username.toLowerCase())) {
+    return { error: { status: 409, code: "USERNAME_EXISTS", message: "Username already exists." } } as const;
+  }
+  if (!ctx.state.organizations.some((item) => item.id === orgId && (item.status ?? "active") === "active")) {
+    return { error: { status: 400, code: "USER_ORGANIZATION_INVALID", message: "Expert account organization must reference an active organization." } } as const;
+  }
+
+  const user: User = {
+    id: `u-expert-${crypto.randomUUID()}`,
+    name,
+    roleId: "expert",
+    orgId,
+    orgScope: [orgId],
+    expertId: expert.id,
+    departmentId: String(provisioning.departmentId ?? "").trim() || undefined,
+    position: String(provisioning.position ?? "").trim() || undefined,
+    status: "active"
+  };
+  const temporaryPassword = generateTemporaryPassword("Init");
+  ctx.state.users.push(user);
+  try {
+    ctx.authStore.createAccount({ userId: user.id, username, temporaryPassword });
+  } catch (error) {
+    ctx.state.users.splice(ctx.state.users.indexOf(user), 1);
+    throw error;
+  }
+  expert.accountUserIds = [user.id];
+  return { user, username, temporaryPassword } as const;
 }
 
 function syncExpertAccountBindings(ctx: AppContext, expert: Expert, accountUserIds: string[]) {
@@ -1051,13 +1092,39 @@ export function expertReviewRoutes(ctx: AppContext) {
     if (requestedId && ctx.state.experts.some((item) => item.id === requestedId)) {
       return res.status(409).json({ error: { code: "EXPERT_ALREADY_EXISTS", message: "Expert already exists." } });
     }
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const provisioning = (body.accountProvisioning ?? {}) as Record<string, unknown>;
+    const accountMode = String(provisioning.mode ?? "").trim();
+    if (accountMode && !["create", "bind"].includes(accountMode)) {
+      return res.status(400).json({ error: { code: "EXPERT_ACCOUNT_MODE_INVALID", message: "Expert account mode must be create or bind." } });
+    }
+    if (accountMode === "bind") {
+      const userId = String(provisioning.userId ?? "").trim();
+      if (!userId) return res.status(400).json({ error: { code: "EXPERT_ACCOUNT_REQUIRED", message: "An existing expert account is required." } });
+      body.accountUserIds = [userId];
+    } else if (accountMode === "create") {
+      body.accountUserIds = [];
+    }
+
     const result = buildExpertFromBody(ctx, req);
     if (!result.expert) return res.status(result.error!.status).json({ error: { code: result.error!.code, message: result.error!.message } });
+    const createdAccount = accountMode === "create" ? createExpertAccount(ctx, body, result.expert) : undefined;
+    if (createdAccount?.error) {
+      const provisioningError = createdAccount.error;
+      return res.status(provisioningError.status).json({ error: { code: provisioningError.code, message: provisioningError.message } });
+    }
     ctx.state.experts.push(result.expert);
     syncExpertAccountBindings(ctx, result.expert, result.expert.accountUserIds ?? []);
     ctx.r5ReviewAwardRepository.upsertExpert(result.expert);
     const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "expert.directory.create", "expert", result.expert.id, undefined, result.expert.maintenanceLog);
-    return res.status(201).json({ expert: result.expert, auditLogId: log.id });
+    return res.status(201).json({
+      expert: result.expert,
+      account:
+        createdAccount?.user
+          ? { userId: createdAccount.user.id, username: createdAccount.username, temporaryPassword: createdAccount.temporaryPassword, passwordChangeRequired: true }
+          : undefined,
+      auditLogId: log.id
+    });
   });
 
   router.get("/experts/:expertId", (req, res) => {

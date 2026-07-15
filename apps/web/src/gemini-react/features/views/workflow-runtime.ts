@@ -29,6 +29,7 @@ export interface UnifiedTaskView {
   businessType: R8ApprovalBusinessType;
   businessId: string;
   projectId?: string;
+  projectName: string;
   taskTypeLabel: string;
   title: string;
   businessTypeLabel: string;
@@ -50,12 +51,35 @@ export interface UnifiedTaskLoadResult {
   errorMessage: string;
 }
 
+interface ProjectNameSource {
+  id: string;
+  code?: string;
+  name?: string;
+  sourceRequestTitle?: string;
+  displayName?: string;
+}
+
+function projectDisplayName(project: ProjectNameSource) {
+  const explicitName = project.name?.trim() || project.sourceRequestTitle?.trim();
+  if (explicitName) return explicitName;
+  const displayName = project.displayName?.trim();
+  const codePrefix = project.code ? `${project.code} / ` : '';
+  if (displayName && codePrefix && displayName.startsWith(codePrefix)) return displayName.slice(codePrefix.length).trim();
+  if (displayName && displayName !== project.id && displayName !== project.code) return displayName;
+  return '项目名称暂不可用';
+}
+
+function resolveProjectName(projects: Map<string, ProjectNameSource>, projectId: string | undefined, businessType: R8ApprovalBusinessType) {
+  if (!projectId) return businessType === 'procurement_request' ? '尚未生成采购项目' : '未关联采购项目';
+  const project = projects.get(projectId);
+  if (!project) return '项目名称暂不可用';
+  return projectDisplayName(project);
+}
+
 function findCompatibleR8Task(processTask: ProcessTaskView, r8Tasks: Awaited<ReturnType<typeof loadWorkflowTasks>>) {
   return r8Tasks.find(
     (task) =>
-      task.businessType === processTask.businessType &&
       task.businessId === processTask.businessId &&
-      task.taskType === processTask.taskType &&
       task.status === processTask.status
   );
 }
@@ -66,10 +90,17 @@ export async function loadAuthSession(userId?: string) {
 
 export async function loadUnifiedTasks(userId?: string): Promise<UnifiedTaskLoadResult> {
   const session = await loadAuthSession(userId);
-  const [processResult, r8Result] = await Promise.allSettled([loadProcessTasks(userId), loadWorkflowTasks(session, 'all', userId)]);
+  const [processResult, r8Result, projectsResult] = await Promise.allSettled([
+    loadProcessTasks(userId),
+    loadWorkflowTasks(session, 'all', userId),
+    apiGet<{ projects: ProjectNameSource[] }>('/api/projects', userId)
+  ]);
 
   const processTasks = processResult.status === 'fulfilled' ? processResult.value : [];
   const r8Tasks = r8Result.status === 'fulfilled' ? r8Result.value : [];
+  const projects = new Map(
+    (projectsResult.status === 'fulfilled' ? projectsResult.value.projects : []).map((project) => [project.id, project])
+  );
   const matchedR8TaskIds = new Set<string>();
   const tasks: UnifiedTaskView[] = [
     ...processTasks.map((task) => {
@@ -84,8 +115,9 @@ export async function loadUnifiedTasks(userId?: string): Promise<UnifiedTaskLoad
         businessType: task.businessType,
         businessId: task.businessId,
         projectId: task.projectId,
+        projectName: resolveProjectName(projects, task.projectId, task.businessType),
         taskTypeLabel: task.taskTypeLabel,
-        title: task.businessTitle || task.title,
+        title: r8Task?.taskTypeLabel ?? task.taskTypeLabel,
         businessTypeLabel: task.businessTypeLabel,
         status: task.status,
         statusLabel: task.statusLabel,
@@ -111,8 +143,9 @@ export async function loadUnifiedTasks(userId?: string): Promise<UnifiedTaskLoad
         businessType: task.businessType,
         businessId: task.businessId,
         projectId: task.projectId,
+        projectName: resolveProjectName(projects, task.projectId, task.businessType),
         taskTypeLabel: task.taskTypeLabel,
-        title: task.title,
+        title: task.taskTypeLabel,
         businessTypeLabel: task.businessTypeLabel,
         status: task.status,
         statusLabel: task.statusLabel,
@@ -126,14 +159,17 @@ export async function loadUnifiedTasks(userId?: string): Promise<UnifiedTaskLoad
       }))
   ];
 
-  let errorMessage = '';
+  const warnings: string[] = [];
   if (processResult.status === 'rejected' && r8Result.status === 'rejected') {
     throw (r8Result.reason instanceof Error ? r8Result.reason : new Error('待办任务加载失败'));
   }
   if (processResult.status === 'rejected') {
-    errorMessage = '业务待办暂时不可用，当前仅展示审批任务。';
+    warnings.push('业务待办暂时不可用，当前仅展示审批任务。');
   }
-  return { tasks, errorMessage };
+  if (projectsResult.status === 'rejected') {
+    warnings.push('项目名称暂时不可用，请稍后刷新。');
+  }
+  return { tasks, errorMessage: warnings.join(' ') };
 }
 
 export async function loadNotifications(userId?: string): Promise<R8WorkflowNotificationView[]> {

@@ -34,6 +34,7 @@ const geminiPrimaryRoutes = new Set([
   "/supplier-registration",
   "/bidding",
   "/bid-control",
+  "/expert-directory",
   "/expert-review",
   "/scoring-templates",
   "/expert-scoring",
@@ -69,6 +70,7 @@ const userByRoute = [
   { pattern: /^\/supplier-registration$/, userId: "u11" },
   { pattern: /^\/bidding$/, userId: "u12" },
   { pattern: /^\/expert-scoring$/, userId: "u7" },
+  { pattern: /^\/expert-directory$/, userId: "u1" },
   { pattern: /^\/expert-review$/, userId: "u2" },
   { pattern: /^\/approval-rules$/, userId: "u1" },
   { pattern: /^\/integration-boundary$/, userId: "u5" },
@@ -341,6 +343,14 @@ async function createPageForUser(browser, userId, consoleErrors, httpErrors) {
 function selectorsForEntry(entry) {
   if (entry.path === "/") return geminiDashboardExpectation;
   if (entry.path === "/my-tasks") return geminiTodoExpectation;
+  if (entry.path === "/expert-directory") {
+    return {
+      all: [...geminiShellExpectation.all, '[data-ui-check="expert-directory-view"]'],
+      any: ['[data-ui-check="expert-directory-table"]'],
+      minBodyLength: 140,
+      expectedText: "专家库管理"
+    };
+  }
   if (geminiPrimaryRoutes.has(entry.path)) return geminiShellExpectation;
   return routeOverrides.get(entry.path) ?? kindExpectations[entry.kind] ?? { all: [], any: [], minBodyLength: 80 };
 }

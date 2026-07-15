@@ -32,6 +32,30 @@ function expectDenied(response: request.Response, code: string, sensitiveTokens:
   }
 }
 
+async function uploadAndAttachContractFile(runtime: ReturnType<typeof boot>, contractId: string) {
+  const uploaded = await request(runtime.app)
+    .post("/api/files/upload")
+    .set("x-mock-user-id", "u2")
+    .send({
+      originalName: "hotel-contract.pdf",
+      contentType: "application/pdf",
+      contentBase64: Buffer.from("%PDF-1.4 hotel contract").toString("base64"),
+      attachmentKind: "contract_document",
+      objectType: "contract_ledger",
+      objectId: contractId,
+      projectId: "p-award",
+      supplierId: "sup-1"
+    });
+  expect(uploaded.status).toBe(201);
+
+  const attached = await request(runtime.app)
+    .post(`/api/contracts/${contractId}/attachments`)
+    .set("x-mock-user-id", "u2")
+    .send({ attachmentMetadata: [uploaded.body.file] });
+  expect(attached.status).toBe(200);
+  return uploaded.body.file as { id: string; fileName: string };
+}
+
 describe("Phase 11 stage 4 fulfillment and archive chain", () => {
   let dataRoot: string;
 
@@ -40,6 +64,7 @@ describe("Phase 11 stage 4 fulfillment and archive chain", () => {
   });
 
   function resetAwardProject(runtime: ReturnType<typeof boot>) {
+    runtime.ctx.state.resultNotifications = runtime.ctx.state.resultNotifications.filter((item) => item.projectId !== "p-award");
     runtime.ctx.state.purchaseOrders = runtime.ctx.state.purchaseOrders.filter((item) => item.projectId !== "p-award");
     runtime.ctx.state.receiptRecords = runtime.ctx.state.receiptRecords.filter((item) => item.projectId !== "p-award");
     runtime.ctx.state.settlementMaterials = runtime.ctx.state.settlementMaterials.filter((item) => item.projectId !== "p-award");
@@ -55,6 +80,112 @@ describe("Phase 11 stage 4 fulfillment and archive chain", () => {
         : item
     );
   }
+
+  it("allows result notification before purchase order generation", async () => {
+    const runtime = boot(dataRoot);
+    resetAwardProject(runtime);
+
+    const notified = await request(runtime.app)
+      .post("/api/projects/p-award/result-notifications")
+      .set("x-mock-user-id", "u2")
+      .send({ scope: "supplier_self", visibilityConfig: "supplier_self_only" });
+    expect(notified.status).toBe(201);
+    expect(runtime.ctx.state.projects.find((item) => item.id === "p-award")?.status).toBe("result_notified");
+
+    const generated = await request(runtime.app)
+      .post("/api/project-workbench/projects/p-award/purchase-orders/generate")
+      .set("x-mock-user-id", "u2")
+      .send({ orderNo: "PO-NOTIFY-FIRST" });
+    expect(generated.status).toBe(201);
+    expect(runtime.ctx.state.projects.find((item) => item.id === "p-award")?.status).toBe("contract_registered");
+  });
+
+  it("does not move project status backward when notification follows order generation", async () => {
+    const runtime = boot(dataRoot);
+    resetAwardProject(runtime);
+
+    const generated = await request(runtime.app)
+      .post("/api/project-workbench/projects/p-award/purchase-orders/generate")
+      .set("x-mock-user-id", "u2")
+      .send({ orderNo: "PO-ORDER-FIRST" });
+    expect(generated.status).toBe(201);
+    expect(runtime.ctx.state.projects.find((item) => item.id === "p-award")?.status).toBe("contract_registered");
+
+    const notified = await request(runtime.app)
+      .post("/api/projects/p-award/result-notifications")
+      .set("x-mock-user-id", "u2")
+      .send({ scope: "supplier_self", visibilityConfig: "supplier_self_only" });
+    expect(notified.status).toBe(201);
+    expect(runtime.ctx.state.projects.find((item) => item.id === "p-award")?.status).toBe("contract_registered");
+  });
+
+  it("requires supplier-confirmed contract before purchase order generation", async () => {
+    const runtime = boot(dataRoot);
+    resetAwardProject(runtime);
+    runtime.ctx.state.contractLedgers = runtime.ctx.state.contractLedgers.filter((item) => item.projectId !== "p-award");
+
+    const withoutContract = await request(runtime.app)
+      .post("/api/project-workbench/projects/p-award/purchase-orders/generate")
+      .set("x-mock-user-id", "u2")
+      .send({ orderNo: "PO-CONTRACT-REQUIRED" });
+    expectDenied(withoutContract, "CONTRACT_CONFIRMATION_REQUIRED");
+
+    const signing = await request(runtime.app).post("/api/projects/p-award/contracts/signing").set("x-mock-user-id", "u2").send();
+    expect(signing.status).toBe(201);
+    expect(signing.body.contract.status).toBe("pending_supplier_confirmation");
+
+    const beforeConfirmation = await request(runtime.app)
+      .post("/api/project-workbench/projects/p-award/purchase-orders/generate")
+      .set("x-mock-user-id", "u2")
+      .send({ orderNo: "PO-CONTRACT-PENDING" });
+    expectDenied(beforeConfirmation, "CONTRACT_CONFIRMATION_REQUIRED");
+
+    const withoutDocument = await request(runtime.app).post(`/api/contracts/${signing.body.contract.id}/confirm`).set("x-mock-user-id", "u11").send();
+    expectDenied(withoutDocument, "CONTRACT_DOCUMENT_REQUIRED");
+
+    const supplierUpload = await request(runtime.app)
+      .post("/api/files/upload")
+      .set("x-mock-user-id", "u11")
+      .send({
+        originalName: "supplier-must-not-upload.pdf",
+        contentType: "application/pdf",
+        contentBase64: Buffer.from("supplier file").toString("base64"),
+        attachmentKind: "contract_document",
+        objectType: "contract_ledger",
+        objectId: signing.body.contract.id,
+        projectId: "p-award",
+        supplierId: "sup-1"
+      });
+    expectDenied(supplierUpload, "CONTRACT_FILE_UPLOAD_DENIED");
+
+    const contractFile = await uploadAndAttachContractFile(runtime, signing.body.contract.id);
+
+    const supplierDownload = await request(runtime.app).get(`/api/files/${contractFile.id}/download`).set("x-mock-user-id", "u11");
+    expect(supplierDownload.status).toBe(200);
+    expect(supplierDownload.headers["content-disposition"]).toContain("hotel-contract.pdf");
+
+    const otherSupplierDownload = await request(runtime.app).get(`/api/files/${contractFile.id}/download`).set("x-mock-user-id", "u15");
+    expectDenied(otherSupplierDownload, "SUPPLIER_FILE_DOWNLOAD_DENIED");
+
+    const confirmed = await request(runtime.app).post(`/api/contracts/${signing.body.contract.id}/confirm`).set("x-mock-user-id", "u11").send();
+    expect(confirmed.status).toBe(200);
+    expect(runtime.ctx.state.projects.find((item) => item.id === "p-award")?.status).toBe("contract_registered");
+
+    const generated = await request(runtime.app)
+      .post("/api/project-workbench/projects/p-award/purchase-orders/generate")
+      .set("x-mock-user-id", "u2")
+      .send({ orderNo: "PO-CONTRACT-CONFIRMED" });
+    expect(generated.status).toBe(201);
+    expect(generated.body.purchaseOrder.contractId).toBe(signing.body.contract.id);
+
+    const supplierWorkbench = await request(runtime.app).get("/api/project-workbench/projects/p-award").set("x-mock-user-id", "u11");
+    expect(supplierWorkbench.status).toBe(200);
+    expect(supplierWorkbench.body.contracts).toEqual([expect.objectContaining({ id: signing.body.contract.id, status: "registered" })]);
+
+    const otherSupplierWorkbench = await request(runtime.app).get("/api/project-workbench/projects/p-award").set("x-mock-user-id", "u15");
+    expect(otherSupplierWorkbench.status).toBe(200);
+    expect(otherSupplierWorkbench.body.contracts).toHaveLength(0);
+  });
 
   it("keeps workbench access and supplier scope aligned with stage 4 permissions", async () => {
     const runtime = boot(dataRoot);
@@ -77,6 +208,19 @@ describe("Phase 11 stage 4 fulfillment and archive chain", () => {
 
     const admin = await request(runtime.app).get("/api/project-workbench/projects/p-award").set("x-mock-user-id", "u6");
     expectDenied(admin, "PROJECT_WORKBENCH_READ_DENIED");
+  });
+
+  it("lists only the current supplier's project purchase orders for dashboard aggregation", async () => {
+    const runtime = boot(dataRoot);
+
+    const supplierOrders = await request(runtime.app).get("/api/project-workbench/purchase-orders").set("x-mock-user-id", "u3");
+    expect(supplierOrders.status).toBe(200);
+    expect(supplierOrders.body.purchaseOrders.length).toBeGreaterThan(0);
+    expect(supplierOrders.body.purchaseOrders.every((item: { supplierId: string }) => item.supplierId === "sup-1")).toBe(true);
+    expect(supplierOrders.body.purchaseOrders.some((item: { id: string }) => item.id === "po-award-1")).toBe(true);
+
+    const expertOrders = await request(runtime.app).get("/api/project-workbench/purchase-orders").set("x-mock-user-id", "u4");
+    expectDenied(expertOrders, "PURCHASE_ORDER_LIST_READ_DENIED");
   });
 
   it("runs awarded project through order, settlement, evaluation and archive seal", async () => {

@@ -86,11 +86,11 @@ export function createApp(ctx: AppContext = createAppContext()) {
     ]);
     if (publicPaths.has(req.path)) return next();
     if (!requireAuthenticated(req, res)) return;
-    if (supplierPasswordChangeRequired(ctx, req)) {
+    if (managedPasswordChangeRequired(ctx, req)) {
       return res.status(403).json({
         error: {
           code: "PASSWORD_CHANGE_REQUIRED",
-          message: "Supplier account must change temporary password before using business functions."
+          message: "Account must change its temporary password before using other functions."
         }
       });
     }
@@ -142,9 +142,7 @@ function isPayloadTooLargeError(error: unknown) {
   return Boolean(error && typeof error === "object" && "type" in error && (error as { type?: string }).type === "entity.too.large");
 }
 
-function supplierPasswordChangeRequired(ctx: AppContext, req: express.Request) {
-  const supplierRoles = new Set(["supplier", "supplier_admin", "supplier_quotation"]);
-  if (!supplierRoles.has(req.auth.roleId)) return false;
+function managedPasswordChangeRequired(ctx: AppContext, req: express.Request) {
   if (["/auth/session", "/auth/logout", "/me", "/me/change-password"].includes(req.path)) return false;
   const account = ctx.authStore.getAccountsByUserIds([req.auth.user.id])[0];
   return Boolean(account?.passwordChangeRequired);

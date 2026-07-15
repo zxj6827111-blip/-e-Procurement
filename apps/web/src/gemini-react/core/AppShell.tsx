@@ -26,6 +26,7 @@ import { ProcurementDocumentView } from '../features/views/ProcurementDocumentVi
 import { AnnouncementInvitationView } from '../features/views/AnnouncementInvitationView';
 import { RegistrationMaterialView } from '../features/views/RegistrationMaterialView';
 import { QuoteProgressView } from '../features/views/QuoteProgressView';
+import { ExpertDirectoryView } from '../features/views/ExpertDirectoryView';
 import { ReviewAwardView } from '../features/views/ReviewAwardView';
 import { AwardResultView } from '../features/views/AwardResultView';
 import { OrderFulfillmentView } from '../features/views/OrderFulfillmentView';
@@ -152,6 +153,7 @@ export function AppShell() {
       case 'ANNOUNCEMENT': return <AnnouncementInvitationView />;
       case 'REGISTRATION': return <RegistrationMaterialView />;
       case 'QUOTE_PROGRESS': return <QuoteProgressView />;
+      case 'EXPERT_DIRECTORY': return <ExpertDirectoryView />;
       case 'REVIEW_AWARD': return <ReviewAwardView />;
       case 'AWARD_RESULT': return <AwardResultView />;
       case 'ORDER_FULFILLMENT': return <OrderFulfillmentView />;
@@ -258,7 +260,7 @@ export function AppShell() {
                   <button
                     data-ui-check="nav-item"
                     onClick={() => {
-                      setCurrentView(item.id as ViewState);
+                      navigateToPath(item.route);
                       setMobileSidebarOpen(false);
                     }}
                     className={cn(

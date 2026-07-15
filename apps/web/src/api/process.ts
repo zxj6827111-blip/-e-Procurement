@@ -232,12 +232,14 @@ export function processBusinessLabel(type: ProcessBusinessType) {
 }
 
 export function toProcessTaskView(task: ProcessTaskDto): ProcessTaskView {
+  const taskTypeLabel = r8TaskTypeLabels[task.taskType] ?? processNodeLabel(task.nodeKey) ?? processBusinessLabel(task.businessType);
   return {
     ...task,
+    title: taskTypeLabel,
     source: "process",
     sourceLabel: "Process",
     businessTypeLabel: processBusinessLabel(task.businessType),
-    taskTypeLabel: r8TaskTypeLabels[task.taskType] ?? processBusinessLabel(task.businessType),
+    taskTypeLabel,
     statusLabel: processStatusLabel(task.status),
     assigneeLabel: processRoleLabel(task.assigneeRoleId),
     nodeLabel: processNodeLabel(task.nodeKey),

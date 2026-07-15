@@ -1,13 +1,13 @@
 # RBAC Role Audit Report
 
-- Generated at: 2026-07-07T08:49:18.990Z
+- Generated at: 2026-07-15T02:55:48.453Z
 - Step: 5 / 9
 - Result: PASS
 - Scope: 12 角色默认着陆页、版式映射、消息铃铛显隐、侧栏菜单，以及未知角色 fail-closed 审计。
 
 | Role | Status | Label | Home | Template | Bell | Sidebar | Mismatch |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| group_manager | PASS | 集团采购管理人 | / | A | show | 工作台<br>我的待办<br>审批规则<br>需求审批<br>采购项目<br>报价进度<br>评审定标<br>评分模板<br>定标审批<br>供应商<br>商品目录<br>档案审计 | - |
+| group_manager | PASS | 集团采购管理人 | / | A | show | 工作台<br>我的待办<br>审批规则<br>需求审批<br>采购项目<br>报价进度<br>专家库管理<br>评审定标<br>评分模板<br>定标审批<br>供应商<br>商品目录<br>档案审计 | - |
 | buyer | PASS | 采购经办人 | / | A | show | 工作台<br>我的待办<br>采购申请<br>采购项目<br>商品目录<br>评审定标<br>定标审批<br>订单履约<br>档案审计 | - |
 | hotel_buyer | PASS | 酒店采购 | / | B | show | 工作台<br>我的待办<br>采购申请<br>商品目录<br>订单履约 | - |
 | hotel_finance | PASS | 酒店财务 | / | B | show | 工作台<br>我的待办<br>结算付款<br>付款进度 | - |

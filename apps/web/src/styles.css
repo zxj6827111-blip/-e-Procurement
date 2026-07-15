@@ -7,6 +7,14 @@
   }
 }
 
+@layer components {
+  [data-ui-check~="shell"] table th,
+  [data-ui-check~="shell"] table button,
+  [data-ui-check~="shell"] table a {
+    white-space: nowrap;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

@@ -22,6 +22,7 @@ import { cn } from '../../shared/lib/utils';
 import { type Role, type ViewState } from '../../shared/types';
 import { getGovernedMenuItems } from '../../core/governed-menu';
 import { apiGet } from '../../../api/http';
+import { r8BusinessTypeLabels, r8TaskTypeLabels } from '../../../api/workflow';
 import { formatDateTime, labelStatus } from '../../../utils/status-labels';
 import { ProcurementAnalytics } from '../components/ProcurementAnalytics';
 import { SmartRiskPanel, type SmartRiskItem } from '../components/SmartRiskPanel';
@@ -31,6 +32,7 @@ interface ApiProject {
   code?: string;
   name?: string;
   displayName?: string;
+  sourceRequestTitle?: string;
   status: string;
   displayStatus?: string;
   category?: string;
@@ -58,6 +60,8 @@ interface ApiProduct {
 interface ApiOrder {
   id: string;
   orderNo: string;
+  projectId?: string;
+  supplierId?: string;
   status: string;
   totalAmount?: number;
   paymentStatus?: string;
@@ -89,6 +93,8 @@ interface ApiTask {
   status: string;
   statusLabel?: string;
   title?: string;
+  taskType?: string;
+  taskTypeLabel?: string;
   businessTitle?: string;
   businessType?: string;
   businessId?: string;
@@ -128,7 +134,7 @@ interface WorkItem {
   id: string;
   status: string;
   title: string;
-  code: string;
+  relatedProject: string;
   deadline: string;
   target: DashboardTarget;
 }
@@ -175,7 +181,7 @@ function isFinanceRole(role: Role) {
 }
 
 function canReadProjects(role: Role) {
-  return procurementRoles.includes(role) || supplierRoles.includes(role) || auditRoles.includes(role);
+  return procurementRoles.includes(role) || supplierRoles.includes(role) || financeRoles.includes(role) || auditRoles.includes(role) || role === 'EXPERT';
 }
 
 function canReadProducts(role: Role) {
@@ -204,11 +210,23 @@ function displayTime(value?: string | null) {
 }
 
 function projectTitle(project: ApiProject) {
-  return project.displayName ?? project.name ?? project.code ?? project.id;
+  return projectName(project);
 }
 
-function projectCode(project: ApiProject) {
-  return project.code ?? project.id;
+function projectName(project: ApiProject) {
+  const explicitName = project.name?.trim() || project.sourceRequestTitle?.trim();
+  if (explicitName) return explicitName;
+  const displayName = project.displayName?.trim();
+  const codePrefix = project.code ? `${project.code} / ` : '';
+  if (displayName && codePrefix && displayName.startsWith(codePrefix)) return displayName.slice(codePrefix.length).trim();
+  if (displayName && displayName !== project.id && displayName !== project.code) return displayName;
+  return '项目名称暂不可用';
+}
+
+function relatedProjectName(projects: ApiProject[], projectId?: string, businessType?: string) {
+  if (!projectId) return businessType === 'procurement_request' ? '尚未生成采购项目' : '未关联采购项目';
+  const project = projects.find((item) => item.id === projectId);
+  return project ? projectName(project) : '项目名称暂不可用';
 }
 
 function isActiveProject(project: ApiProject) {
@@ -217,6 +235,35 @@ function isActiveProject(project: ApiProject) {
 
 function isQuoteDeadlineProject(project: ApiProject) {
   return ['document_published', 'registration_open', 'bidding_open'].includes(project.status);
+}
+
+function taskDisplayTitle(task: ApiTask) {
+  if (task.taskTypeLabel) return task.taskTypeLabel;
+  if (task.taskType && r8TaskTypeLabels[task.taskType]) return r8TaskTypeLabels[task.taskType];
+  const businessType = String(task.businessType ?? '');
+  return r8BusinessTypeLabels[businessType as keyof typeof r8BusinessTypeLabels] ?? task.title ?? '待处理任务';
+}
+
+function combineOrders(...groups: ApiOrder[][]) {
+  const seen = new Set<string>();
+  return groups
+    .flat()
+    .filter((order) => {
+      if (seen.has(order.id)) return false;
+      seen.add(order.id);
+      return true;
+    })
+    .sort((left, right) => {
+      const leftTime = new Date(left.updatedAt ?? left.createdAt ?? 0).getTime();
+      const rightTime = new Date(right.updatedAt ?? right.createdAt ?? 0).getTime();
+      return rightTime - leftTime;
+    });
+}
+
+function orderTarget(order?: ApiOrder): DashboardTarget {
+  return order?.projectId
+    ? { view: 'ORDER_FULFILLMENT', projectId: order.projectId }
+    : { view: 'ORDER_FULFILLMENT' };
 }
 
 function supplierProjectTarget(project: ApiProject): DashboardTarget {
@@ -311,7 +358,8 @@ function taskTarget(task: ApiTask, role: Role): DashboardTarget {
   if (businessType === 'procurement_request') return { view: role === 'GROUP_PROCUREMENT_MANAGER' ? 'REQUEST_APPROVE' : 'PURCHASE_REQUEST' };
   if (businessType === 'supplier_onboarding') return { view: role === 'GROUP_PROCUREMENT_MANAGER' || role === 'DISCIPLINARY_AUDIT' ? 'SUPPLIERS' : 'REGISTRATION' };
   if (['order_fulfillment', 'contract_preparation'].includes(businessType)) return { view: 'ORDER_FULFILLMENT' };
-  if (['settlement', 'invoice', 'payment'].includes(businessType)) return { view: isSupplierRole(role) ? 'SETTLEMENT_MATS' : 'SETTLEMENT' };
+  if (businessType === 'payment_request') return { view: 'PAYMENT_PROGRESS', projectId: task.projectId };
+  if (['settlement', 'settlement_bill', 'invoice', 'payment'].includes(businessType)) return { view: isSupplierRole(role) ? 'SETTLEMENT_MATS' : 'SETTLEMENT', projectId: task.projectId };
   if (businessType === 'archive') return { view: 'AUDIT_LOG' };
   if (task.projectId && canOpenProjectWorkbench(role)) return { view: 'PROJECT_DETAIL', projectId: task.projectId };
   return fallbackTargetForRole(role);
@@ -382,7 +430,16 @@ export function DashboardView() {
     Promise.all([
       canReadProjects(role) ? safeGet<{ projects: ApiProject[] }>('/api/projects', userId, { projects: [] }) : Promise.resolve({ projects: [] }),
       canReadProducts(role) ? safeGet<{ products: ApiProduct[] }>('/api/mall/products', userId, { products: [] }) : Promise.resolve({ products: [] }),
-      canReadOrders(role) ? safeGet<{ orders: ApiOrder[] }>('/api/mall/orders', userId, { orders: [] }) : Promise.resolve({ orders: [] }),
+      canReadOrders(role)
+        ? Promise.all([
+            safeGet<{ orders: ApiOrder[] }>('/api/mall/orders', userId, { orders: [] }),
+            isSupplierRole(role)
+              ? safeGet<{ purchaseOrders: ApiOrder[] }>('/api/project-workbench/purchase-orders', userId, { purchaseOrders: [] })
+              : Promise.resolve({ purchaseOrders: [] as ApiOrder[] })
+          ]).then(([mallOrderData, purchaseOrderData]) => ({
+            orders: combineOrders(purchaseOrderData.purchaseOrders, mallOrderData.orders)
+          }))
+        : Promise.resolve({ orders: [] }),
       canReadSuppliers(role) ? safeGet<{ suppliers: ApiSupplier[] }>('/api/suppliers', userId, { suppliers: [] }) : Promise.resolve({ suppliers: [] }),
       canReadAuditLogs(role) ? safeGet<{ auditLogs: ApiAuditLog[] }>('/api/audit-logs', userId, { auditLogs: [] }) : Promise.resolve({ auditLogs: [] }),
       safeGet<{ processTasks: ApiTask[] }>('/api/process/tasks', userId, { processTasks: [] }),
@@ -390,13 +447,17 @@ export function DashboardView() {
     ])
       .then(([projectData, productData, orderData, supplierData, auditData, processTaskData, workflowTaskData]) => {
         if (!mounted) return;
+        const workflowTaskKeys = new Set(workflowTaskData.tasks.map((task) => `${task.businessId ?? task.id}:${task.status}`));
+        const processTasks = processTaskData.processTasks.filter(
+          (task) => !workflowTaskKeys.has(`${task.businessId ?? task.id}:${task.status}`)
+        );
         setDashboardData({
           projects: projectData.projects,
           products: productData.products,
           orders: orderData.orders,
           suppliers: supplierData.suppliers,
           auditLogs: auditData.auditLogs,
-          tasks: [...processTaskData.processTasks, ...workflowTaskData.tasks]
+          tasks: [...processTasks, ...workflowTaskData.tasks]
         });
       })
       .finally(() => {
@@ -451,9 +512,8 @@ export function DashboardView() {
     }
 
     if (currentUser.role === 'GROUP_PROCUREMENT_MANAGER') {
-      const approvalCount = pendingTasks.filter((task) => ['procurement_request', 'award_approval'].includes(String(task.businessType))).length;
       return [
-        { id: 'approval', label: '待审批需求', value: approvalCount, unit: '项', meta: '集团审批任务', tone: 'primary', icon: 'todo', target: { view: 'TODO' } },
+        { id: 'approval', label: '待审批', value: pendingTasks.length, unit: '项', meta: '当前账号全部审批事项', tone: 'primary', icon: 'todo', target: { view: 'TODO' } },
         { id: 'active-projects', label: '在途项目', value: activeProjects.length, unit: '个', meta: '集团组织范围', tone: 'warning', icon: 'review', target: { view: 'PROJECTS' } },
         { id: 'award', label: '定标/评审关注', value: reviewProjects.length, unit: '个', meta: '需复核节点', tone: 'blue', icon: 'review', target: { view: 'AWARD_APPROVE' } },
         { id: 'supplier-risk', label: '供应商风险', value: supplierRiskCount, unit: '项', meta: '准入与资质', tone: supplierRiskCount ? 'danger' : 'success', icon: 'supplier', target: { view: 'SUPPLIERS' } }
@@ -482,7 +542,7 @@ export function DashboardView() {
           icon: 'deadline',
           target: quoteProjects[0] ? supplierProjectTarget(quoteProjects[0]) : { view: 'REGISTRATION' }
         },
-        { id: 'orders', label: '订单履约', value: dashboardData.orders.length, unit: '单', meta: '本企业订单', tone: 'blue', icon: 'catalog', target: { view: 'ORDER_FULFILLMENT' } },
+        { id: 'orders', label: '订单履约', value: dashboardData.orders.length, unit: '单', meta: '本企业订单', tone: 'blue', icon: 'catalog', target: orderTarget(dashboardData.orders[0]) },
         { id: 'settlement', label: '待结算/异常', value: dashboardData.orders.filter((order) => order.paymentStatus !== 'paid' || isAbnormalOrder(order)).length, unit: '单', meta: '发票与验收', tone: abnormalOrders.length ? 'danger' : 'success', icon: 'finance', target: { view: 'SETTLEMENT_MATS' } }
       ];
     }
@@ -528,8 +588,8 @@ export function DashboardView() {
     const taskRows = pendingTasks.slice(0, 4).map((task) => ({
       id: task.id,
       status: task.statusLabel ?? labelStatus(task.status),
-      title: task.businessTitle ?? task.title ?? '待处理任务',
-      code: task.businessId ?? task.id,
+      title: taskDisplayTitle(task),
+      relatedProject: relatedProjectName(dashboardData.projects, task.projectId, task.businessType),
       deadline: displayTime(task.dueAt ?? task.updatedAt),
       target: taskTarget(task, currentUser.role)
     }));
@@ -541,7 +601,7 @@ export function DashboardView() {
           id: `product-${product.id}`,
           status: labelStatus(product.status),
           title: product.name,
-          code: product.skuCode ?? product.id,
+          relatedProject: '商品目录',
           deadline: product.activePrice ? '待确认上架' : '待补齐价格',
           target: { view: 'ITEM_CATALOG' as const }
         })),
@@ -549,7 +609,7 @@ export function DashboardView() {
           id: `supplier-${supplier.id}`,
           status: labelStatus(supplier.admissionStatus ?? supplier.status),
           title: supplier.name,
-          code: supplier.id,
+          relatedProject: '供应商档案',
           deadline: supplier.risk || '准入/资质关注',
           target: { view: 'REGISTRATION' as const }
         }))
@@ -561,7 +621,7 @@ export function DashboardView() {
         id: `finance-${order.id}`,
         status: labelStatus(order.paymentStatus ?? order.status),
         title: order.orderNo,
-        code: order.id,
+        relatedProject: relatedProjectName(dashboardData.projects, order.projectId),
         deadline: money(order.totalAmount),
         target: { view: 'SETTLEMENT' as const }
       }));
@@ -572,7 +632,7 @@ export function DashboardView() {
         id: `audit-${log.id}`,
         status: labelStatus(log.result ?? 'recorded'),
         title: log.action,
-        code: log.objectId,
+        relatedProject: '审计业务对象',
         deadline: displayTime(log.createdAt),
         target: { view: 'OPERATION_LOGS' as const }
       }));
@@ -584,7 +644,7 @@ export function DashboardView() {
           id: `quote-${project.id}`,
           status: labelStatus(project.status),
           title: projectTitle(project),
-          code: projectCode(project),
+          relatedProject: projectName(project),
           deadline: project.quoteDeadlineAt ? displayTime(project.quoteDeadlineAt) : '等待采购方推进',
           target: supplierProjectTarget(project)
         })),
@@ -592,9 +652,9 @@ export function DashboardView() {
           id: `order-${order.id}`,
           status: labelStatus(order.status),
           title: order.orderNo,
-          code: order.id,
+          relatedProject: relatedProjectName(dashboardData.projects, order.projectId),
           deadline: labelStatus(order.paymentStatus ?? order.status),
-          target: { view: 'ORDER_FULFILLMENT' as const }
+          target: orderTarget(order)
         }))
       ].slice(0, 4);
     }
@@ -605,7 +665,7 @@ export function DashboardView() {
           id: `hotel-request-${project.id}`,
           status: labelStatus(project.status),
           title: projectTitle(project),
-          code: projectCode(project),
+          relatedProject: projectName(project),
           deadline: project.quoteDeadlineAt ? displayTime(project.quoteDeadlineAt) : '按采购申请跟进',
           target: { view: 'PURCHASE_REQUEST' as const }
         })),
@@ -613,9 +673,9 @@ export function DashboardView() {
           id: `hotel-order-${order.id}`,
           status: labelStatus(order.status),
           title: order.orderNo,
-          code: order.id,
+          relatedProject: relatedProjectName(dashboardData.projects, order.projectId),
           deadline: labelStatus(order.paymentStatus ?? order.status),
-          target: { view: 'ORDER_FULFILLMENT' as const }
+          target: orderTarget(order)
         }))
       ].slice(0, 4);
     }
@@ -624,7 +684,7 @@ export function DashboardView() {
       id: `project-${project.id}`,
       status: labelStatus(project.status),
       title: projectTitle(project),
-      code: projectCode(project),
+      relatedProject: projectName(project),
       deadline: project.quoteDeadlineAt ? displayTime(project.quoteDeadlineAt) : project.dueAt ? displayTime(project.dueAt) : '按阶段推进',
       target: { view: 'PROJECT_DETAIL' as const, projectId: project.id }
     }));
@@ -742,7 +802,7 @@ export function DashboardView() {
           phase: progress.phase,
           progress: progress.progress,
           tone: progress.tone,
-          target: { view: 'ORDER_FULFILLMENT' }
+          target: orderTarget(order)
         };
       });
       return [...productRows, ...orderRows];
@@ -784,7 +844,7 @@ export function DashboardView() {
           id: `supplier-project-${project.id}`,
           title: projectTitle(project),
           status: labelStatus(project.status),
-          meta: projectCode(project),
+          meta: projectName(project),
           phase: progress.phase,
           progress: progress.progress,
           tone: progress.tone,
@@ -801,7 +861,7 @@ export function DashboardView() {
           phase: progress.phase,
           progress: progress.progress,
           tone: progress.tone,
-          target: { view: 'ORDER_FULFILLMENT' }
+          target: orderTarget(order)
         };
       });
       return [...projectRows, ...orderRows];
@@ -814,7 +874,7 @@ export function DashboardView() {
           id: `hotel-project-${project.id}`,
           title: projectTitle(project),
           status: labelStatus(project.status),
-          meta: projectCode(project),
+          meta: projectName(project),
           phase: progress.phase,
           progress: progress.progress,
           tone: progress.tone,
@@ -831,7 +891,7 @@ export function DashboardView() {
           phase: progress.phase,
           progress: progress.progress,
           tone: progress.tone,
-          target: { view: 'ORDER_FULFILLMENT' }
+          target: orderTarget(order)
         };
       });
       return [...requestRows, ...orderRows];
@@ -843,7 +903,7 @@ export function DashboardView() {
         id: `project-${project.id}`,
         title: projectTitle(project),
         status: labelStatus(project.status),
-        meta: [projectCode(project), project.category, project.buyer].filter(Boolean).join(' / '),
+        meta: [projectName(project), project.category, project.buyer].filter(Boolean).join(' / '),
         phase: progress.phase,
         progress: progress.progress,
         tone: progress.tone,
@@ -950,12 +1010,12 @@ export function DashboardView() {
               </Button>
             </CardHeader>
             <div data-ui-check="table-wrap" className="overflow-x-auto">
-              <table data-ui-check="table" className="w-full text-sm text-left">
+              <table data-ui-check="table" className="w-full min-w-[700px] text-sm text-left">
                 <thead className="bg-slate-50 text-slate-500 font-medium">
                   <tr>
                     <th className="px-5 py-3 rounded-tl-lg">状态</th>
                     <th className="px-5 py-3">任务名称</th>
-                    <th className="px-5 py-3">关联编号</th>
+                    <th className="px-5 py-3">关联项目</th>
                     <th className="px-5 py-3">截止/更新</th>
                     <th className="px-5 py-3 text-right">操作</th>
                   </tr>
@@ -963,13 +1023,13 @@ export function DashboardView() {
                 <tbody className="divide-y divide-slate-100">
                   {workItems.slice(0, 4).map((task) => (
                     <tr key={task.id} className="hover:bg-slate-50/50">
-                      <td className="px-5 py-3">
+                      <td className="px-5 py-3 whitespace-nowrap">
                         <Badge variant="warning">{task.status}</Badge>
                       </td>
                       <td className="px-5 py-3 font-medium text-slate-900">{task.title}</td>
-                      <td className="px-5 py-3 text-slate-500 font-mono text-xs">{task.code}</td>
-                      <td className="px-5 py-3 text-slate-500">{task.deadline}</td>
-                      <td className="px-5 py-3 text-right">
+                      <td className="px-5 py-3 text-slate-600">{task.relatedProject}</td>
+                      <td className="px-5 py-3 whitespace-nowrap text-slate-500">{task.deadline}</td>
+                      <td className="px-5 py-3 whitespace-nowrap text-right">
                         <Button variant="outline" size="sm" className="text-xs" onClick={() => openTarget(task.target)}>
                           {task.target.view === 'REGISTRATION' ? '去报名' : '去处理'}
                         </Button>

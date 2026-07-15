@@ -64,7 +64,7 @@ export function TodoView() {
       const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
       const matchesKeyword =
         !text ||
-        [task.title, task.businessId, task.businessTypeLabel, task.taskTypeLabel, task.assigneeLabel]
+        [task.title, task.projectName, task.businessId, task.projectId, task.businessTypeLabel, task.taskTypeLabel, task.assigneeLabel]
           .join(' ')
           .toLowerCase()
           .includes(text);
@@ -123,11 +123,8 @@ export function TodoView() {
               <p className="font-medium text-slate-900">{selectedTask.title}</p>
             </div>
             <div>
-              <p className="mb-1 text-sm text-slate-500">关联业务</p>
-              <p className="font-medium text-slate-900">
-                {selectedTask.businessId}
-                {selectedTask.projectId ? ` / ${selectedTask.projectId}` : ''}
-              </p>
+              <p className="mb-1 text-sm text-slate-500">关联项目</p>
+              <p className="font-medium text-slate-900">{selectedTask.projectName}</p>
             </div>
             <div>
               <p className="mb-1 text-sm text-slate-500">当前状态</p>
@@ -228,7 +225,7 @@ export function TodoView() {
               type="text"
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
-              placeholder="搜索任务标题、业务单号、项目号"
+              placeholder="搜索任务标题、项目名称"
               className="w-full rounded-md border border-slate-300 py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
             />
           </div>
@@ -262,8 +259,7 @@ export function TodoView() {
                   </div>
                   <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
                     <span>{task.businessTypeLabel}</span>
-                    <span>{task.businessId}</span>
-                    {task.projectId ? <span>{task.projectId}</span> : null}
+                    <span>{task.projectName}</span>
                     <span>{formatDateTime(task.createdAt)}</span>
                   </div>
                 </div>

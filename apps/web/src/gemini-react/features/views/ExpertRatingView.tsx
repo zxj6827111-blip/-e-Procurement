@@ -77,6 +77,10 @@ function editableSheetStatus(status?: string | null) {
   return ['scoring', 'saved', 'reevaluation_approved'].includes(String(status ?? ''));
 }
 
+function lockedSheetStatus(status?: string | null) {
+  return ['submitted_locked', 'resubmitted_locked'].includes(String(status ?? ''));
+}
+
 export function ExpertRatingView() {
   const { currentProjectId, currentUser } = useApp();
   const [assignments, setAssignments] = useState<AssignmentRecord[]>([]);
@@ -99,9 +103,17 @@ export function ExpertRatingView() {
     () => sheets.filter((item) => item.projectId === selectedProjectId),
     [selectedProjectId, sheets]
   );
+  const editableProjectSheets = useMemo(
+    () => projectSheets.filter((item) => editableSheetStatus(item.status)),
+    [projectSheets]
+  );
+  const allProjectSheetsLocked = useMemo(
+    () => projectSheets.length > 0 && projectSheets.every((item) => lockedSheetStatus(item.status)),
+    [projectSheets]
+  );
   const selectedSheet = useMemo(
-    () => projectSheets.find((item) => item.id === selectedSheetId) ?? projectSheets[0] ?? null,
-    [projectSheets, selectedSheetId]
+    () => projectSheets.find((item) => item.id === selectedSheetId) ?? editableProjectSheets[0] ?? projectSheets[0] ?? null,
+    [editableProjectSheets, projectSheets, selectedSheetId]
   );
   const scoringItems = selectedSheetDetail?.scoringItems ?? [];
   const confirmationCompleted = Boolean(
@@ -159,7 +171,10 @@ export function ExpertRatingView() {
     setOpinion(sheet.opinion ?? '');
   };
 
-  const loadBaseData = async () => {
+  const loadBaseData = async (
+    preferredProjectId = selectedProjectId,
+    preferredSheetId = selectedSheetId
+  ) => {
     if (!currentUser) return;
     setLoading(true);
     setError('');
@@ -176,14 +191,22 @@ export function ExpertRatingView() {
       const availableProjectIds = new Set<string>();
       nextAssignments.forEach((item) => availableProjectIds.add(item.projectId));
       nextSheets.forEach((item) => availableProjectIds.add(item.projectId));
+      // 保存或确认后的刷新应停留在专家当前选择的项目，只有项目已不可用时才回退。
       const nextProjectId =
-        currentProjectId && availableProjectIds.has(currentProjectId)
+        preferredProjectId && availableProjectIds.has(preferredProjectId)
+          ? preferredProjectId
+          : currentProjectId && availableProjectIds.has(currentProjectId)
           ? currentProjectId
           : nextSheets[0]?.projectId ?? nextAssignments[0]?.projectId ?? '';
       setSelectedProjectId(nextProjectId);
 
       const nextProjectSheets = nextSheets.filter((item) => item.projectId === nextProjectId);
-      setSelectedSheetId(nextProjectSheets[0]?.id ?? '');
+      const preferredSheet = nextProjectSheets.find((item) => item.id === preferredSheetId);
+      const nextSheetId =
+        preferredSheet && editableSheetStatus(preferredSheet.status)
+          ? preferredSheet.id
+          : nextProjectSheets.find((item) => editableSheetStatus(item.status))?.id ?? preferredSheet?.id ?? nextProjectSheets[0]?.id ?? '';
+      setSelectedSheetId(nextSheetId);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '专家评分页面加载失败');
     } finally {
@@ -238,7 +261,7 @@ export function ExpertRatingView() {
         await apiPost(`/api/expert-assignments/${currentAssignment.id}/confirm`, { type }, currentUser.id);
       }
       setMessage('专家回避、纪律和保密确认已完成。');
-      await loadBaseData();
+      await loadBaseData(selectedProjectId, selectedSheetId);
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : '确认失败');
     } finally {
@@ -273,7 +296,7 @@ export function ExpertRatingView() {
     try {
       await apiPost(`/api/scoring-sheets/${selectedSheetDetail.id}/save`, buildScorePayload(), currentUser.id);
       setMessage('评分进度已保存。');
-      await loadBaseData();
+      await loadBaseData(selectedProjectId, selectedSheetDetail.id);
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : '评分保存失败');
     } finally {
@@ -288,8 +311,15 @@ export function ExpertRatingView() {
     setMessage('');
     try {
       await apiPost(`/api/scoring-sheets/${selectedSheetDetail.id}/submit-lock`, buildScorePayload(), currentUser.id);
-      setMessage('评分已提交并锁定。');
-      await loadBaseData();
+      const nextEditableSheet = projectSheets.find(
+        (item) => item.id !== selectedSheetDetail.id && editableSheetStatus(item.status)
+      );
+      setMessage(
+        nextEditableSheet
+          ? `当前供应商评分已提交，已切换至${nextEditableSheet.supplierName ?? '下一家供应商'}。`
+          : '全部供应商评分已提交并锁定。'
+      );
+      await loadBaseData(selectedProjectId, nextEditableSheet?.id ?? selectedSheetDetail.id);
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : '评分提交失败');
     } finally {
@@ -327,9 +357,13 @@ export function ExpertRatingView() {
             选择评审项目
             <select
               value={selectedProjectId}
+              disabled={busyAction !== null}
               onChange={(event) => {
-                setSelectedProjectId(event.target.value);
-                const firstSheet = sheets.find((item) => item.projectId === event.target.value);
+                const projectId = event.target.value;
+                setSelectedProjectId(projectId);
+                const firstSheet =
+                  sheets.find((item) => item.projectId === projectId && editableSheetStatus(item.status)) ??
+                  sheets.find((item) => item.projectId === projectId);
                 setSelectedSheetId(firstSheet?.id ?? '');
               }}
               className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
@@ -389,10 +423,11 @@ export function ExpertRatingView() {
                     选择供应商评分单
                     <select
                       value={selectedSheetId}
+                      disabled={busyAction !== null}
                       onChange={(event) => setSelectedSheetId(event.target.value)}
                       className="mt-1 border border-slate-300 rounded px-3 py-2 text-sm"
                     >
-                      {projectSheets.map((sheet) => (
+                      {editableProjectSheets.map((sheet) => (
                         <option key={sheet.id} value={sheet.id}>
                           {sheet.supplierName ?? sheet.supplierId}
                         </option>
@@ -482,7 +517,7 @@ export function ExpertRatingView() {
                   </Button>
                 </div>
               </div>
-            ) : rankingRows.length ? (
+            ) : allProjectSheetsLocked ? (
               <div className="space-y-4">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -516,6 +551,10 @@ export function ExpertRatingView() {
                   当前项目评分已锁定。推荐供应商：{rankingRows[0]?.supplierName ?? '-'}，总分 {rankingRows[0]?.total ?? '-'}。
                 </div>
               </div>
+            ) : projectSheets.length ? (
+              <div className="py-12 text-center text-slate-500" data-ui-check="expert-scoring-loading">
+                当前项目仍有待评分供应商，正在加载下一张评分单...
+              </div>
             ) : (
               <div className="py-12 text-center text-slate-500" data-ui-check="expert-empty-state">当前角色暂无可展示的评分任务。</div>
             )}
@@ -534,9 +573,13 @@ export function ExpertRatingView() {
                 <div className="text-slate-600">承诺交付：{selectedSheetDetail.materials.bidSummary.deliveryDays ?? '-'} 天</div>
                 <div className="text-slate-600">响应文件：{selectedSheetDetail.materials.bidSummary.fileName ?? '未上传'}</div>
               </div>
-            ) : (
+            ) : allProjectSheetsLocked ? (
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-slate-600">
                 当前项目已完成评分锁定，页面展示汇总结果，不再开放单家供应商评分录入。
+              </div>
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-slate-600">
+                正在加载下一家待评分供应商的参考资料。
               </div>
             )}
 

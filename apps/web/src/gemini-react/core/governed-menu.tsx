@@ -17,7 +17,8 @@ import {
   PenTool,
   Settings,
   Store,
-  Users
+  Users,
+  UserRoundCog
 } from "lucide-react";
 import type { RegistryMenuConfig } from "../../meta/menu-adapter";
 import type { ViewState } from "../shared/types";
@@ -41,6 +42,7 @@ const menuIconsByView: Partial<Record<ViewState, ReactNode>> = {
   PROCUREMENT_DOCUMENT: <FileText className="w-5 h-5" />,
   ANNOUNCEMENT: <Megaphone className="w-5 h-5" />,
   QUOTE_PROGRESS: <Activity className="w-5 h-5" />,
+  EXPERT_DIRECTORY: <UserRoundCog className="w-5 h-5" />,
   REVIEW_AWARD: <Users className="w-5 h-5" />,
   RATING_TEMPLATE: <PenTool className="w-5 h-5" />,
   AWARD_APPROVE: <FileCheck className="w-5 h-5" />,

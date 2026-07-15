@@ -83,9 +83,7 @@ const isPermissionDeniedRoute = computed(() => route.path === "/permission-denie
 const isNotFoundRoute = computed(() => route.matched.some((item) => item.path === "/:pathMatch(.*)*"));
 const isHiddenUtilityRoute = computed(() => route.path === "/role-switch");
 const renderStateInAuthShell = computed(() => isPermissionDeniedRoute.value && !hasCurrentRoleProfile.value);
-const supplierPasswordChangeRequired = computed(
-  () => session.passwordChangeRequired && ["supplier", "supplier_admin", "supplier_quotation"].includes(session.roleId)
-);
+const managedPasswordChangeRequired = computed(() => session.passwordChangeRequired);
 const geminiView = computed(() => geminiViewForPath(route.path, session.roleId));
 const geminiRenderableView = computed(() => (runtimeRouteDecision.value.canRenderReact ? geminiView.value : null));
 const geminiCurrentUser = computed(() => {
@@ -191,7 +189,7 @@ function enforceCurrentRoute() {
     void router.replace("/permission-denied");
     return;
   }
-  if (supplierPasswordChangeRequired.value && route.path !== "/account-security") {
+  if (managedPasswordChangeRequired.value && route.path !== "/account-security") {
     void router.replace("/account-security");
     return;
   }

@@ -15,6 +15,7 @@ export interface UnifiedTaskView {
   businessType: R8ApprovalBusinessType;
   businessId: string;
   projectId?: string;
+  projectName: string;
   taskTypeLabel: string;
   title: string;
   businessTypeLabel: string;
@@ -29,6 +30,14 @@ export interface UnifiedTaskView {
   targetPath: string;
   targetLabel: string;
   canComplete: boolean;
+}
+
+export interface TaskProjectView {
+  id: string;
+  code?: string;
+  name?: string;
+  sourceRequestTitle?: string;
+  displayName?: string;
 }
 
 export interface BusinessTypeOption {

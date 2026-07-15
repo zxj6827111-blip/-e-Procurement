@@ -3,7 +3,7 @@ import type { DateFilter, StatusTone, TaskStatusFilter } from "./types";
 
 export const TASK_COLUMNS: DataTableColumn[] = [
   { key: "task", label: "任务" },
-  { key: "business", label: "业务对象" },
+  { key: "business", label: "项目名称" },
   { key: "status", label: "状态" },
   { key: "assignee", label: "分派" },
   { key: "time", label: "时间" },

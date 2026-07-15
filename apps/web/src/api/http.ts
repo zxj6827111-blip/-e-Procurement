@@ -28,6 +28,9 @@ function normalizeErrorMessage(message: string, status: number, path: string) {
   if (/Approved award approval is required before contract signing/i.test(value)) return "请先完成中标审批，再发起合同签订。";
   if (/Contract supplier must be the awarded supplier/i.test(value)) return "合同供应商必须是本项目的中标供应商。";
   if (/Supplier can only confirm own contract/i.test(value)) return "供应商只能确认本企业的合同。";
+  if (/Contract document must be uploaded before supplier confirmation/i.test(value)) return "采购方必须先上传正式合同文件，供应商才能确认。";
+  if (/Only procurement maintainers can upload contract files/i.test(value)) return "只有采购经办或平台运营可以上传合同文件。";
+  if (/Contract attachment must be an active file uploaded for this contract/i.test(value)) return "合同附件无效或不属于当前合同，请重新上传。";
   if (/Supplier must confirm the contract before awarded products can be listed/i.test(value)) return "请先由中标供应商确认合同，再上架中标商品。";
   if (/Approved award approval is required before listing awarded products/i.test(value)) return "请先完成中标审批，再上架中标商品。";
   if (/System administrators cannot read/i.test(value)) return "系统管理员不能读取业务附件内容。";

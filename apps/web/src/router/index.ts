@@ -80,6 +80,7 @@ export const router = createRouter({
     { path: "/supplier-registration", component: SupplierRegistrationPage, meta: getPageClassification("/supplier-registration") },
     { path: "/bidding", component: BiddingPage, meta: getPageClassification("/bidding") },
     { path: "/bid-control", component: BidControlPage, meta: getPageClassification("/bid-control") },
+    { path: "/expert-directory", component: ExpertReviewPage, meta: getPageClassification("/expert-directory") },
     { path: "/expert-review", component: ExpertReviewPage, meta: getPageClassification("/expert-review") },
     { path: "/scoring-templates", component: ScoringTemplatesPage, meta: getPageClassification("/scoring-templates") },
     { path: "/expert-scoring", component: ExpertScoringPage, meta: getPageClassification("/expert-scoring") },
@@ -123,7 +124,7 @@ router.beforeEach(async (to) => {
   }
 
   if (!session.roleId) return "/login";
-  if (session.passwordChangeRequired && supplierRoles.includes(session.roleId as (typeof supplierRoles)[number]) && to.path !== "/account-security") {
+  if (session.passwordChangeRequired && to.path !== "/account-security") {
     return "/account-security";
   }
 

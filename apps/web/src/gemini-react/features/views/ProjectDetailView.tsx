@@ -3,7 +3,7 @@ import { useApp } from '../../core/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../../shared/ui/Card';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
-import { AlertCircle, ArrowLeft, Archive, ArrowRight, CheckCircle2, Clock, FileText, LockKeyhole, Scissors, ShieldAlert, Trophy, Truck, Users } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Archive, ArrowRight, CheckCircle2, Clock, FileText, ListChecks, LockKeyhole, PackageCheck, Scissors, ShieldAlert, Trophy, Truck, Users } from 'lucide-react';
 import { apiPost } from '../../../api/http';
 import { cn } from '../../shared/lib/utils';
 import {
@@ -70,6 +70,16 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
   const [bidActionMessage, setBidActionMessage] = useState('');
   const [bidActionError, setBidActionError] = useState('');
   const [cutoffReason, setCutoffReason] = useState('');
+  const [registrationReviewAction, setRegistrationReviewAction] = useState<{
+    registrationId: string;
+    status: 'qualified' | 'rejected';
+  } | null>(null);
+  const [registrationReviewMessage, setRegistrationReviewMessage] = useState('');
+  const [registrationReviewError, setRegistrationReviewError] = useState('');
+  const [archiveAction, setArchiveAction] = useState<string | null>(null);
+  const [archiveActionMessage, setArchiveActionMessage] = useState('');
+  const [archiveActionError, setArchiveActionError] = useState('');
+  const [archiveCheckResult, setArchiveCheckResult] = useState<{ status: string; missingItems: Array<{ id: string; itemName: string }> } | null>(null);
 
   useEffect(() => {
     if (!currentProjectId && resolvedProjectId) {
@@ -82,6 +92,9 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
   }, [initialTab]);
 
   const archivePercent = calculateArchiveCompleteness(workbench);
+  const canMaintainArchive = ['PROCUREMENT_AGENT', 'PLATFORM_OPERATIONS'].includes(String(currentUser?.role));
+  const canCheckArchive = ['GROUP_PROCUREMENT_MANAGER', 'PROCUREMENT_AGENT', 'PLATFORM_OPERATIONS', 'DISCIPLINARY_AUDIT'].includes(String(currentUser?.role));
+  const archiveSealed = Boolean(workbench?.archiveItems.length) && workbench!.archiveItems.every((item) => item.sealed || item.status === 'sealed');
   const activeProcurementDocuments = useMemo(
     () => (workbench?.procurementDocuments ?? []).filter((document) => document.status !== 'voided'),
     [workbench?.procurementDocuments]
@@ -154,6 +167,64 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
     downloadTextFile(`${workbench.project.code}-archive-checklist.txt`, content);
   };
 
+  const runArchiveAction = async (key: string, action: () => Promise<unknown>, success: string) => {
+    if (!currentUser || !resolvedProjectId || archiveAction) return;
+    setArchiveAction(key);
+    setArchiveActionMessage('');
+    setArchiveActionError('');
+    try {
+      await action();
+      setArchiveActionMessage(success);
+      reload();
+    } catch (archiveFailure) {
+      setArchiveActionError(archiveFailure instanceof Error ? archiveFailure.message : '档案操作失败，请稍后重试。');
+    } finally {
+      setArchiveAction(null);
+    }
+  };
+
+  const createArchiveSnapshot = () => runArchiveAction(
+    'snapshot',
+    () => apiPost(`/api/projects/${encodeURIComponent(resolvedProjectId!)}/archive-snapshot`, {}, currentUser?.id),
+    '档案快照已生成，归集清单已刷新。'
+  );
+
+  const checkArchiveCompleteness = async () => {
+    if (!currentUser || !resolvedProjectId || archiveAction) return;
+    setArchiveAction('check');
+    setArchiveActionMessage('');
+    setArchiveActionError('');
+    try {
+      const result = await apiPost<{ status: string; missingItems: Array<{ id: string; itemName: string }> }>(
+        `/api/projects/${encodeURIComponent(resolvedProjectId)}/archive-check`,
+        {},
+        currentUser.id
+      );
+      setArchiveCheckResult(result);
+      setArchiveActionMessage(result.missingItems.length ? `完整性检查完成，仍缺少 ${result.missingItems.length} 项必传档案。` : '完整性检查通过，已具备档案完整条件。');
+      reload();
+    } catch (archiveFailure) {
+      setArchiveActionError(archiveFailure instanceof Error ? archiveFailure.message : '档案完整性检查失败。');
+    } finally {
+      setArchiveAction(null);
+    }
+  };
+
+  const updateArchiveItem = (itemId: string, collectedFlag: boolean) => runArchiveAction(
+    `item:${itemId}`,
+    () => apiPost(`/api/project-workbench/archive-items/${encodeURIComponent(itemId)}/update`, { collectedFlag }, currentUser?.id),
+    collectedFlag ? '档案项已标记为归集完成。' : '档案项已恢复为待归集。'
+  );
+
+  const sealArchive = () => {
+    if (!window.confirm('确认封存当前项目档案吗？封存后业务记录不能直接修改。')) return;
+    return runArchiveAction(
+      'seal',
+      () => apiPost(`/api/projects/${encodeURIComponent(resolvedProjectId!)}/archive-seal`, {}, currentUser?.id),
+      '项目档案已封存。'
+    );
+  };
+
   const runBidControlAction = async (action: 'cutoff' | 'lock') => {
     if (!currentUser || !workbench || !resolvedProjectId || bidAction) return;
     const submittedCount = workbench.bids.filter((bid) => bid.status === 'submitted').length;
@@ -196,6 +267,32 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
     }
   };
 
+  const runRegistrationReview = async (registrationId: string, status: 'qualified' | 'rejected') => {
+    if (!currentUser || registrationReviewAction) return;
+
+    const reason = status === 'qualified'
+      ? '报名材料符合当前项目要求。'
+      : window.prompt('请输入退回补正原因：', '报名材料需要补正后重新审核。')?.trim();
+    if (status === 'rejected' && !reason) return;
+
+    setRegistrationReviewAction({ registrationId, status });
+    setRegistrationReviewMessage('');
+    setRegistrationReviewError('');
+    try {
+      await apiPost(
+        `/api/registrations/${encodeURIComponent(registrationId)}/qualify`,
+        { status, reason },
+        currentUser.id
+      );
+      setRegistrationReviewMessage(status === 'qualified' ? '供应商资格审核已通过。' : '报名资料已退回补正。');
+      reload();
+    } catch (actionError) {
+      setRegistrationReviewError(actionError instanceof Error ? actionError.message : '资格审核失败，请稍后重试。');
+    } finally {
+      setRegistrationReviewAction(null);
+    }
+  };
+
   if (loading && !workbench) {
     return <div className="rounded-lg border border-slate-200 bg-white p-8 text-slate-500">项目工作台加载中...</div>;
   }
@@ -215,6 +312,7 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
   const recommendedSupplierId = workbench.comparisonReport?.recommendedSupplierId ?? latestAward?.selectedSupplierId;
   const recommendedSupplierName = resolveSupplierName(workbench, recommendedSupplierId);
   const canMaintainBidControl = ['PROCUREMENT_AGENT', 'PLATFORM_OPERATIONS'].includes(String(currentUser?.role));
+  const canReviewRegistrations = ['GROUP_PROCUREMENT_MANAGER', 'PROCUREMENT_AGENT', 'PLATFORM_OPERATIONS'].includes(String(currentUser?.role));
   const submittedBidCount = workbench.bids.filter((bid) => bid.status === 'submitted').length;
   const draftBidCount = workbench.bids.filter((bid) => bid.status === 'draft').length;
   const lockedBidCount = workbench.bids.filter((bid) => bid.status === 'locked').length;
@@ -574,6 +672,19 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
                     </div>
                   </div>
 
+                  {registrationReviewMessage ? (
+                    <div className="flex items-start gap-2 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{registrationReviewMessage}</span>
+                    </div>
+                  ) : null}
+                  {registrationReviewError ? (
+                    <div className="flex items-start gap-2 rounded border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{registrationReviewError}</span>
+                    </div>
+                  ) : null}
+
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
                       <thead className="bg-slate-50 text-slate-600">
@@ -585,6 +696,7 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
                           <th className="px-4 py-3">报价金额</th>
                           <th className="px-4 py-3">最终得分</th>
                           <th className="px-4 py-3">排名</th>
+                          {canReviewRegistrations ? <th className="px-4 py-3">资格审核</th> : null}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -610,6 +722,40 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
                                   : '-'}
                             </td>
                             <td className="px-4 py-3 text-slate-600">{row.comparisonRow?.rank ?? '-'}</td>
+                            {canReviewRegistrations ? (
+                              <td className="px-4 py-3">
+                                {row.registration?.status === 'submitted' ? (
+                                  <div className="flex min-w-max gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="brand"
+                                      disabled={registrationReviewAction !== null}
+                                      onClick={() => void runRegistrationReview(row.registration!.id, 'qualified')}
+                                    >
+                                      <CheckCircle2 className="mr-1 h-4 w-4" />
+                                      {registrationReviewAction?.registrationId === row.registration.id && registrationReviewAction.status === 'qualified'
+                                        ? '审核中...'
+                                        : '资格通过'}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={registrationReviewAction !== null}
+                                      onClick={() => void runRegistrationReview(row.registration!.id, 'rejected')}
+                                    >
+                                      <ShieldAlert className="mr-1 h-4 w-4" />
+                                      {registrationReviewAction?.registrationId === row.registration.id && registrationReviewAction.status === 'rejected'
+                                        ? '处理中...'
+                                        : '退回补正'}
+                                    </Button>
+                                  </div>
+                                ) : row.registration ? (
+                                  <span className="text-slate-500" title={row.registration.qualificationReason}>已处理</span>
+                                ) : (
+                                  <span className="text-slate-400">-</span>
+                                )}
+                              </td>
+                            ) : null}
                           </tr>
                         ))}
                       </tbody>
@@ -738,6 +884,47 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
 
               {activeTab === 'ARCHIVE' && (
                 <div className="space-y-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <div>
+                      <div className="font-medium text-slate-900">档案完整度 {archivePercent}%</div>
+                      <div className="mt-1 text-sm text-slate-500">
+                        {archiveSealed ? '当前项目档案已封存。' : `必传档案待归集 ${workbench.archiveItems.filter((item) => item.requiredFlag && !item.collectedFlag).length} 项。`}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {canMaintainArchive && !archiveSealed ? (
+                        <Button size="sm" variant="outline" disabled={Boolean(archiveAction)} onClick={() => void createArchiveSnapshot()}>
+                          <Archive className="mr-1 h-4 w-4" />
+                          {archiveAction === 'snapshot' ? '生成中...' : '生成档案快照'}
+                        </Button>
+                      ) : null}
+                      {canCheckArchive ? (
+                        <Button size="sm" variant="outline" disabled={Boolean(archiveAction)} onClick={() => void checkArchiveCompleteness()}>
+                          <ListChecks className="mr-1 h-4 w-4" />
+                          {archiveAction === 'check' ? '检查中...' : '完整性检查'}
+                        </Button>
+                      ) : null}
+                      {canMaintainArchive && !archiveSealed ? (
+                        <Button size="sm" variant="brand" disabled={Boolean(archiveAction) || archivePercent < 100} onClick={() => void sealArchive()}>
+                          <PackageCheck className="mr-1 h-4 w-4" />
+                          {archiveAction === 'seal' ? '封存中...' : '封存档案'}
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {archiveActionMessage || archiveActionError ? (
+                    <div className={`rounded-md border px-4 py-3 text-sm ${archiveActionError ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`} role="status">
+                      {archiveActionError || archiveActionMessage}
+                    </div>
+                  ) : null}
+
+                  {archiveCheckResult?.missingItems.length ? (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                      <div className="font-medium">本次检查缺少：{archiveCheckResult.missingItems.map((item) => item.itemName).join('、')}</div>
+                    </div>
+                  ) : null}
+
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-lg border border-slate-200 p-5">
                       <div className="mb-4 text-base font-medium text-slate-900">档案归集清单</div>
@@ -748,7 +935,19 @@ export function ProjectDetailView({ initialTab = 'OVERVIEW' }: ProjectDetailView
                               <div className="font-medium text-slate-900">{item.itemName}</div>
                               <div className="mt-1 text-xs text-slate-500">{item.requiredFlag ? '必传档案' : '选传档案'}</div>
                             </div>
-                            <Badge variant={item.collectedFlag ? 'success' : 'warning'}>{item.collectedFlag ? '已归集' : humanizeStatus(item.status)}</Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={item.collectedFlag ? 'success' : 'warning'}>{item.collectedFlag ? '已归集' : humanizeStatus(item.status)}</Badge>
+                              {canMaintainArchive && !archiveSealed ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={Boolean(archiveAction)}
+                                  onClick={() => void updateArchiveItem(item.id, !item.collectedFlag)}
+                                >
+                                  {archiveAction === `item:${item.id}` ? '保存中...' : item.collectedFlag ? '撤销' : '标记归集'}
+                                </Button>
+                              ) : null}
+                            </div>
                           </div>
                         ))}
                       </div>

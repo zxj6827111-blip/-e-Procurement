@@ -1,5 +1,7 @@
+import crypto from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import type { AppContext } from "../app-context.js";
+import { generateTemporaryPassword, type ManagedAccountStatus } from "../runtime/auth-store.js";
 import type { ApprovalRule, RoleId, User } from "../types.js";
 import { denyResponse } from "./permission-helpers.js";
 
@@ -74,6 +76,134 @@ function findUser(ctx: AppContext, userId: string) {
   return ctx.state.users.find((item) => item.id === userId);
 }
 
+function accountResponse(ctx: AppContext, user: User) {
+  const account = ctx.authStore.getAccountsByUserIds([user.id])[0];
+  return {
+    ...user,
+    username: account?.username ?? user.id,
+    accountStatus: account?.status ?? user.status ?? "active",
+    statusSource: account?.statusSource ?? null,
+    passwordChangeRequired: account?.passwordChangeRequired ?? false,
+    lastLoginAt: account?.lastLoginAt ?? null
+  };
+}
+
+function usernameIsValid(username: string) {
+  return /^[A-Za-z0-9][A-Za-z0-9._@-]{1,63}$/.test(username);
+}
+
+function normalizeOptionalString(value: unknown) {
+  const normalized = String(value ?? "").trim();
+  return normalized || undefined;
+}
+
+function validateOrganizationIds(ctx: AppContext, orgId: string, orgScope: string[], existing?: User) {
+  const organizationIds = new Set(ctx.state.organizations.filter((item) => (item.status ?? "active") === "active").map((item) => item.id));
+  const legacyIds = new Set(existing ? [existing.orgId, ...(existing.orgScope ?? [])] : []);
+  return (organizationIds.has(orgId) || legacyIds.has(orgId)) && orgScope.every((item) => organizationIds.has(item) || legacyIds.has(item));
+}
+
+function validateSupplierBinding(ctx: AppContext, roleId: RoleId, supplierId: string | undefined) {
+  const supplierRoles = new Set<RoleId>(["supplier", "supplier_admin", "supplier_quotation"]);
+  if (!supplierRoles.has(roleId)) return supplierId ? "USER_SUPPLIER_ROLE_REQUIRED" : null;
+  if (!supplierId || !ctx.state.suppliers.some((item) => item.id === supplierId)) return "USER_SUPPLIER_REQUIRED";
+  return null;
+}
+
+function remainingActiveAdminCount(ctx: AppContext, excludedUserId: string) {
+  return ctx.state.users.filter(
+    (item) => item.id !== excludedUserId && item.roleId === "admin" && (item.status ?? "active") === "active"
+  ).length;
+}
+
+function statusSource(status: ManagedAccountStatus, actorId: string) {
+  if (status === "active") return null;
+  return `administrator_${status}:${actorId}`;
+}
+
+function updateManagedUser(ctx: AppContext, req: Request, res: Response, input: Record<string, unknown>) {
+  if (!assertAdminWriter(ctx, req, res, "user", req.params.userId)) return;
+  const user = findUser(ctx, req.params.userId);
+  if (!user || user.roleId === "system") {
+    return res.status(404).json({ error: { code: "USER_NOT_FOUND", message: "User was not found." } });
+  }
+  const account = ctx.authStore.getAccountsByUserIds([user.id])[0];
+  if (!account) {
+    return res.status(404).json({ error: { code: "AUTH_ACCOUNT_NOT_FOUND", message: "Login account was not found." } });
+  }
+
+  const nextUsername = input.username === undefined ? account.username : String(input.username).trim();
+  const nextName = input.name === undefined ? user.name : String(input.name).trim();
+  const nextRoleValue = input.roleId === undefined ? user.roleId : String(input.roleId).trim();
+  const nextStatusValue = input.status === undefined ? user.status ?? "active" : String(input.status).trim();
+  const nextOrgId = input.orgId === undefined ? user.orgId : String(input.orgId).trim();
+  const nextOrgScope = input.orgScope === undefined ? user.orgScope ?? [nextOrgId] : normalizeStringArray(input.orgScope);
+  const nextSupplierId = input.supplierId === undefined ? user.supplierId : normalizeOptionalString(input.supplierId);
+
+  if (!usernameIsValid(nextUsername)) {
+    return res.status(400).json({ error: { code: "USERNAME_INVALID", message: "Username must be 2-64 characters and may contain letters, numbers, dot, underscore, at sign or hyphen." } });
+  }
+  const duplicate = ctx.state.users
+    .filter((item) => item.id !== user.id)
+    .map((item) => ctx.authStore.getAccountsByUserIds([item.id])[0]?.username)
+    .find((item) => item?.toLowerCase() === nextUsername.toLowerCase());
+  if (duplicate) {
+    return res.status(409).json({ error: { code: "USERNAME_EXISTS", message: "Username already exists." } });
+  }
+  if (!nextName) {
+    return res.status(400).json({ error: { code: "USER_NAME_REQUIRED", message: "User name is required." } });
+  }
+  if (!isRoleId(nextRoleValue) || nextRoleValue === "system") {
+    return res.status(400).json({ error: { code: "USER_ROLE_INVALID", message: "Role id is invalid." } });
+  }
+  if (!isUserStatus(nextStatusValue)) {
+    return res.status(400).json({ error: { code: "USER_STATUS_INVALID", message: "User status must be active, disabled, suspended or offboarded." } });
+  }
+  if (!nextOrgId || nextOrgScope.length === 0 || !validateOrganizationIds(ctx, nextOrgId, nextOrgScope, user)) {
+    return res.status(400).json({ error: { code: "USER_ORGANIZATION_INVALID", message: "Organization and organization scope must reference active organizations." } });
+  }
+  const supplierBindingError = validateSupplierBinding(ctx, nextRoleValue, nextSupplierId);
+  if (supplierBindingError) {
+    return res.status(400).json({ error: { code: supplierBindingError, message: "Supplier roles must be bound to an existing supplier, and other roles cannot retain a supplier binding." } });
+  }
+  if ((user.status ?? "active") === "offboarded" && nextStatusValue !== "offboarded") {
+    return res.status(409).json({ error: { code: "USER_OFFBOARDED_TERMINAL", message: "Offboarded accounts cannot be restored." } });
+  }
+  if (req.auth.user.id === user.id && nextStatusValue !== "active") {
+    return res.status(409).json({ error: { code: "USER_SELF_DISABLE_FORBIDDEN", message: "Administrators cannot disable their own account." } });
+  }
+  if (req.auth.user.id === user.id && nextRoleValue !== "admin") {
+    return res.status(409).json({ error: { code: "USER_SELF_DEMOTION_FORBIDDEN", message: "Administrators cannot remove their own administrator role." } });
+  }
+  if (
+    user.roleId === "admin" &&
+    (user.status ?? "active") === "active" &&
+    (nextRoleValue !== "admin" || nextStatusValue !== "active") &&
+    remainingActiveAdminCount(ctx, user.id) === 0
+  ) {
+    return res.status(409).json({ error: { code: "FINAL_ADMIN_REQUIRED", message: "The final active administrator cannot be disabled or demoted." } });
+  }
+
+  const usernameChanged = nextUsername !== account.username;
+  const roleChanged = nextRoleValue !== user.roleId;
+  user.name = nextName;
+  user.roleId = nextRoleValue;
+  user.status = nextStatusValue;
+  user.orgId = nextOrgId;
+  user.orgScope = nextOrgScope;
+  user.departmentId = input.departmentId === undefined ? user.departmentId : normalizeOptionalString(input.departmentId);
+  user.position = input.position === undefined ? user.position : normalizeOptionalString(input.position);
+  user.supplierId = nextSupplierId;
+  if (usernameChanged) ctx.authStore.updateUsername(user.id, nextUsername);
+  if (nextStatusValue !== account.status) {
+    ctx.authStore.setAccountStatus(user.id, nextStatusValue, statusSource(nextStatusValue, req.auth.user.id));
+  } else if (roleChanged || usernameChanged) {
+    ctx.authStore.deleteSessionsForUser(user.id);
+  }
+  const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "user.update", "user", user.id, undefined, `role=${user.roleId};status=${user.status}`);
+  return res.json({ user: accountResponse(ctx, user), auditLogId: log.id });
+}
+
 export function organizationRoutes(ctx: AppContext) {
   const router = Router();
 
@@ -113,44 +243,95 @@ export function organizationRoutes(ctx: AppContext) {
   });
   router.get("/users", (req, res) => {
     if (!assertAdminConfigReader(ctx, req, res, "users")) return;
-    return res.json({ users: ctx.state.users });
+    return res.json({ users: ctx.state.users.filter((item) => item.roleId !== "system").map((item) => accountResponse(ctx, item)) });
   });
-  router.patch("/users/:userId/status", (req, res) => {
-    if (!assertAdminWriter(ctx, req, res, "user", req.params.userId)) return;
-    const user = findUser(ctx, req.params.userId);
-    if (!user || user.roleId === "system") return res.status(404).json({ error: { code: "USER_NOT_FOUND", message: "User was not found." } });
-    const status = String(req.body?.status ?? "");
-    if (!isUserStatus(status)) {
-      return res.status(400).json({ error: { code: "USER_STATUS_INVALID", message: "User status must be active, disabled, suspended or offboarded." } });
+  router.post("/users", (req, res) => {
+    if (!assertAdminWriter(ctx, req, res, "user", "new")) return;
+    const username = String(req.body?.username ?? "").trim();
+    const name = String(req.body?.name ?? "").trim();
+    const roleValue = String(req.body?.roleId ?? "").trim();
+    const orgId = String(req.body?.orgId ?? "").trim();
+    const orgScope = req.body?.orgScope === undefined ? [orgId] : normalizeStringArray(req.body.orgScope);
+    const supplierId = normalizeOptionalString(req.body?.supplierId);
+    if (!usernameIsValid(username)) {
+      return res.status(400).json({ error: { code: "USERNAME_INVALID", message: "Username must be 2-64 characters and may contain letters, numbers, dot, underscore, at sign or hyphen." } });
     }
-    user.status = status;
-    ctx.authStore.setAccountStatus(user.id, status);
-    const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "user.status.update", "user", user.id, undefined, status);
-    return res.json({ user, auditLogId: log.id });
-  });
-  router.patch("/users/:userId/role", (req, res) => {
-    if (!assertAdminWriter(ctx, req, res, "user", req.params.userId)) return;
-    const user = findUser(ctx, req.params.userId);
-    if (!user || user.roleId === "system") return res.status(404).json({ error: { code: "USER_NOT_FOUND", message: "User was not found." } });
-    const roleId = String(req.body?.roleId ?? "");
-    if (!isRoleId(roleId) || roleId === "system") {
+    if (!name) {
+      return res.status(400).json({ error: { code: "USER_NAME_REQUIRED", message: "User name is required." } });
+    }
+    if (!isRoleId(roleValue) || roleValue === "system") {
       return res.status(400).json({ error: { code: "USER_ROLE_INVALID", message: "Role id is invalid." } });
     }
-    user.roleId = roleId;
-    if (Array.isArray(req.body?.orgScope)) user.orgScope = normalizeStringArray(req.body.orgScope);
-    if (req.body?.orgId !== undefined) user.orgId = String(req.body.orgId).trim() || user.orgId;
-    const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "user.role.update", "user", user.id, undefined, roleId);
-    return res.json({ user, auditLogId: log.id });
+    if (!orgId || orgScope.length === 0 || !validateOrganizationIds(ctx, orgId, orgScope)) {
+      return res.status(400).json({ error: { code: "USER_ORGANIZATION_INVALID", message: "Organization and organization scope must reference active organizations." } });
+    }
+    const supplierBindingError = validateSupplierBinding(ctx, roleValue, supplierId);
+    if (supplierBindingError) {
+      return res.status(400).json({ error: { code: supplierBindingError, message: "Supplier roles must be bound to an existing supplier, and other roles cannot retain a supplier binding." } });
+    }
+    if (ctx.authStore.getAccountByUsername(username) || ctx.authStore.getAccountsByUserIds(ctx.state.users.map((item) => item.id)).some((item) => item.username.toLowerCase() === username.toLowerCase())) {
+      return res.status(409).json({ error: { code: "USERNAME_EXISTS", message: "Username already exists." } });
+    }
+
+    const user: User = {
+      id: `u-managed-${crypto.randomUUID()}`,
+      name,
+      roleId: roleValue,
+      orgId,
+      status: "active",
+      orgScope,
+      departmentId: normalizeOptionalString(req.body?.departmentId),
+      position: normalizeOptionalString(req.body?.position),
+      supplierId
+    };
+    const temporaryPassword = generateTemporaryPassword("Init");
+    ctx.state.users.push(user);
+    try {
+      ctx.authStore.createAccount({ userId: user.id, username, temporaryPassword });
+    } catch (error) {
+      ctx.state.users.splice(ctx.state.users.indexOf(user), 1);
+      throw error;
+    }
+    const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "user.create", "user", user.id, undefined, `role=${user.roleId}`);
+    return res.status(201).json({ user: accountResponse(ctx, user), temporaryPassword, auditLogId: log.id });
   });
-  router.patch("/users/:userId/profile", (req, res) => {
+  router.patch("/users/:userId", (req, res) => {
+    return updateManagedUser(ctx, req, res, (req.body ?? {}) as Record<string, unknown>);
+  });
+  router.post("/users/:userId/reset-password", (req, res) => {
     if (!assertAdminWriter(ctx, req, res, "user", req.params.userId)) return;
     const user = findUser(ctx, req.params.userId);
-    if (!user || user.roleId === "system") return res.status(404).json({ error: { code: "USER_NOT_FOUND", message: "User was not found." } });
-    if (req.body?.name !== undefined) user.name = String(req.body.name).trim() || user.name;
-    if (req.body?.departmentId !== undefined) user.departmentId = String(req.body.departmentId).trim() || undefined;
-    if (req.body?.position !== undefined) user.position = String(req.body.position).trim() || undefined;
-    const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "user.profile.update", "user", user.id);
-    return res.json({ user, auditLogId: log.id });
+    if (!user || user.roleId === "system") {
+      return res.status(404).json({ error: { code: "USER_NOT_FOUND", message: "User was not found." } });
+    }
+    if ((user.status ?? "active") === "offboarded") {
+      return res.status(409).json({ error: { code: "USER_OFFBOARDED_TERMINAL", message: "Offboarded account passwords cannot be reset." } });
+    }
+    const temporaryPassword = generateTemporaryPassword("Reset");
+    const account = ctx.authStore.resetPassword(user.id, temporaryPassword);
+    if (!account) {
+      return res.status(404).json({ error: { code: "AUTH_ACCOUNT_NOT_FOUND", message: "Login account was not found." } });
+    }
+    const log = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "user.password.reset", "auth_account", user.id, undefined, "administrator reset");
+    return res.json({ user: accountResponse(ctx, user), temporaryPassword, auditLogId: log.id });
+  });
+  router.patch("/users/:userId/status", (req, res) => {
+    return updateManagedUser(ctx, req, res, { status: req.body?.status });
+  });
+  router.patch("/users/:userId/role", (req, res) => {
+    return updateManagedUser(ctx, req, res, {
+      roleId: req.body?.roleId,
+      orgScope: req.body?.orgScope,
+      orgId: req.body?.orgId,
+      supplierId: req.body?.supplierId
+    });
+  });
+  router.patch("/users/:userId/profile", (req, res) => {
+    return updateManagedUser(ctx, req, res, {
+      name: req.body?.name,
+      departmentId: req.body?.departmentId,
+      position: req.body?.position
+    });
   });
   router.get("/role-permissions", (req, res) => {
     if (!assertAdminConfigReader(ctx, req, res, "role_permissions")) return;

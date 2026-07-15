@@ -1,6 +1,6 @@
-import crypto from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import type { AppContext } from "../app-context.js";
+import { generateTemporaryPassword } from "../runtime/auth-store.js";
 import type {
   ProcurementDocumentAttachment,
   Supplier,
@@ -493,11 +493,6 @@ function supplierAccountPayload(userId: string, includePassword: boolean) {
   };
 }
 
-function temporaryPasswordFor(userId: string) {
-  const token = crypto.randomBytes(4).toString("hex").toUpperCase();
-  return `Reset@${new Date().getUTCFullYear()}-${userId.slice(-6)}-${token}`;
-}
-
 function ensureSupplierAccessAccounts(ctx: AppContext, supplier: Supplier, options: { includeInitialPassword: boolean }) {
   const { adminUserId, quotationUserId } = supplierAccountIds(supplier.id);
   const accountIds = [adminUserId, quotationUserId];
@@ -513,7 +508,6 @@ function ensureSupplierAccessAccounts(ctx: AppContext, supplier: Supplier, optio
       existing.roleId = accountUser.roleId;
       existing.orgId = accountUser.orgId;
       existing.supplierId = accountUser.supplierId;
-      existing.status = "active";
     } else {
       ctx.state.users.push(accountUser);
     }
@@ -552,6 +546,7 @@ function supplierAccountDirectory(ctx: AppContext, supplier: Supplier) {
       userId: adminUserId,
       username: accountRows.get(adminUserId)?.username ?? adminUserId,
       status: accountRows.get(adminUserId)?.status ?? users.get(adminUserId)?.status ?? "inactive",
+      statusSource: accountRows.get(adminUserId)?.statusSource ?? null,
       credentialSetupRequired: accountRows.get(adminUserId)?.passwordChangeRequired ?? false,
       lastLoginAt: accountRows.get(adminUserId)?.lastLoginAt ?? null
     },
@@ -561,10 +556,38 @@ function supplierAccountDirectory(ctx: AppContext, supplier: Supplier) {
       userId: quotationUserId,
       username: accountRows.get(quotationUserId)?.username ?? quotationUserId,
       status: accountRows.get(quotationUserId)?.status ?? users.get(quotationUserId)?.status ?? "inactive",
+      statusSource: accountRows.get(quotationUserId)?.statusSource ?? null,
       credentialSetupRequired: accountRows.get(quotationUserId)?.passwordChangeRequired ?? false,
       lastLoginAt: accountRows.get(quotationUserId)?.lastLoginAt ?? null
     }
   ];
+}
+
+function syncSupplierLinkedAccountStatus(ctx: AppContext, supplier: Supplier, status: Supplier["admissionStatus"]) {
+  const source = `supplier_inactive:${supplier.id}`;
+  const linkedUsers = ctx.state.users.filter(
+    (user) => user.supplierId === supplier.id && ["supplier", "supplier_admin", "supplier_quotation"].includes(user.roleId)
+  );
+  const accounts = new Map(ctx.authStore.getAccountsByUserIds(linkedUsers.map((user) => user.id)).map((account) => [account.userId, account]));
+
+  if (status === "inactive") {
+    for (const user of linkedUsers) {
+      const account = accounts.get(user.id);
+      if ((user.status ?? "active") !== "active" || account?.status !== "active") continue;
+      user.status = "suspended";
+      ctx.authStore.setAccountStatus(user.id, "suspended", source);
+    }
+    return;
+  }
+
+  if (status === "admitted") {
+    for (const user of linkedUsers) {
+      const account = accounts.get(user.id);
+      if (user.status !== "suspended" || account?.status !== "suspended" || account.statusSource !== source) continue;
+      user.status = "active";
+      ctx.authStore.setAccountStatus(user.id, "active");
+    }
+  }
 }
 
 export function supplierRoutes(ctx: AppContext) {
@@ -1031,7 +1054,11 @@ export function supplierRoutes(ctx: AppContext) {
     if (!allowedIds.includes(req.params.userId)) {
       return res.status(404).json({ error: { code: "SUPPLIER_ACCOUNT_NOT_FOUND", message: "Supplier account does not exist for this supplier." } });
     }
-    const temporaryPassword = temporaryPasswordFor(req.params.userId);
+    const currentAccount = ctx.authStore.getAccountsByUserIds([req.params.userId])[0];
+    if (currentAccount?.status === "offboarded") {
+      return res.status(409).json({ error: { code: "USER_OFFBOARDED_TERMINAL", message: "Offboarded account passwords cannot be reset." } });
+    }
+    const temporaryPassword = generateTemporaryPassword("Reset");
     const account = ctx.authStore.resetPassword(req.params.userId, temporaryPassword);
     if (!account) {
       return res.status(404).json({ error: { code: "SUPPLIER_ACCOUNT_NOT_FOUND", message: "Supplier account does not exist." } });
@@ -1171,6 +1198,7 @@ export function supplierRoutes(ctx: AppContext) {
         latestResult: "warning"
       };
     }
+    syncSupplierLinkedAccountStatus(ctx, supplier, supplier.admissionStatus);
     persistSupplierToR3(ctx, supplier);
     const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "supplier.status.update", "supplier", supplier.id, undefined, reason ? `status=${status};reason=${reason}` : `status=${status}`);
     if (status === "admitted") {

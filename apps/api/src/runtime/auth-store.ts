@@ -7,6 +7,7 @@ interface AuthAccountRow {
   username: string;
   password_hash: string;
   status: string;
+  status_source: string | null;
   password_change_required: number;
   last_login_at: string | null;
 }
@@ -27,8 +28,16 @@ export interface AuthAccountSummary {
   userId: string;
   username: string;
   status: string;
+  statusSource: string | null;
   passwordChangeRequired: boolean;
   lastLoginAt: string | null;
+}
+
+export type ManagedAccountStatus = "active" | "disabled" | "suspended" | "offboarded";
+
+export function generateTemporaryPassword(prefix: "Init" | "Reset" = "Init") {
+  const token = crypto.randomBytes(6).toString("hex").toUpperCase();
+  return `${prefix}@${new Date().getUTCFullYear()}-${token}`;
 }
 
 function toAccountSummary(row: AuthAccountRow): AuthAccountSummary {
@@ -36,6 +45,7 @@ function toAccountSummary(row: AuthAccountRow): AuthAccountSummary {
     userId: row.user_id,
     username: row.username,
     status: row.status,
+    statusSource: row.status_source,
     passwordChangeRequired: Boolean(row.password_change_required),
     lastLoginAt: row.last_login_at
   };
@@ -73,12 +83,13 @@ export class AuthStore {
         this.runtimeDb.db.prepare("delete from auth_accounts").run();
       }
       const statement = this.runtimeDb.db.prepare(
-        `insert into auth_accounts (user_id, username, password_hash, status, password_change_required, created_at, updated_at)
-         values (?, ?, ?, 'active', 0, ?, ?)
+        `insert into auth_accounts (user_id, username, password_hash, status, status_source, password_change_required, created_at, updated_at)
+         values (?, ?, ?, 'active', null, 0, ?, ?)
          on conflict(user_id) do update set
            username = excluded.username,
            password_hash = excluded.password_hash,
            status = 'active',
+           status_source = null,
            password_change_required = 0,
            updated_at = excluded.updated_at`
       );
@@ -96,12 +107,35 @@ export class AuthStore {
     this.runtimeDb.db.prepare("update auth_accounts set password_change_required = 1, updated_at = ? where user_id = ?").run(new Date().toISOString(), userId);
   }
 
-  setAccountStatus(userId: string, status: "active" | "disabled" | "suspended" | "offboarded") {
-    const accountStatus = status === "active" ? "active" : "disabled";
-    this.runtimeDb.db.prepare("update auth_accounts set status = ?, updated_at = ? where user_id = ?").run(accountStatus, new Date().toISOString(), userId);
-    if (accountStatus !== "active") {
-      this.runtimeDb.db.prepare("delete from auth_sessions where user_id = ?").run(userId);
-    }
+  createAccount(input: { userId: string; username: string; temporaryPassword: string; statusSource?: string | null }) {
+    const now = new Date().toISOString();
+    this.runtimeDb.db
+      .prepare(
+        `insert into auth_accounts
+         (user_id, username, password_hash, status, status_source, password_change_required, created_at, updated_at)
+         values (?, ?, ?, 'active', ?, 1, ?, ?)`
+      )
+      .run(input.userId, input.username, derivePasswordHash(input.temporaryPassword), input.statusSource ?? null, now, now);
+    return this.getAccountsByUserIds([input.userId])[0] ?? null;
+  }
+
+  getAccountByUsername(username: string) {
+    const row = this.runtimeDb.db.prepare("select * from auth_accounts where username = ?").get(username) as AuthAccountRow | undefined;
+    return row ? toAccountSummary(row) : null;
+  }
+
+  updateUsername(userId: string, username: string) {
+    const now = new Date().toISOString();
+    const result = this.runtimeDb.db.prepare("update auth_accounts set username = ?, updated_at = ? where user_id = ?").run(username, now, userId);
+    if (result.changes === 0) return null;
+    return this.getAccountsByUserIds([userId])[0] ?? null;
+  }
+
+  setAccountStatus(userId: string, status: ManagedAccountStatus, statusSource: string | null = null) {
+    this.runtimeDb.db
+      .prepare("update auth_accounts set status = ?, status_source = ?, updated_at = ? where user_id = ?")
+      .run(status, status === "active" ? null : statusSource, new Date().toISOString(), userId);
+    if (status !== "active") this.deleteSessionsForUser(userId);
   }
 
   getAccountsByUserIds(userIds: string[]) {
@@ -114,10 +148,10 @@ export class AuthStore {
   resetPassword(userId: string, temporaryPassword: string) {
     const now = new Date().toISOString();
     const result = this.runtimeDb.db
-      .prepare("update auth_accounts set password_hash = ?, status = 'active', password_change_required = 1, updated_at = ? where user_id = ?")
+      .prepare("update auth_accounts set password_hash = ?, password_change_required = 1, updated_at = ? where user_id = ?")
       .run(derivePasswordHash(temporaryPassword), now, userId);
     if (result.changes === 0) return null;
-    this.runtimeDb.db.prepare("delete from auth_sessions where user_id = ?").run(userId);
+    this.deleteSessionsForUser(userId);
     const row = this.runtimeDb.db.prepare("select * from auth_accounts where user_id = ?").get(userId) as AuthAccountRow | undefined;
     return row ? toAccountSummary(row) : null;
   }
@@ -164,5 +198,9 @@ export class AuthStore {
 
   deleteSession(sessionId: string) {
     this.runtimeDb.db.prepare("delete from auth_sessions where session_id = ?").run(sessionId);
+  }
+
+  deleteSessionsForUser(userId: string) {
+    this.runtimeDb.db.prepare("delete from auth_sessions where user_id = ?").run(userId);
   }
 }

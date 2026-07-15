@@ -973,8 +973,12 @@ export class R7SettlementFinanceRepository {
     if (!["approved", "payable", "paid"].includes(bill.status)) throw new Error("未审核通过结算不能付款。");
     const invoiceAmount = this.verifiedInvoiceTotalForBill(settlementBillId);
     if (invoiceAmount < bill.settlementAmount) throw new Error("已审核通过发票金额不足，不能全额模拟付款。");
+    const activeEntry = this.runtimeDb.db
+      .prepare("select id from r2_fund_ledger_entries where settlement_bill_id = ? and ledger_status in ('payment_requested', 'pending_payment') limit 1")
+      .get(settlementBillId) as Row | undefined;
+    if (activeEntry) throw new Error("当前结算单已有审批中或待付款的申请，请勿重复发起。");
     const paid = this.fundPaidAmount(settlementBillId);
-    if (roundMoney(paid + bill.settlementAmount) > bill.settlementAmount) throw new Error("模拟付款金额不能超过结算可付金额。");
+    if (roundMoney(paid + bill.settlementAmount) > bill.settlementAmount) throw new Error("付款金额不能超过结算可付金额。");
     const timestamp = now();
     const entry: FundLedgerEntry = {
       id: `fle-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
@@ -985,13 +989,13 @@ export class R7SettlementFinanceRepository {
       departmentId: bill.departmentId,
       amount: bill.settlementAmount,
       direction: "outbound",
-      entryType: "simulated_payment",
-      status,
+      entryType: "payment_request",
+      status: "payment_requested",
       createdBy: actor.id,
       createdAt: timestamp,
       operatedBy: actor.id,
       operatedAt: timestamp,
-      note: note ?? "R7 模拟付款台账，仅作本系统台账留痕，不代表真实资金清算。"
+      note: note ?? "付款申请已发起，等待集团采购管理审批。"
     };
     run(
       this.runtimeDb.db.prepare(
@@ -1020,8 +1024,41 @@ export class R7SettlementFinanceRepository {
         timestamp
       ]
     );
-    this.runtimeDb.db.prepare("update r2_settlement_bills set bill_status = ?, updated_at = ? where id = ?").run(status === "paid" ? "paid" : "payable", timestamp, settlementBillId);
+    this.runtimeDb.db.prepare("update r2_settlement_bills set bill_status = ?, updated_at = ? where id = ?").run("payable", timestamp, settlementBillId);
     return entry;
+  }
+
+  getFundLedgerEntry(id: string): FundLedgerEntry | undefined {
+    const row = this.runtimeDb.db.prepare("select * from r2_fund_ledger_entries where id = ?").get(id) as Row | undefined;
+    return row ? this.fundFromRow(row) : undefined;
+  }
+
+  transitionFundLedgerEntry(entryId: string, actor: User, status: FundLedgerEntry["status"], note?: string): FundLedgerEntry {
+    const entry = this.getFundLedgerEntry(entryId);
+    if (!entry) throw new Error("资金台账不存在。");
+    if (!isFundLedgerStatus(status)) throw new Error("资金台账状态无效。");
+    if (entry.status === status) return entry;
+
+    const allowedTransitions: Record<FundLedgerEntry["status"], FundLedgerEntry["status"][]> = {
+      payment_requested: ["pending_payment", "rejected", "cancelled"],
+      pending_payment: ["paid", "rejected", "cancelled"],
+      paid: [],
+      rejected: [],
+      cancelled: []
+    };
+    if (!allowedTransitions[entry.status].includes(status)) {
+      throw new Error(`资金台账不能从 ${entry.status} 变更为 ${status}。`);
+    }
+
+    const timestamp = now();
+    const transitionNote = note?.trim() ? [entry.note, note.trim()].filter(Boolean).join("\n") : entry.note;
+    this.runtimeDb.db
+      .prepare("update r2_fund_ledger_entries set ledger_status = ?, operated_by = ?, operated_at = ?, note = ?, updated_at = ? where id = ?")
+      .run(status, actor.id, timestamp, transitionNote ?? null, timestamp, entryId);
+    this.runtimeDb.db
+      .prepare("update r2_settlement_bills set bill_status = ?, updated_at = ? where id = ?")
+      .run(status === "paid" ? "paid" : "payable", timestamp, entry.settlementBillId);
+    return this.getFundLedgerEntry(entryId)!;
   }
 
   getSettlementBill(id: string): SettlementBill | undefined {
@@ -1425,7 +1462,7 @@ export class R7SettlementFinanceRepository {
 
   private fundPaidAmount(settlementBillId: string) {
     const row = this.runtimeDb.db
-      .prepare("select coalesce(sum(amount), 0) as total from r2_fund_ledger_entries where settlement_bill_id = ? and ledger_status in ('payment_requested', 'paid')")
+      .prepare("select coalesce(sum(amount), 0) as total from r2_fund_ledger_entries where settlement_bill_id = ? and ledger_status = 'paid'")
       .get(settlementBillId) as Row | undefined;
     return Number(row?.total ?? 0);
   }

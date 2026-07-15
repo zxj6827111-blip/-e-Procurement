@@ -115,7 +115,7 @@ function sameItems(left, right) {
 const geminiExpectedNavByRole = {
   buyer: ["工作台", "我的待办", "消息中心", "采购申请", "采购项目", "采购文件", "公告与邀请", "商品目录", "评审定标", "定标审批", "订单履约", "档案审计"],
   platform_operator: ["工作台", "我的待办", "消息中心", "采购申请", "采购项目", "商品目录", "评审定标", "评分模板", "定标审批", "订单履约", "档案审计"],
-  group_manager: ["工作台", "我的待办", "消息中心", "审批规则", "需求审批", "采购项目", "采购文件", "公告与邀请", "报价进度", "评审定标", "评分模板", "定标审批", "供应商管理", "商品目录", "档案审计"],
+  group_manager: ["工作台", "我的待办", "消息中心", "审批规则", "需求审批", "采购项目", "采购文件", "公告与邀请", "报价进度", "专家库管理", "评审定标", "评分模板", "定标审批", "供应商管理", "商品目录", "档案审计"],
   auditor: ["工作台", "我的待办", "消息中心", "审批规则", "档案审计", "采购监督", "定标监督", "供应商监督", "操作日志", "集成配置"]
 };
 
@@ -353,7 +353,34 @@ async function runApiFlow() {
 
   const signing = await postAs(actors.buyer, `/api/projects/${projectId}/contracts/signing`, undefined, 201);
   const contractId = signing.contract.id;
-  trace.push("buyer:start contract signing");
+  trace.push("采购经办:发起合同签订");
+
+  // 业务规则：生成采购订单前必须已有供应商确认合同；确认前采购方须先上传正式合同文件。
+  const contractFile = await postAs(
+    actors.buyer,
+    "/api/files/upload",
+    {
+      originalName: `contract-${suffix}.pdf`,
+      contentType: "application/pdf",
+      contentBase64: Buffer.from(`%PDF-1.4 e2e contract ${projectId}`).toString("base64"),
+      attachmentKind: "contract_document",
+      objectType: "contract_ledger",
+      objectId: contractId,
+      projectId,
+      supplierId: selectedSupplier.supplierId
+    },
+    201
+  );
+  await postAs(actors.buyer, `/api/contracts/${contractId}/attachments`, {
+    attachmentMetadata: [contractFile.file]
+  });
+  trace.push("采购经办:上传合同文件");
+
+  await postAs(selectedSupplier.adminActor, `/api/contracts/${contractId}/confirm`);
+  trace.push("供应商管理员:确认合同");
+
+  await postAs(actors.buyer, `/api/projects/${projectId}/result-notifications`, { scope: "supplier_self", visibilityConfig: "supplier_self_only" }, 201);
+  trace.push("采购经办:发送中标结果通知");
 
   const generatedOrder = await postAs(
     actors.buyer,
@@ -367,15 +394,7 @@ async function runApiFlow() {
     201
   );
   const orderId = generatedOrder.purchaseOrder.id;
-  trace.push("buyer:generate purchase order");
-
-  await postAs(actors.buyer, `/api/projects/${projectId}/result-notifications`, { scope: "supplier_self", visibilityConfig: "supplier_self_only" }, 201);
-  trace.push("buyer:send award result notification");
-
-  await postAs(selectedSupplier.adminActor, `/api/contracts/${contractId}/confirm`, {
-    attachmentMetadata: [{ fileName: `contract-confirm-${suffix}.pdf`, fileType: "application/pdf" }]
-  });
-  trace.push("supplier:confirm contract");
+  trace.push("采购经办:生成采购订单");
 
   const performanceNode = await postAs(
     actors.buyer,
@@ -398,13 +417,13 @@ async function runApiFlow() {
     },
     201
   );
-  trace.push("buyer:record contract performance");
+  trace.push("采购经办:登记履约节点与验收");
 
   await postAs(actors.buyer, `/api/projects/${projectId}/award-products/auto-list`, undefined, 201);
-  trace.push("buyer:auto-list awarded products");
+  trace.push("采购经办:中标商品自动上架");
 
   await postAs(selectedSupplier.adminActor, `/api/project-workbench/purchase-orders/${orderId}/confirm`);
-  trace.push("supplier:confirm purchase order");
+  trace.push("供应商管理员:确认采购订单");
 
   const orderLineItems = Array.isArray(generatedOrder.purchaseOrder.lineItems) ? generatedOrder.purchaseOrder.lineItems : [];
   await postAs(
@@ -422,7 +441,7 @@ async function runApiFlow() {
     },
     201
   );
-  trace.push("buyer:record full receipt");
+  trace.push("采购经办:登记全量收货");
 
   const uploadedSettlementFile = await postAs(
     selectedSupplier.adminActor,
@@ -446,13 +465,13 @@ async function runApiFlow() {
     201
   );
   const settlementMaterialId = settlement.settlementMaterial.id;
-  trace.push("supplier:submit settlement material");
+  trace.push("供应商管理员:提交结算材料");
 
   await postAs(actors.buyer, `/api/project-workbench/settlement-materials/${settlementMaterialId}/verify`, {
     approved: true,
     verificationOpinion: "settlement material verified"
   });
-  trace.push("buyer:verify settlement material");
+  trace.push("采购经办:核验结算材料");
 
   await postAs(
     actors.buyer,
@@ -469,11 +488,11 @@ async function runApiFlow() {
     },
     201
   );
-  trace.push("buyer:submit fulfillment evaluation");
+  trace.push("采购经办:提交履约评价");
 
   await postAs(actors.buyer, `/api/projects/${projectId}/archive-check`);
   await postAs(actors.buyer, `/api/projects/${projectId}/archive-seal`);
-  trace.push("buyer:archive check and seal");
+  trace.push("采购经办:档案检查并封档");
 
   const pendingApprovalRequestTitle = `集团待审可见性验证-${suffix}`;
   const pendingApprovalRequest = await postAs(
@@ -506,7 +525,7 @@ async function runApiFlow() {
   );
   const pendingApprovalRequestId = pendingApprovalRequest.procurementRequest.id;
   await postAs(actors.hotelBuyer, `/api/procurement-requests/${pendingApprovalRequestId}/submit`);
-  trace.push("hotel:submit pending request for group approval visibility");
+  trace.push("酒店采购:提交待审申请供集团列表可见性校验");
 
   return {
     requestId,

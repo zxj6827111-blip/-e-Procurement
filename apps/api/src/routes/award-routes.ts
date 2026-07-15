@@ -133,6 +133,7 @@ function projectToAwardApproving(project: ProcurementProject) {
 
 function projectToResultNotified(project: ProcurementProject) {
   if (project.externalTradeFlag) return;
+  if (!["awarded_pending_order", "result_notified"].includes(project.status)) return;
   project.status = "result_notified" satisfies InternalProjectStatus;
   project.displayStatus = "result notified";
 }
@@ -735,6 +736,7 @@ export function awardRoutes(ctx: AppContext) {
     const existingSupplierTargets = new Set(existingNotifications.map((item) => item.supplierId).filter(Boolean));
     const missingSupplierTargets = expectedSupplierTargets.filter((supplierId) => !existingSupplierTargets.has(supplierId));
     if (existingNotifications.length > 0 && (typedScope !== "supplier_self" || missingSupplierTargets.length === 0)) {
+      projectToResultNotified(project);
       return res.json({ notifications: existingNotifications });
     }
     const now = new Date().toISOString();

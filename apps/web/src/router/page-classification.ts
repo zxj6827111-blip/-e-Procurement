@@ -100,6 +100,7 @@ export const pageClassifications: PageClassification[] = [
   { path: "/supplier-registration", domain: "supplier-registration", kind: "FORM_PAGE", component: "SupplierRegistrationPage" },
   { path: "/bidding", domain: "bidding", kind: "FORM_PAGE", component: "BiddingPage" },
   { path: "/bid-control", domain: "bid-control", kind: "LIST_PAGE", component: "BidControlPage" },
+  { path: "/expert-directory", domain: "expert-directory", kind: "LIST_PAGE", component: "ExpertReviewPage" },
   { path: "/expert-review", domain: "expert-review", kind: "LIST_PAGE", component: "ExpertReviewPage" },
   { path: "/scoring-templates", domain: "scoring-template", kind: "FORM_PAGE", component: "ScoringTemplatesPage" },
   { path: "/expert-scoring", domain: "expert-scoring", kind: "FORM_PAGE", component: "ExpertScoringPage" },

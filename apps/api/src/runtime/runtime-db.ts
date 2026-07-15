@@ -107,6 +107,7 @@ export class RuntimeDb {
     this.addColumnIfMissing("stored_files", "deleted_reason", "text null");
     this.addColumnIfMissing("stored_files", "deleted_at", "text null");
     this.addColumnIfMissing("auth_accounts", "password_change_required", "integer not null default 0");
+    this.addColumnIfMissing("auth_accounts", "status_source", "text null");
     this.addColumnIfMissing("integration_jobs", "business_type", "text not null default 'integration'");
     this.addColumnIfMissing("integration_jobs", "business_id", "text not null default 'n/a'");
     this.addColumnIfMissing("integration_jobs", "request_id", "text not null default 'n/a'");

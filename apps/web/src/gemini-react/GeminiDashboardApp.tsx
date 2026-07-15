@@ -381,7 +381,7 @@ export function GeminiDashboardApp(props: GeminiDashboardProps) {
                         </Button>
                       </CardHeader>
                       <div data-ui-check="table-wrap" className="overflow-x-auto">
-                        <table data-ui-check="table" className="w-full text-sm text-left">
+                        <table data-ui-check="table" className="w-full min-w-[700px] text-sm text-left">
                           <thead className="bg-slate-50 text-slate-500 font-medium">
                             <tr>
                               <th className="px-5 py-3 rounded-tl-lg">状态</th>
@@ -394,13 +394,13 @@ export function GeminiDashboardApp(props: GeminiDashboardProps) {
                           <tbody className="divide-y divide-slate-100">
                             {props.todoRows.slice(0, 4).map((task, index) => (
                               <tr key={`${task.code}-${index}`} className="hover:bg-slate-50/50">
-                                <td className="px-5 py-3">
+                                <td className="px-5 py-3 whitespace-nowrap">
                                   <Badge variant="warning">{task.status}</Badge>
                                 </td>
                                 <td className="px-5 py-3 font-medium text-slate-900">{task.title}</td>
-                                <td className="px-5 py-3 text-slate-500 font-mono text-xs">{task.code}</td>
-                                <td className="px-5 py-3 text-slate-500">{task.deadline}</td>
-                                <td className="px-5 py-3 text-right">
+                                <td className="px-5 py-3 whitespace-nowrap text-slate-500 font-mono text-xs">{task.code}</td>
+                                <td className="px-5 py-3 whitespace-nowrap text-slate-500">{task.deadline}</td>
+                                <td className="px-5 py-3 whitespace-nowrap text-right">
                                   <Button variant="outline" size="sm" className="text-xs" onClick={() => props.onNavigate(task.to)}>
                                     去处理
                                   </Button>

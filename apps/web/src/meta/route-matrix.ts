@@ -135,6 +135,7 @@ export const routeMatrixSource: RouteMatrixSourceItem[] = [
   hybrid({ route: "/supplier-registration", moduleId: "supplier", component: "SupplierRegistrationPage" }),
   hybrid({ route: "/bidding", moduleId: "bidding", component: "BiddingPage" }),
   hybrid({ route: "/bid-control", moduleId: "bidding", component: "BidControlPage" }),
+  hybrid({ route: "/expert-directory", moduleId: "expert", component: "ExpertReviewPage", roleAccess: ["group_manager"], migrationStage: 2, apiReady: true }),
   hybrid({ route: "/expert-review", moduleId: "expert", component: "ExpertReviewPage" }),
   hybrid({ route: "/scoring-templates", moduleId: "expert", component: "ScoringTemplatesPage" }),
   hybrid({ route: "/expert-scoring", moduleId: "expert", component: "ExpertScoringPage" }),

@@ -315,6 +315,15 @@ describe("Phase 3 bidding, locking and abnormal view approvals", () => {
     expect(futureProjectList.body.projects.find((item: { id: string }) => item.id === "p-pre").beforeDeadline).toBe(true);
   });
 
+  it("includes source request line items in supplier-visible project rows", async () => {
+    const projectList = await request(runtime.app).get("/api/projects").set("x-mock-user-id", "u3");
+
+    expect(projectList.status).toBe(200);
+    const project = projectList.body.projects.find((item: { id: string }) => item.id === "p-pre");
+    expect(project.sourceLineItems).toEqual(runtime.ctx.state.procurementRequests.find((item) => item.id === "req-pre")?.lineItems);
+    expect(project.sourceLineItems).toHaveLength(2);
+  });
+
   it("requires a business reason before an early cutoff changes the supplier deadline", async () => {
     const project = runtime.ctx.state.projects.find((item) => item.id === "p-pre")!;
     const previousDeadline = project.quoteDeadlineAt;

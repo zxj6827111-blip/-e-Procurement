@@ -314,7 +314,7 @@ export function ApprovalRuleView() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="w-full min-w-[1180px] text-left text-sm">
               <thead className="bg-slate-50 text-slate-600">
                 <tr>
                   <th className="px-4 py-3">规则编号</th>
@@ -338,7 +338,7 @@ export function ApprovalRuleView() {
                 ) : filteredRules.length ? (
                   filteredRules.map((rule) => (
                     <tr key={rule.id} className="hover:bg-slate-50/60">
-                      <td className="px-4 py-3 font-medium text-slate-900">{rule.ruleCode}</td>
+                      <td className="px-4 py-3 whitespace-nowrap font-medium text-slate-900">{rule.ruleCode}</td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-900">{rule.ruleName}</div>
                         <div className="mt-1 text-xs text-slate-500">版本 {rule.versionNo}</div>
@@ -347,11 +347,11 @@ export function ApprovalRuleView() {
                       <td className="px-4 py-3 text-slate-600">{rule.amountRangeLabel}</td>
                       <td className="px-4 py-3 text-slate-600">{rule.nodeRoleLabels}</td>
                       <td className="px-4 py-3 text-slate-600">{rule.actionLabels}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <Badge variant={badgeVariantForRuleStatus(rule.status)}>{rule.statusLabel}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{formatR8DateTime(rule.updatedAt)}</td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">{formatR8DateTime(rule.updatedAt)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right">
                         <Button variant="ghost" size="sm" onClick={() => syncEditor(rule)}>
                           {canMaintainRules ? '编辑' : '查看'}
                         </Button>

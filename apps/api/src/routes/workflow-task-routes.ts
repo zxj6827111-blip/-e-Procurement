@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import type { AppContext } from "../app-context.js";
 import { WorkflowRuleError } from "../repositories/r8-workflow-task-repository.js";
-import type { ApprovalBusinessType, ApprovalRule, RoleId } from "../types.js";
+import type { ApprovalBusinessType, ApprovalRule, RoleId, User } from "../types.js";
 import { isOrgReaderRole } from "../role-groups.js";
 import { denyResponse } from "./permission-helpers.js";
 
@@ -68,7 +68,7 @@ function syncStateRule(ctx: AppContext, rule: ApprovalRule) {
   else ctx.state.approvalRules.push(rule);
 }
 
-function syncBusinessAfterWorkflowAction(ctx: AppContext, instanceId: string) {
+function syncBusinessAfterWorkflowAction(ctx: AppContext, instanceId: string, actor: User) {
   const instance = ctx.r8WorkflowTaskRepository.getApprovalInstance(instanceId);
   if (!instance) return;
   const workflowStatus = instance.approvalStatus;
@@ -110,6 +110,16 @@ function syncBusinessAfterWorkflowAction(ctx: AppContext, instanceId: string) {
     }
     document.updatedAt = instance.updatedAt;
     ctx.r4SourcingRepository.upsertProcurementDocument(document);
+  }
+  if (instance.businessType === "payment_request" && ["approved", "rejected", "cancelled"].includes(businessApprovalStatus)) {
+    const nextStatus = businessApprovalStatus === "approved" ? "pending_payment" : businessApprovalStatus === "rejected" ? "rejected" : "cancelled";
+    const note =
+      businessApprovalStatus === "approved"
+        ? "付款申请审批通过，等待酒店财务确认付款。"
+        : businessApprovalStatus === "rejected"
+          ? "付款申请审批未通过。"
+          : "付款申请已取消。";
+    ctx.r7SettlementFinanceRepository.transitionFundLedgerEntry(instance.businessId, actor, nextStatus, note);
   }
 }
 
@@ -157,7 +167,7 @@ function resolveManualWorkflowBusiness(ctx: AppContext, businessType: ApprovalBu
     const item = ctx.r7SettlementFinanceRepository.getSettlementBill(businessId);
     return item
       ? {
-          title: `Settlement bill ${item.billNo}`,
+          title: "结算单审批",
           amount: item.settlementAmount,
           methodType: "settlement_bill",
           projectId: item.projectId,
@@ -171,7 +181,7 @@ function resolveManualWorkflowBusiness(ctx: AppContext, businessType: ApprovalBu
     const bill = item ? ctx.r7SettlementFinanceRepository.getSettlementBill(item.settlementBillId) : undefined;
     return item && bill
       ? {
-          title: `Invoice ${item.invoiceNo}`,
+          title: "发票审核",
           amount: item.amount,
           methodType: "invoice",
           projectId: bill.projectId,
@@ -185,7 +195,7 @@ function resolveManualWorkflowBusiness(ctx: AppContext, businessType: ApprovalBu
     const bill = item ? ctx.r7SettlementFinanceRepository.getSettlementBill(item.settlementBillId) : undefined;
     return item && bill
       ? {
-          title: `Payment request ${item.ledgerNo}`,
+          title: "付款申请审批",
           amount: item.amount,
           methodType: item.entryType,
           projectId: bill.projectId,
@@ -321,7 +331,7 @@ export function workflowTaskRoutes(ctx: AppContext) {
         opinion: req.body?.opinion === undefined ? undefined : String(req.body.opinion),
         sourceJson: { route: "workflow" }
       });
-      syncBusinessAfterWorkflowAction(ctx, result.approvalInstance.id);
+      syncBusinessAfterWorkflowAction(ctx, result.approvalInstance.id, req.auth.user);
       const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, `workflow_instance.${action}`, "approval_instance", result.approvalInstance.id, result.approvalInstance.projectId);
       return res.json({ ...result, auditLogId: auditLog.id });
     } catch (error) {

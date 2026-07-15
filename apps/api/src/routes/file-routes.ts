@@ -29,6 +29,27 @@ interface UploadScope {
 
 function validateUploadScope(ctx: AppContext, req: Request, res: Response, scope: UploadScope) {
   const { objectType, objectId, projectId, supplierId } = scope;
+  if (objectType === "contract_ledger") {
+    const contract = ctx.state.contractLedgers.find((item) => item.id === objectId);
+    if (!contract) {
+      res.status(404).json({ error: { code: "CONTRACT_NOT_FOUND", message: "Contract does not exist." } });
+      return false;
+    }
+    const project = ctx.state.projects.find((item) => item.id === contract.projectId);
+    if (!project) {
+      res.status(404).json({ error: { code: "PROJECT_NOT_FOUND", message: "Project does not exist." } });
+      return false;
+    }
+    if (projectId !== contract.projectId || supplierId !== contract.supplierId) {
+      denyResponse(ctx, req, res, 403, "CONTRACT_FILE_SCOPE_DENIED", "Contract file scope must match the contract project and awarded supplier.", "file.upload.denied", objectType, objectId, contract.projectId);
+      return false;
+    }
+    if (!isProcurementMaintainerRole(req.auth.roleId) || !canReadProject(req, project)) {
+      denyResponse(ctx, req, res, 403, "CONTRACT_FILE_UPLOAD_DENIED", "Only procurement maintainers can upload contract files.", "file.upload.denied", objectType, objectId, contract.projectId);
+      return false;
+    }
+    return true;
+  }
   if (supplierPreParticipationObjectTypes.has(objectType)) {
     if (!isSupplierRole(req.auth.roleId) || !supplierIdMatches(req.auth.user, supplierId)) {
       denyResponse(ctx, req, res, 403, "SUPPLIER_FILE_SCOPE_DENIED", "Only supplier accounts can upload own registration files.", "file.upload.denied", objectType, objectId, projectId);

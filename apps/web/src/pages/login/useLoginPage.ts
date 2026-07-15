@@ -21,7 +21,7 @@ function defaultRoute(roleId: string) {
 }
 
 function postLoginRoute(roleId: string, passwordChangeRequired?: boolean) {
-  if (passwordChangeRequired && ["supplier", "supplier_admin", "supplier_quotation"].includes(roleId)) return "/account-security";
+  if (passwordChangeRequired) return "/account-security";
   return defaultRoute(roleId);
 }
 

@@ -4,6 +4,7 @@ import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../shared/ui/Card';
 import { Network, RefreshCw, Settings, Shield, Users } from 'lucide-react';
+import { AccountManagementPanel } from './AccountManagementPanel';
 import { loadSystemAdminSnapshot, type SystemAdminSnapshot } from './system-admin-runtime';
 
 type Panel = 'permissions' | 'organization';
@@ -216,48 +217,13 @@ export function SystemSettingsView() {
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="border-b border-slate-100">
-                  <CardTitle>账号样本</CardTitle>
-                  <p className="mt-1 text-sm text-slate-500">展示当前可见账号前 10 条。</p>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-slate-50 text-slate-600">
-                        <tr>
-                          <th className="border-b border-slate-200 px-6 py-4">账号</th>
-                          <th className="border-b border-slate-200 px-6 py-4">角色</th>
-                          <th className="border-b border-slate-200 px-6 py-4">组织</th>
-                          <th className="border-b border-slate-200 px-6 py-4">状态</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {(snapshot?.users ?? []).slice(0, 10).map((user) => (
-                          <tr key={user.id}>
-                            <td className="px-6 py-4 font-medium text-slate-900">
-                              {user.name}
-                              <div className="mt-1 text-xs text-slate-400">{user.id}</div>
-                            </td>
-                            <td className="px-6 py-4 text-slate-600">{user.roleId}</td>
-                            <td className="px-6 py-4 text-slate-600">{snapshot?.organizations.find((org) => org.id === user.orgId)?.name ?? user.orgId}</td>
-                            <td className="px-6 py-4">
-                              <Badge variant={statusVariant(user.status)}>{user.status ?? 'active'}</Badge>
-                            </td>
-                          </tr>
-                        ))}
-                        {(snapshot?.users.length ?? 0) === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
-                              当前没有可展示的账号数据。
-                            </td>
-                          </tr>
-                        ) : null}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
+              <AccountManagementPanel
+                users={snapshot?.users ?? []}
+                roles={snapshot?.roles ?? []}
+                organizations={snapshot?.organizations ?? []}
+                currentUserId={currentUser?.id}
+                onReload={load}
+              />
             </>
           )}
         </div>

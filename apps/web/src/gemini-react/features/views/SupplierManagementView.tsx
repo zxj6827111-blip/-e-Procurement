@@ -482,20 +482,21 @@ export function SupplierManagementView() {
           <div className="text-sm text-slate-500">共 {filteredSuppliers.length} 家供应商</div>
         </div>
         <CardContent className="p-0">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-6 py-4">供应商编号</th>
-                <th className="px-6 py-4">企业名称 / 联系人</th>
-                <th className="px-6 py-4">主营品类</th>
-                <th className="px-6 py-4">服务覆盖</th>
-                <th className="px-6 py-4">资质数</th>
-                <th className="px-6 py-4">评分</th>
-                <th className="px-6 py-4">状态</th>
-                <th className="px-6 py-4">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1180px] text-sm text-left">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-6 py-4">供应商编号</th>
+                  <th className="px-6 py-4">企业名称 / 联系人</th>
+                  <th className="px-6 py-4">主营品类</th>
+                  <th className="px-6 py-4">服务覆盖</th>
+                  <th className="px-6 py-4">资质数</th>
+                  <th className="px-6 py-4">评分</th>
+                  <th className="px-6 py-4">状态</th>
+                  <th className="px-6 py-4">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
               {loading ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-12 text-center text-slate-500">供应商数据加载中...</td>
@@ -509,7 +510,7 @@ export function SupplierManagementView() {
                   const status = currentStatus(item);
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/50">
-                      <td className="px-6 py-4 font-mono">{item.id}</td>
+                      <td className="px-6 py-4 whitespace-nowrap font-mono">{item.id}</td>
                       <td className="px-6 py-4">
                         <div className="font-medium text-slate-900">{item.name}</div>
                         <div className="text-xs text-slate-500 mt-1">{item.contactName || '-'} / {item.contactPhone || '-'}</div>
@@ -518,11 +519,11 @@ export function SupplierManagementView() {
                       <td className="px-6 py-4 text-slate-600">{serviceSummary(item)}</td>
                       <td className="px-6 py-4 text-slate-600">{item.qualificationAttachments?.length ?? 0}</td>
                       <td className="px-6 py-4 text-slate-600">{item.evaluationScore ?? '-'}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={statusVariant(status)}>{labelStatus(status)}</Badge>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-nowrap items-center gap-3 whitespace-nowrap">
                           <button className="text-[#006666] text-xs font-medium" onClick={() => setSelectedId(item.id)}>查看详情</button>
                           {canMaintain ? (
                             <button className="text-slate-500 text-xs font-medium" disabled={busy} onClick={() => void toggleSupplierStatus(item)}>
@@ -535,8 +536,9 @@ export function SupplierManagementView() {
                   );
                 })
               )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
 

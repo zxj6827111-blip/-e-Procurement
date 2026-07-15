@@ -14,6 +14,8 @@ import { isSupplierRole, supplierIdMatches } from "../role-groups.js";
 
 const maintainerRoles = new Set(["buyer", "platform_operator"]);
 const readerRoles = new Set(["buyer", "platform_operator", "group_manager", "auditor"]);
+const internalPostContractStatuses = new Set<ProcurementProject["status"]>(["performing", "evaluated", "archived", "closed", "cancelled"]);
+const externalPostContractStatuses = new Set<ProcurementProject["status"]>(["external_performing", "external_evaluated", "external_archived", "external_closed"]);
 
 function denyResponse(
   ctx: AppContext,
@@ -141,6 +143,24 @@ function nextContractId(ctx: AppContext) {
   return id;
 }
 
+function syncProjectAfterContractConfirmation(ctx: AppContext, project: ProcurementProject, contract: ContractLedger, now: string) {
+  const linkedOrders = ctx.state.purchaseOrders.filter(
+    (order) => order.projectId === project.id && order.supplierId === contract.supplierId && !order.contractId
+  );
+  for (const order of linkedOrders) {
+    order.contractId = contract.id;
+    order.updatedAt = now;
+  }
+
+  const postContractStatuses = project.externalTradeFlag ? externalPostContractStatuses : internalPostContractStatuses;
+  if (!postContractStatuses.has(project.status)) {
+    project.status = project.externalTradeFlag ? "external_contract_registered" : "contract_registered";
+    project.displayStatus = "合同已确认";
+  }
+
+  return linkedOrders.length;
+}
+
 function buildContract(ctx: AppContext, req: Request, project: ProcurementProject, supplierId: string, status: ContractLedger["status"], amount: number): ContractLedger {
   const now = new Date().toISOString();
   const id = nextContractId(ctx);
@@ -152,9 +172,7 @@ function buildContract(ctx: AppContext, req: Request, project: ProcurementProjec
     amount,
     status,
     contractSystemLink: req.body?.contractSystemLink ? String(req.body.contractSystemLink) : undefined,
-    attachmentMetadata: Array.isArray(req.body?.attachmentMetadata)
-      ? req.body.attachmentMetadata.map((item: unknown, index: number) => toAttachment(item, `contract-att-${id}-${index + 1}`))
-      : [],
+    attachmentMetadata: [],
     createdBy: req.auth.user.id,
     createdAt: now,
     updatedAt: now
@@ -245,6 +263,64 @@ export function contractPerformanceRoutes(ctx: AppContext) {
     return res.status(201).json({ contract, auditLogId: auditLog.id });
   });
 
+  router.post("/contracts/:contractId/attachments", (req, res) => {
+    const contract = ensureContract(ctx, req.params.contractId, res);
+    if (!contract) return;
+    const project = ensureProject(ctx, contract.projectId, res);
+    if (!project) return;
+    if (!assertMaintainer(ctx, req, res, project, "contract_attachment.create.denied")) return;
+    if (contract.status === "cancelled") {
+      return denyResponse(ctx, req, res, 400, "CONTRACT_CANCELLED", "Cancelled contract cannot receive attachments.", "contract_attachment.create.denied", "contract_ledger", contract.id, project.id);
+    }
+
+    const attachmentIds: string[] = Array.isArray(req.body?.attachmentMetadata)
+      ? req.body.attachmentMetadata.map((item: unknown) => String((item as { id?: unknown } | null)?.id ?? "")).filter(Boolean)
+      : [];
+    if (attachmentIds.length === 0) {
+      return denyResponse(ctx, req, res, 400, "CONTRACT_ATTACHMENT_REQUIRED", "At least one uploaded contract file is required.", "contract_attachment.create.denied", "contract_ledger", contract.id, project.id);
+    }
+
+    const attachments: Array<ProcurementDocumentAttachment | null> = attachmentIds.map((fileId: string) => {
+      const file = ctx.fileStore.get(fileId);
+      if (
+        !file ||
+        file.deletedAt ||
+        file.objectType !== "contract_ledger" ||
+        file.objectId !== contract.id ||
+        file.projectId !== contract.projectId ||
+        file.supplierId !== contract.supplierId
+      ) {
+        return null;
+      }
+      return {
+        id: file.fileId,
+        fileName: file.originalName,
+        contentType: file.contentType,
+        sizeBytes: file.sizeBytes,
+        uploadedAt: file.createdAt
+      };
+    });
+    if (attachments.some((item) => item === null)) {
+      return denyResponse(ctx, req, res, 400, "CONTRACT_ATTACHMENT_INVALID", "Contract attachment must be an active file uploaded for this contract.", "contract_attachment.create.denied", "contract_ledger", contract.id, project.id);
+    }
+
+    const existingIds = new Set(contract.attachmentMetadata.map((item) => item.id));
+    contract.attachmentMetadata = [
+      ...contract.attachmentMetadata,
+      ...attachments.filter((item): item is ProcurementDocumentAttachment => item !== null && !existingIds.has(item.id))
+    ];
+    contract.updatedAt = new Date().toISOString();
+    const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(
+      req.auth,
+      "contract_attachment.create",
+      "contract_ledger",
+      contract.id,
+      project.id,
+      `fileIds=${attachmentIds.join(",")}`
+    );
+    return res.json({ contract, auditLogId: auditLog.id });
+  });
+
   router.post("/projects/:projectId/contracts", (req, res) => {
     const project = ensureProject(ctx, req.params.projectId, res);
     if (!project) return;
@@ -304,19 +380,24 @@ export function contractPerformanceRoutes(ctx: AppContext) {
     if (contract.status === "cancelled") {
       return denyResponse(ctx, req, res, 400, "CONTRACT_CANCELLED", "Cancelled contract cannot be confirmed.", "contract_signing.confirm.denied", "contract_ledger", contract.id, project.id);
     }
-    if (Array.isArray(req.body?.attachmentMetadata) && req.body.attachmentMetadata.length > 0) {
-      const existingCount = contract.attachmentMetadata.length;
-      contract.attachmentMetadata = [
-        ...contract.attachmentMetadata,
-        ...req.body.attachmentMetadata.map((item: unknown, index: number) => toAttachment(item, `contract-confirm-${contract.id}-${existingCount + index + 1}`))
-      ];
+    if (["registered", "performing", "completed"].includes(contract.status)) {
+      return res.json({ contract });
+    }
+    if (contract.attachmentMetadata.length === 0) {
+      return denyResponse(ctx, req, res, 400, "CONTRACT_DOCUMENT_REQUIRED", "Contract document must be uploaded before supplier confirmation.", "contract_signing.confirm.denied", "contract_ledger", contract.id, project.id);
     }
     const now = new Date().toISOString();
     contract.status = "registered";
     contract.updatedAt = now;
-    project.status = project.externalTradeFlag ? "external_contract_registered" : "contract_registered";
-    project.displayStatus = "contract registered";
-    const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(req.auth, "contract_signing.confirm", "contract_ledger", contract.id, project.id, `supplier=${contract.supplierId}`);
+    const linkedOrderCount = syncProjectAfterContractConfirmation(ctx, project, contract, now);
+    const auditLog = ctx.policies.auditRequiredAction.recordSensitiveAction(
+      req.auth,
+      "contract_signing.confirm",
+      "contract_ledger",
+      contract.id,
+      project.id,
+      `supplier=${contract.supplierId};linkedOrders=${linkedOrderCount}`
+    );
     return res.json({ contract, auditLogId: auditLog.id });
   });
 

@@ -40,7 +40,7 @@ function submitTask() {
         <p class="eds-meta">{{ row.title }}</p>
         <p v-if="row.nodeLabel" class="eds-meta">办理环节：{{ row.nodeLabel }} / 处理状态：{{ row.processStatusLabel }}</p>
       </template>
-      <template #business="{ row }">{{ row.businessTypeLabel }} / {{ row.businessId }}</template>
+      <template #business="{ row }">{{ row.projectName }}</template>
       <template #status="{ row }">
         <StatusTag :tone="taskStatusTone(row.status)">{{ row.statusLabel }}</StatusTag>
       </template>
@@ -93,7 +93,7 @@ function submitTask() {
       </header>
       <div class="g-hotel-detail-list">
         <p><span>任务名称：</span>{{ selectedTask.title }}</p>
-        <p><span>关联单据 / 项目：</span>{{ selectedTask.businessTypeLabel }} / {{ selectedTask.businessId }}</p>
+        <p><span>关联项目：</span>{{ selectedTask.projectName }}</p>
         <p><span>任务发起：</span>{{ selectedTask.assigneeLabel }}</p>
         <p><span>到达时间：</span>{{ formatDateTime(selectedTask.createdAt) }}</p>
         <p><span>当前状态：</span>{{ selectedTask.statusLabel }}</p>

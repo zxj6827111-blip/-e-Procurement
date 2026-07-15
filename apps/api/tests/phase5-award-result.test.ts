@@ -44,6 +44,28 @@ async function approveAwardThroughWorkflow(runtime: ReturnType<typeof boot>, app
   return { submitted, approved };
 }
 
+async function uploadAndAttachContractFile(runtime: ReturnType<typeof boot>, contractId: string) {
+  const uploaded = await request(runtime.app)
+    .post("/api/files/upload")
+    .set("x-mock-user-id", "u2")
+    .send({
+      originalName: "award-contract.pdf",
+      contentType: "application/pdf",
+      contentBase64: Buffer.from("%PDF-1.4 award contract").toString("base64"),
+      attachmentKind: "contract_document",
+      objectType: "contract_ledger",
+      objectId: contractId,
+      projectId: "p-award",
+      supplierId: "sup-1"
+    });
+  expect(uploaded.status).toBe(201);
+  const attached = await request(runtime.app)
+    .post(`/api/contracts/${contractId}/attachments`)
+    .set("x-mock-user-id", "u2")
+    .send({ attachmentMetadata: [uploaded.body.file] });
+  expect(attached.status).toBe(200);
+}
+
 describe("Phase 5 award approval and result notification", () => {
   let runtime: ReturnType<typeof boot>;
 
@@ -230,6 +252,29 @@ describe("Phase 5 award approval and result notification", () => {
     const supplierMall = await request(runtime.app).get("/api/mall/products").set("x-mock-user-id", "u11");
     expect(supplierMall.status).toBe(200);
     expect(supplierMall.body.products.some((item: { sourceProjectId?: string; supplierId: string; status: string; activePrice?: unknown }) => item.sourceProjectId === "p-award" && item.supplierId === "sup-1" && item.status === "listed" && item.activePrice)).toBe(true);
+  });
+
+  it("backfills an unlinked historical order without moving a performing project backward", async () => {
+    runtime.ctx.state.contractLedgers = runtime.ctx.state.contractLedgers.filter((item) => item.projectId !== "p-award");
+    const project = runtime.ctx.state.projects.find((item) => item.id === "p-award");
+    const order = runtime.ctx.state.purchaseOrders.find((item) => item.id === "po-award-1");
+    expect(project).toBeDefined();
+    expect(order).toBeDefined();
+    if (!project || !order) throw new Error("seeded award project and order are required");
+    project.status = "performing";
+    project.displayStatus = "履约中";
+    order.contractId = undefined;
+
+    const signing = await request(runtime.app).post("/api/projects/p-award/contracts/signing").set("x-mock-user-id", "u2").send();
+    expect(signing.status).toBe(201);
+
+    await uploadAndAttachContractFile(runtime, signing.body.contract.id);
+
+    const confirmed = await request(runtime.app).post(`/api/contracts/${signing.body.contract.id}/confirm`).set("x-mock-user-id", "u11").send();
+    expect(confirmed.status).toBe(200);
+    expect(project.status).toBe("performing");
+    expect(project.displayStatus).toBe("履约中");
+    expect(order.contractId).toBe(signing.body.contract.id);
   });
 
   it("keeps award result visible when participant list misses the selected supplier", async () => {

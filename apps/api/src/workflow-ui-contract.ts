@@ -305,9 +305,9 @@ export function r8BusinessTargetPath(type: R8ApprovalBusinessType, businessId: s
     archive_supplement: `/archive-audit${suffix}`,
     price_approval: `/award-result${suffix}`,
     mall_order: `/supply-mall${suffix}`,
-    settlement_bill: `/supply-mall${suffix}`,
-    invoice: `/supply-mall${suffix}`,
-    payment_request: `/supply-mall${suffix}`,
+    settlement_bill: `/settlement-materials${suffix}`,
+    invoice: `/settlement-materials${suffix}`,
+    payment_request: `/payment-status${suffix}`,
     return_request: `/supply-mall${suffix}`,
     expert_scoring: `/expert-scoring${suffix}`
   };
@@ -360,10 +360,12 @@ export function toR8WorkflowTaskView(task: R8WorkflowTaskDto, user: R8WorkflowUs
     user.roleId === "expert" && task.businessType === "review_award"
       ? r8BusinessTargetPath("expert_scoring", task.businessId, task.projectId)
       : r8BusinessTargetPath(task.businessType, task.businessId, task.projectId);
+  const taskTypeLabel = r8TaskTypeLabels[task.taskType] ?? r8BusinessTypeLabels[task.businessType] ?? task.taskType;
   return {
     ...task,
+    title: taskTypeLabel,
     businessTypeLabel: r8BusinessTypeLabels[task.businessType] ?? task.businessType,
-    taskTypeLabel: r8TaskTypeLabels[task.taskType] ?? r8BusinessTypeLabels[task.businessType] ?? task.taskType,
+    taskTypeLabel,
     statusLabel: r8LabelStatus(task.status),
     assigneeLabel: task.assigneeUserId ? `指定用户 ${task.assigneeUserId}` : task.assigneeRoleId ? r8RoleLabels[task.assigneeRoleId] ?? task.assigneeRoleId : "未指定",
     targetPath,
